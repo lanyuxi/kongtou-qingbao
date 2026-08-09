@@ -233,6 +233,8 @@ pnpm verify
 
 ### P1-003 — Project 与 Source Catalog
 
+**状态：** DONE
+
 **迁移：** `20260809000300_catalog.sql`
 
 **表：** `projects`、`sources`、`project_sources`。  

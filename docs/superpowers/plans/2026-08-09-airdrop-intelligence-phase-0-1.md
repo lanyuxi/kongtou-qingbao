@@ -192,10 +192,11 @@ project_sources
   authority_domains text[] NOT NULL DEFAULT '{}'
   is_official boolean NOT NULL DEFAULT false
   verified_at timestamptz NULL
-  verified_by uuid NULL -> profiles.id ON DELETE SET NULL
+  verified_by uuid NULL -> profiles.id ON DELETE RESTRICT
   created_at timestamptz NOT NULL DEFAULT now()
   PK (project_id, source_id)
   official rows require authority_domains, verified_at, and verified_by
+  verifier deletion is restricted to preserve verification provenance
 
 signals
   id uuid PK DEFAULT gen_random_uuid()
