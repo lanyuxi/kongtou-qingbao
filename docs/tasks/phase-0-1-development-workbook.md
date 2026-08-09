@@ -241,6 +241,12 @@ pnpm verify
 **索引：** lifecycle、source status、source relation、authority domain GIN。  
 **测试：** slug/URL/分数/官方来源完整性约束；公开只读；普通用户与浏览器 admin 均不可写 canonical catalog。
 
+**安全边界：** 公开角色只能显式读取 active catalog 安全列，不开放候选官方 URL、canonical URL 或 verifier identity；`service_role` 仅后端只读，canonical DML 在 Promotion Service + audit + transactional outbox 落地前保持关闭。
+
+**URL 契约：** 当前阶段仅接受 HTTPS + canonical lowercase DNS host，禁止 userinfo、IP/IPv6 literal、非法 DNS label 和 1..65535 以外的显式端口。
+
+**更新时钟：** material update 使用严格单调 `updated_at`；no-op 保持时间和版本，时间上界耗尽时 fail closed。
+
 **验收：** `pnpm test:db`
 
 **Commit：** `feat(db): add secured project and source catalog`

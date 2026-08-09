@@ -1,6 +1,6 @@
 begin;
 
-select plan(105);
+select plan(135);
 
 select has_table('public', 'projects', 'projects table exists');
 select has_table('public', 'sources', 'sources table exists');
@@ -112,43 +112,155 @@ select is(
 );
 
 select ok(
-  (
-    select procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-      and not procedure.prosecdef
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.valid_authority_domains(text[])'::regprocedure
+  coalesce(
+    (
+      select pg_catalog.pg_get_userbyid(procedure.proowner) = 'postgres'
+        and procedure.provolatile = 'i'
+        and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
+        and not procedure.prosecdef
+      from pg_catalog.pg_proc as procedure
+      where procedure.oid = pg_catalog.to_regprocedure('public.valid_authority_domains(text[])')
+    ),
+    false
   ),
-  'authority-domain validation uses a fixed search path without elevated privileges'
+  'authority-domain validation has the controlled owner and immutable invoker-safe configuration'
 );
 select ok(
-  (
-    select procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-      and not procedure.prosecdef
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.apply_project_material_update()'::regprocedure
+  coalesce(
+    (
+      select pg_catalog.pg_get_userbyid(procedure.proowner) = 'postgres'
+        and procedure.provolatile = 'i'
+        and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
+        and not procedure.prosecdef
+      from pg_catalog.pg_proc as procedure
+      where procedure.oid = pg_catalog.to_regprocedure('public.valid_https_url(text)')
+    ),
+    false
   ),
-  'project versioning uses a fixed search path without elevated privileges'
+  'HTTPS validation has the controlled owner and immutable invoker-safe configuration'
 );
 select ok(
-  (
-    select procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-      and not procedure.prosecdef
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.apply_source_material_update()'::regprocedure
+  coalesce(
+    (
+      select pg_catalog.pg_get_userbyid(procedure.proowner) = 'postgres'
+        and procedure.provolatile = 'v'
+        and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
+        and not procedure.prosecdef
+      from pg_catalog.pg_proc as procedure
+      where procedure.oid = pg_catalog.to_regprocedure('public.apply_project_material_update()')
+    ),
+    false
   ),
-  'source timestamping uses a fixed search path without elevated privileges'
+  'project versioning has the controlled owner and volatile invoker-safe configuration'
 );
 select ok(
-  not has_function_privilege('authenticated', 'public.valid_authority_domains(text[])', 'EXECUTE')
+  coalesce(
+    (
+      select pg_catalog.pg_get_userbyid(procedure.proowner) = 'postgres'
+        and procedure.provolatile = 'v'
+        and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
+        and not procedure.prosecdef
+      from pg_catalog.pg_proc as procedure
+      where procedure.oid = pg_catalog.to_regprocedure('public.apply_source_material_update()')
+    ),
+    false
+  ),
+  'source timestamping has the controlled owner and volatile invoker-safe configuration'
+);
+select ok(
+  not coalesce(
+    has_function_privilege(
+      'anon',
+      pg_catalog.to_regprocedure('public.valid_authority_domains(text[])'),
+      'EXECUTE'
+    ),
+    true
+  )
+    and not coalesce(
+      has_function_privilege(
+        'anon',
+        pg_catalog.to_regprocedure('public.valid_https_url(text)'),
+        'EXECUTE'
+      ),
+      true
+    )
+    and not coalesce(
+      has_function_privilege(
+        'authenticated',
+        pg_catalog.to_regprocedure('public.valid_authority_domains(text[])'),
+        'EXECUTE'
+      ),
+      true
+    )
+    and not coalesce(
+      has_function_privilege(
+        'authenticated',
+        pg_catalog.to_regprocedure('public.valid_https_url(text)'),
+        'EXECUTE'
+      ),
+      true
+    )
+    and not coalesce(
+      has_function_privilege(
+        'service_role',
+        pg_catalog.to_regprocedure('public.valid_authority_domains(text[])'),
+        'EXECUTE'
+      ),
+      true
+    )
+    and not coalesce(
+      has_function_privilege(
+        'service_role',
+        pg_catalog.to_regprocedure('public.valid_https_url(text)'),
+        'EXECUTE'
+      ),
+      true
+    )
+    and not has_function_privilege('anon', 'public.apply_project_material_update()', 'EXECUTE')
+    and not has_function_privilege('anon', 'public.apply_source_material_update()', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.apply_project_material_update()', 'EXECUTE')
-    and not has_function_privilege('authenticated', 'public.apply_source_material_update()', 'EXECUTE'),
-  'authenticated users cannot call catalog validation or trigger functions directly'
-);
-select ok(
-  has_function_privilege('service_role', 'public.valid_authority_domains(text[])', 'EXECUTE')
+    and not has_function_privilege('authenticated', 'public.apply_source_material_update()', 'EXECUTE')
     and not has_function_privilege('service_role', 'public.apply_project_material_update()', 'EXECUTE')
     and not has_function_privilege('service_role', 'public.apply_source_material_update()', 'EXECUTE'),
-  'service role can execute only the pure validator needed by relation constraints'
+  'exposed roles cannot invoke catalog validators or trigger functions directly'
+);
+select ok(
+  has_column_privilege('anon', 'public.projects', 'slug', 'SELECT')
+    and not has_column_privilege('anon', 'public.projects', 'official_website_url', 'SELECT')
+    and has_column_privilege('anon', 'public.sources', 'name', 'SELECT')
+    and not has_column_privilege('anon', 'public.sources', 'canonical_url', 'SELECT')
+    and has_column_privilege('anon', 'public.project_sources', 'verified_at', 'SELECT')
+    and not has_column_privilege('anon', 'public.project_sources', 'verified_by', 'SELECT')
+    and has_column_privilege('authenticated', 'public.projects', 'slug', 'SELECT')
+    and not has_column_privilege(
+      'authenticated',
+      'public.projects',
+      'official_website_url',
+      'SELECT'
+    )
+    and has_column_privilege('authenticated', 'public.sources', 'name', 'SELECT')
+    and not has_column_privilege(
+      'authenticated',
+      'public.sources',
+      'canonical_url',
+      'SELECT'
+    )
+    and has_column_privilege('authenticated', 'public.project_sources', 'verified_at', 'SELECT')
+    and not has_column_privilege(
+      'authenticated',
+      'public.project_sources',
+      'verified_by',
+      'SELECT'
+    )
+    and has_column_privilege(
+      'service_role',
+      'public.projects',
+      'official_website_url',
+      'SELECT'
+    )
+    and has_column_privilege('service_role', 'public.sources', 'canonical_url', 'SELECT')
+    and has_column_privilege('service_role', 'public.project_sources', 'verified_by', 'SELECT'),
+  'column privileges expose safe public fields while reserving links and verifier identity for backend reads'
 );
 
 insert into auth.users (
@@ -380,6 +492,21 @@ select throws_like(
   '%projects_official_website_url_https%',
   'official project URLs reject an empty HTTPS prefix'
 );
+select lives_ok(
+  $$
+    insert into public.projects (slug, name, official_website_url)
+    values ('minimum-port-project', 'Minimum Port Project', 'https://project.example.invalid:1/path')
+  $$,
+  'official project URLs accept the minimum explicit port'
+);
+select throws_like(
+  $$
+    insert into public.projects (slug, name, official_website_url)
+    values ('empty-label-project', 'Empty Label Project', 'https://project..example.invalid')
+  $$,
+  '%projects_official_website_url_https%',
+  'official project URLs reject empty DNS labels'
+);
 
 select throws_like(
   $$insert into public.sources (source_type, name, canonical_url) values ('news', '', 'https://blank-source.example.invalid')$$,
@@ -405,6 +532,134 @@ select throws_like(
   $$insert into public.sources (source_type, name, canonical_url) values ('news', 'Fake HTTPS Source', 'https://')$$,
   '%sources_canonical_url_https%',
   'canonical source URLs reject an empty HTTPS prefix'
+);
+select lives_ok(
+  $$
+    insert into public.sources (source_type, name, canonical_url, status)
+    values (
+      'news',
+      'Maximum Port Source',
+      'https://maximum-port.example.invalid:65535/report',
+      'retired'
+    )
+  $$,
+  'canonical source URLs accept the maximum explicit port'
+);
+select lives_ok(
+  $$
+    insert into public.sources (source_type, name, canonical_url, status)
+    values (
+      'news',
+      'Maximum Label Source',
+      pg_catalog.format('https://%s.example.invalid', pg_catalog.repeat('a', 63)),
+      'retired'
+    )
+  $$,
+  'canonical source URLs accept a 63-character DNS label'
+);
+select lives_ok(
+  $$
+    insert into public.sources (source_type, name, canonical_url, status)
+    values (
+      'news',
+      'Maximum Host Source',
+      pg_catalog.format(
+        'https://%s.%s.%s.%s/path',
+        pg_catalog.repeat('a', 63),
+        pg_catalog.repeat('b', 63),
+        pg_catalog.repeat('c', 63),
+        pg_catalog.repeat('d', 61)
+      ),
+      'retired'
+    )
+  $$,
+  'canonical source URLs accept a 253-character DNS host'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'Leading Hyphen Host', 'https://-bad.example.invalid')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject labels with a leading hyphen'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'Trailing Hyphen Host', 'https://bad-.example.invalid')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject labels with a trailing hyphen'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values (
+      'news',
+      'Overlong Label Source',
+      pg_catalog.format('https://%s.example.invalid', pg_catalog.repeat('a', 64))
+    )
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject DNS labels longer than 63 characters'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values (
+      'news',
+      'Overlong Host Source',
+      pg_catalog.format(
+        'https://%s.%s.%s.%s',
+        pg_catalog.repeat('a', 63),
+        pg_catalog.repeat('b', 63),
+        pg_catalog.repeat('c', 63),
+        pg_catalog.repeat('d', 62)
+      )
+    )
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject DNS hosts longer than 253 characters'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'Userinfo Source', 'https://user@example.invalid')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject userinfo authorities'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'Zero Port Source', 'https://zero-port.example.invalid:0')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject explicit port zero'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'High Port Source', 'https://high-port.example.invalid:65536')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject explicit ports above 65535'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'IPv4 Source', 'https://127.0.0.1/path')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs reject IP literals in this DNS-only catalog phase'
+);
+select throws_like(
+  $$
+    insert into public.sources (source_type, name, canonical_url)
+    values ('news', 'Uppercase Host Source', 'https://Uppercase.example.invalid')
+  $$,
+  '%sources_canonical_url_https%',
+  'canonical source URLs require lowercase canonical DNS hosts'
 );
 select throws_like(
   $$insert into public.sources (source_type, name, canonical_url, reputation_score) values ('news', 'Below Minimum', 'https://below.example.invalid', -0.01)$$,
@@ -634,7 +889,7 @@ select is(
 
 alter table public.projects disable trigger projects_apply_material_update;
 update public.projects
-set updated_at = '2000-01-01 00:00:00+00'
+set updated_at = '2100-01-01 00:00:00+00'
 where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
 alter table public.projects enable trigger projects_apply_material_update;
 
@@ -655,13 +910,14 @@ select is(
   2::bigint,
   'a material project update increments version exactly once'
 );
-select ok(
+select is(
   (
-    select updated_at > '2000-01-01 00:00:00+00'::timestamptz
+    select updated_at
     from public.projects
     where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
   ),
-  'a material project update advances updated_at'
+  '2100-01-01 00:00:00.000001+00'::timestamptz,
+  'a material project update advances a future timestamp by one microsecond'
 );
 
 create temporary table project_update_snapshot as
@@ -695,10 +951,68 @@ select is(
   (select updated_at from project_update_snapshot),
   'a no-op project update does not advance updated_at'
 );
+select throws_like(
+  $$
+    update public.projects
+    set version = 999
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  $$,
+  '%project_system_fields_immutable%',
+  'the owner-side trigger rejects direct project version forgery'
+);
+select throws_like(
+  $$
+    update public.projects
+    set id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa99'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  $$,
+  '%project_system_fields_immutable%',
+  'the owner-side trigger rejects direct project identity rewrites'
+);
+select throws_like(
+  $$
+    update public.projects
+    set created_at = '2099-01-01 00:00:00+00'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  $$,
+  '%project_system_fields_immutable%',
+  'the owner-side trigger rejects direct project creation-time rewrites'
+);
+select throws_like(
+  $$
+    update public.projects
+    set updated_at = '2099-01-01 00:00:00+00'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  $$,
+  '%project_system_fields_immutable%',
+  'the owner-side trigger rejects direct project update-time rewrites'
+);
+
+alter table public.projects disable trigger projects_apply_material_update;
+update public.projects
+set updated_at = 'infinity'::timestamptz
+where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+alter table public.projects enable trigger projects_apply_material_update;
+
+select throws_like(
+  $$
+    update public.projects
+    set summary = 'Timestamp exhaustion must fail closed'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  $$,
+  '%catalog_updated_at_exhausted%',
+  'project updates fail closed when no strictly later timestamp exists'
+);
+
+alter table public.projects disable trigger projects_apply_material_update;
+update public.projects
+set updated_at = '2100-01-01 00:00:00.000001+00'
+where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+alter table public.projects enable trigger projects_apply_material_update;
 
 alter table public.sources disable trigger sources_apply_material_update;
 update public.sources
-set updated_at = '2000-01-01 00:00:00+00'
+set updated_at = '2100-01-01 00:00:00+00'
 where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
 alter table public.sources enable trigger sources_apply_material_update;
 
@@ -710,13 +1024,14 @@ select lives_ok(
   $$,
   'a material source update is accepted'
 );
-select ok(
+select is(
   (
-    select updated_at > '2000-01-01 00:00:00+00'::timestamptz
+    select updated_at
     from public.sources
     where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
   ),
-  'a material source update advances updated_at'
+  '2100-01-01 00:00:00.000001+00'::timestamptz,
+  'a material source update advances a future timestamp by one microsecond'
 );
 
 create temporary table source_update_snapshot as
@@ -741,6 +1056,55 @@ select is(
   (select updated_at from source_update_snapshot),
   'a no-op source update does not advance updated_at'
 );
+select throws_like(
+  $$
+    update public.sources
+    set id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb99'
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  $$,
+  '%source_system_fields_immutable%',
+  'the owner-side trigger rejects direct source identity rewrites'
+);
+select throws_like(
+  $$
+    update public.sources
+    set created_at = '2099-01-01 00:00:00+00'
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  $$,
+  '%source_system_fields_immutable%',
+  'the owner-side trigger rejects direct source creation-time rewrites'
+);
+select throws_like(
+  $$
+    update public.sources
+    set updated_at = '2099-01-01 00:00:00+00'
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  $$,
+  '%source_system_fields_immutable%',
+  'the owner-side trigger rejects direct source update-time rewrites'
+);
+
+alter table public.sources disable trigger sources_apply_material_update;
+update public.sources
+set updated_at = 'infinity'::timestamptz
+where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+alter table public.sources enable trigger sources_apply_material_update;
+
+select throws_like(
+  $$
+    update public.sources
+    set reputation_score = 76
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  $$,
+  '%catalog_updated_at_exhausted%',
+  'source updates fail closed when no strictly later timestamp exists'
+);
+
+alter table public.sources disable trigger sources_apply_material_update;
+update public.sources
+set updated_at = '2100-01-01 00:00:00.000001+00'
+where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1';
+alter table public.sources enable trigger sources_apply_material_update;
 
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -764,6 +1128,21 @@ select results_eq(
     )
   $$,
   'anonymous users see relations only when both catalog parents are active'
+);
+select throws_like(
+  $$select official_website_url from public.projects$$,
+  'permission denied for table projects',
+  'anonymous users cannot read unpromoted official project links'
+);
+select throws_like(
+  $$select canonical_url from public.sources$$,
+  'permission denied for table sources',
+  'anonymous users cannot read unpromoted canonical source links'
+);
+select throws_like(
+  $$select verified_by from public.project_sources$$,
+  'permission denied for table project_sources',
+  'anonymous users cannot read verifier identities'
 );
 select ok(
   not has_any_column_privilege('anon', 'public.projects', 'INSERT,UPDATE')
@@ -809,6 +1188,21 @@ select results_eq(
     )
   $$,
   'an authenticated owner sees relations only when both catalog parents are active'
+);
+select throws_like(
+  $$select official_website_url from public.projects$$,
+  'permission denied for table projects',
+  'an authenticated owner cannot read unpromoted official project links'
+);
+select throws_like(
+  $$select canonical_url from public.sources$$,
+  'permission denied for table sources',
+  'an authenticated owner cannot read unpromoted canonical source links'
+);
+select throws_like(
+  $$select verified_by from public.project_sources$$,
+  'permission denied for table project_sources',
+  'an authenticated owner cannot read verifier identities'
 );
 select ok(
   not has_any_column_privilege('authenticated', 'public.projects', 'INSERT,UPDATE')
@@ -892,6 +1286,21 @@ select results_eq(
   $$,
   'a browser admin still sees only active catalog relations'
 );
+select throws_like(
+  $$select official_website_url from public.projects$$,
+  'permission denied for table projects',
+  'a browser admin cannot read unpromoted official project links'
+);
+select throws_like(
+  $$select canonical_url from public.sources$$,
+  'permission denied for table sources',
+  'a browser admin cannot read unpromoted canonical source links'
+);
+select throws_like(
+  $$select verified_by from public.project_sources$$,
+  'permission denied for table project_sources',
+  'a browser admin cannot read verifier identities'
+);
 select ok(
   not has_any_column_privilege('authenticated', 'public.projects', 'INSERT,UPDATE')
     and not has_any_column_privilege('authenticated', 'public.sources', 'INSERT,UPDATE')
@@ -913,109 +1322,118 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.projects), 2, 'service role can read every project lifecycle');
-select is((select count(*)::integer from public.sources), 4, 'service role can read every source status');
+select is((select count(*)::integer from public.projects), 3, 'service role can read every project lifecycle');
+select is((select count(*)::integer from public.sources), 7, 'service role can read every source status');
 select is((select count(*)::integer from public.project_sources), 3, 'service role can read every catalog relation');
-select lives_ok(
+select is(
+  (
+    select official_website_url
+    from public.projects
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+  ),
+  'https://active.example.invalid',
+  'service role can read official project-link candidates'
+);
+select is(
+  (
+    select canonical_url
+    from public.sources
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  ),
+  'https://docs.active.example.invalid/start',
+  'service role can read canonical source-link candidates'
+);
+select is(
+  (
+    select verified_by
+    from public.project_sources
+    where project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+      and source_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  ),
+  '44444444-4444-4444-8444-444444444444'::uuid,
+  'service role can read verifier provenance'
+);
+select throws_like(
   $$
     insert into public.projects (slug, name, lifecycle)
-    values ('service-project', 'Service Project', 'active')
+    values ('blocked-service-project', 'Blocked Service Project', 'active')
   $$,
-  'service role can insert a project through defaulted system columns'
+  'permission denied for table projects',
+  'service role cannot insert canonical projects before Promotion Service exists'
 );
-select lives_ok(
-  $$update public.projects set summary = 'Service update' where slug = 'service-project'$$,
-  'service role can update project business fields'
-);
-select lives_ok(
+select throws_like(
   $$
     insert into public.sources (source_type, name, canonical_url)
-    values ('official_docs', 'Service Source', 'https://service-source.example.invalid')
+    values ('official_docs', 'Blocked Service Source', 'https://blocked-service.example.invalid')
   $$,
-  'service role can insert a source through defaulted system columns'
+  'permission denied for table sources',
+  'service role cannot insert canonical sources before Promotion Service exists'
 );
-select lives_ok(
-  $$update public.sources set reputation_score = 80 where name = 'Service Source'$$,
-  'service role can update source business fields'
-);
-select lives_ok(
+select throws_like(
   $$
     insert into public.project_sources (project_id, source_id)
-    select project.id, source.id
-    from public.projects as project
-    cross join public.sources as source
-    where project.slug = 'service-project'
-      and source.name = 'Service Source'
+    values (
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'
+    )
   $$,
-  'service role can insert a project-source relation'
+  'permission denied for table project_sources',
+  'service role cannot insert canonical relations before Promotion Service exists'
 );
-select lives_ok(
+select throws_like(
   $$
-    update public.project_sources
-    set authority_domains = array['service-source.example.invalid']
-    where project_id = (select id from public.projects where slug = 'service-project')
-      and source_id = (select id from public.sources where name = 'Service Source')
+    update public.projects
+    set summary = 'Blocked service rewrite'
+    where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
   $$,
-  'service role can update relation verification fields'
-);
-select throws_like(
-  $$update public.projects set version = 1 where slug = 'service-project'$$,
   'permission denied for table projects',
-  'service role cannot forge or roll back a project version'
+  'service role cannot update canonical projects before Promotion Service exists'
 );
 select throws_like(
-  $$update public.projects set created_at = now() where slug = 'service-project'$$,
-  'permission denied for table projects',
-  'service role cannot forge project creation time'
-);
-select throws_like(
-  $$update public.projects set id = gen_random_uuid() where slug = 'service-project'$$,
-  'permission denied for table projects',
-  'service role cannot rewrite project identity'
-);
-select throws_like(
-  $$update public.sources set created_at = now() where name = 'Service Source'$$,
+  $$
+    update public.sources
+    set reputation_score = 80
+    where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
+  $$,
   'permission denied for table sources',
-  'service role cannot forge source creation time'
-);
-select throws_like(
-  $$update public.sources set id = gen_random_uuid() where name = 'Service Source'$$,
-  'permission denied for table sources',
-  'service role cannot rewrite source identity'
+  'service role cannot update canonical sources before Promotion Service exists'
 );
 select throws_like(
   $$
     update public.project_sources
-    set is_official = true
-    where project_id = (select id from public.projects where slug = 'service-project')
-      and source_id = (select id from public.sources where name = 'Service Source')
+    set verified_by = null
+    where project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
+      and source_id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1'
   $$,
-  '%project_sources_official_verification_complete%',
-  'service role cannot turn an incomplete relation into an official relation'
+  'permission denied for table project_sources',
+  'service role cannot overwrite official relation provenance before Promotion Service exists'
 );
 select throws_like(
-  $$delete from public.projects where slug = 'service-project'$$,
+  $$delete from public.projects where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'$$,
   'permission denied for table projects',
   'service role cannot physically delete canonical projects'
 );
 select throws_like(
-  $$delete from public.sources where name = 'Service Source'$$,
+  $$delete from public.sources where id = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2'$$,
   'permission denied for table sources',
   'service role cannot physically delete canonical sources'
 );
 select throws_like(
   $$
     delete from public.project_sources
-    where project_id = (select id from public.projects where slug = 'service-project')
+    where project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
   $$,
   'permission denied for table project_sources',
   'service role cannot physically delete canonical relations'
 );
 select ok(
-  not has_table_privilege('service_role', 'public.projects', 'DELETE,TRUNCATE')
+  not has_any_column_privilege('service_role', 'public.projects', 'INSERT,UPDATE')
+    and not has_any_column_privilege('service_role', 'public.sources', 'INSERT,UPDATE')
+    and not has_any_column_privilege('service_role', 'public.project_sources', 'INSERT,UPDATE')
+    and not has_table_privilege('service_role', 'public.projects', 'DELETE,TRUNCATE')
     and not has_table_privilege('service_role', 'public.sources', 'DELETE,TRUNCATE')
     and not has_table_privilege('service_role', 'public.project_sources', 'DELETE,TRUNCATE'),
-  'service role receives neither delete nor truncate on catalog tables'
+  'service role receives read only and no catalog mutation privilege'
 );
 
 reset role;

@@ -41,6 +41,63 @@ begin
 end;
 $$;
 
+create function public.valid_https_url(candidate_url text)
+returns boolean
+language plpgsql
+immutable
+set search_path = pg_catalog, public
+as $$
+declare
+  authority text;
+  host_name text;
+  port_text text;
+  colon_count integer;
+begin
+  if candidate_url is null
+    or candidate_url <> pg_catalog.btrim(candidate_url)
+    or candidate_url !~ '^https://'
+    or candidate_url ~ '[[:space:][:cntrl:]]'
+  then
+    return false;
+  end if;
+
+  authority := pg_catalog.substring(candidate_url, '^https://([^/?#]+)');
+
+  if authority is null
+    or authority = ''
+    or pg_catalog.strpos(authority, '@') > 0
+  then
+    return false;
+  end if;
+
+  colon_count := pg_catalog.char_length(authority)
+    - pg_catalog.char_length(pg_catalog.replace(authority, ':', ''));
+
+  if colon_count > 1 then
+    return false;
+  end if;
+
+  if colon_count = 1 then
+    host_name := pg_catalog.split_part(authority, ':', 1);
+    port_text := pg_catalog.split_part(authority, ':', 2);
+
+    if port_text !~ '^[0-9]{1,5}$'
+      or port_text::integer not between 1 and 65535
+    then
+      return false;
+    end if;
+  else
+    host_name := authority;
+  end if;
+
+  if host_name ~ '^[0-9]+(\.[0-9]+){3}$' then
+    return false;
+  end if;
+
+  return public.valid_authority_domains(array[host_name]);
+end;
+$$;
+
 create function public.apply_project_material_update()
 returns trigger
 language plpgsql
@@ -73,7 +130,22 @@ begin
   )
   then
     new.version := old.version + 1;
-    new.updated_at := pg_catalog.clock_timestamp();
+
+    if not pg_catalog.isfinite(old.updated_at) then
+      raise exception 'catalog_updated_at_exhausted'
+        using errcode = 'datetime_field_overflow';
+    end if;
+
+    begin
+      new.updated_at := greatest(
+        pg_catalog.clock_timestamp(),
+        old.updated_at + interval '1 microsecond'
+      );
+    exception
+      when datetime_field_overflow then
+        raise exception 'catalog_updated_at_exhausted'
+          using errcode = 'datetime_field_overflow';
+    end;
   else
     new.version := old.version;
     new.updated_at := old.updated_at;
@@ -111,7 +183,21 @@ begin
     old.reputation_score
   )
   then
-    new.updated_at := pg_catalog.clock_timestamp();
+    if not pg_catalog.isfinite(old.updated_at) then
+      raise exception 'catalog_updated_at_exhausted'
+        using errcode = 'datetime_field_overflow';
+    end if;
+
+    begin
+      new.updated_at := greatest(
+        pg_catalog.clock_timestamp(),
+        old.updated_at + interval '1 microsecond'
+      );
+    exception
+      when datetime_field_overflow then
+        raise exception 'catalog_updated_at_exhausted'
+          using errcode = 'datetime_field_overflow';
+    end;
   else
     new.updated_at := old.updated_at;
   end if;
@@ -152,7 +238,7 @@ create table public.projects (
   ),
   constraint projects_official_website_url_https check (
     official_website_url is null
-    or official_website_url ~ '^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?([/?#][^[:space:]]*)?$'
+    or public.valid_https_url(official_website_url)
   ),
   constraint projects_version_positive check (version > 0)
 );
@@ -171,7 +257,7 @@ create table public.sources (
     and pg_catalog.char_length(name) between 1 and 160
   ),
   constraint sources_canonical_url_https check (
-    canonical_url ~ '^https://[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?(:[0-9]{1,5})?([/?#][^[:space:]]*)?$'
+    public.valid_https_url(canonical_url)
   ),
   constraint sources_reputation_score_bounds check (
     reputation_score between 0 and 100
@@ -230,24 +316,16 @@ revoke all on table public.projects from public, anon, authenticated, service_ro
 revoke all on table public.sources from public, anon, authenticated, service_role;
 revoke all on table public.project_sources from public, anon, authenticated, service_role;
 
-grant select on table public.projects to anon, authenticated, service_role;
-grant select on table public.sources to anon, authenticated, service_role;
-grant select on table public.project_sources to anon, authenticated, service_role;
+grant select (id, slug, name, summary, lifecycle, primary_chain, version, created_at, updated_at)
+on public.projects to anon, authenticated;
+grant select (id, source_type, name, status, reputation_score, created_at, updated_at)
+on public.sources to anon, authenticated;
+grant select (project_id, source_id, authority_domains, is_official, verified_at, created_at)
+on public.project_sources to anon, authenticated;
 
-grant insert (slug, name, summary, lifecycle, primary_chain, official_website_url)
-on public.projects to service_role;
-grant update (slug, name, summary, lifecycle, primary_chain, official_website_url)
-on public.projects to service_role;
-
-grant insert (source_type, name, canonical_url, status, reputation_score)
-on public.sources to service_role;
-grant update (source_type, name, canonical_url, status, reputation_score)
-on public.sources to service_role;
-
-grant insert (project_id, source_id, authority_domains, is_official, verified_at, verified_by)
-on public.project_sources to service_role;
-grant update (authority_domains, is_official, verified_at, verified_by)
-on public.project_sources to service_role;
+grant select on table public.projects to service_role;
+grant select on table public.sources to service_role;
+grant select on table public.project_sources to service_role;
 
 create policy projects_read_active
 on public.projects
@@ -281,7 +359,6 @@ using (
 );
 
 revoke all on function public.valid_authority_domains(text[]) from public, anon, authenticated, service_role;
+revoke all on function public.valid_https_url(text) from public, anon, authenticated, service_role;
 revoke all on function public.apply_project_material_update() from public, anon, authenticated, service_role;
 revoke all on function public.apply_source_material_update() from public, anon, authenticated, service_role;
-
-grant execute on function public.valid_authority_domains(text[]) to service_role;

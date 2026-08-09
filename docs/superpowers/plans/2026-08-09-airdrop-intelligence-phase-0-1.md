@@ -171,7 +171,7 @@ projects
   summary text NULL, length <= 1000
   lifecycle project_lifecycle NOT NULL DEFAULT 'rumored'
   primary_chain text NULL, trimmed length 1..80
-  official_website_url text NULL, HTTPS when present
+  official_website_url text NULL, HTTPS with a canonical lowercase DNS host when present
   version bigint NOT NULL DEFAULT 1, check > 0
   created_at timestamptz NOT NULL DEFAULT now()
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -180,7 +180,7 @@ sources
   id uuid PK DEFAULT gen_random_uuid()
   source_type source_type NOT NULL
   name text NOT NULL, trimmed length 1..160
-  canonical_url text UNIQUE NOT NULL, HTTPS
+  canonical_url text UNIQUE NOT NULL, HTTPS with a canonical lowercase DNS host
   status source_status NOT NULL DEFAULT 'active'
   reputation_score numeric(5,2) NOT NULL DEFAULT 50, check 0..100
   created_at timestamptz NOT NULL DEFAULT now()
@@ -284,9 +284,11 @@ user_roles(user_id, role) WHERE revoked_at IS NULL
 user_tasks(user_id, status, due_at)
 ```
 
-- Public read: active catalog rows, published signals, approved score history, approved views.
+- Public read: safe columns from active catalog rows, published signals, approved score history, approved views.
+- Catalog link candidates (`official_website_url`, `canonical_url`) and verifier identity remain backend-only until Promotion Service verification and allowlisting exist.
 - Owner-only: profiles, watchlists, watchlist projects, user projects, user tasks.
-- Service-only write: projects, sources, project sources, signals, project scores.
+- Catalog canonical writes are closed even to `service_role` in Phase 1; a future Promotion Service must open a dedicated audited write path with transactional outbox events.
+- Service-only write: signals, project scores.
 - Append-only through exposed roles: role history, signals, project scores.
 
 # Phase 0 — Executable Repository Foundation
@@ -454,7 +456,7 @@ export type WorkerHealth = {
 - [ ] Test public reads of active catalog and denial of all ordinary/admin browser writes.
 - [ ] Run database tests; observe failures.
 - [ ] Implement constraints, material-update project versioning, updated-at triggers, indexes, RLS, and explicit grants.
-- [ ] Reserve canonical writes for service backend and the future Promotion Service.
+- [ ] Keep canonical catalog writes closed until Promotion Service, audit events, and transactional outbox delivery exist.
 
 **Acceptance:** `pnpm test:db`
 
