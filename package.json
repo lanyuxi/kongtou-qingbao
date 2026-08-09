@@ -1,0 +1,32 @@
+{
+  "name": "airdrop-intelligence-os",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.16.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @airdrop/web --filter @airdrop/worker dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "test:db": "supabase db reset && supabase test db",
+    "db:types": "supabase gen types typescript --local > packages/database/src/generated/database.types.ts",
+    "check:placeholders": "node scripts/check-placeholders.mjs",
+    "verify-env": "node scripts/verify-env.mjs",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:placeholders",
+    "verify:full": "pnpm verify && pnpm test:db"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.4",
+    "eslint": "^10.8.1",
+    "prettier": "^3.9.6",
+    "supabase": "^2.112.0",
+    "tsx": "^4.23.11",
+    "typescript": "^7.0.2",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

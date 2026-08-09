@@ -76,6 +76,8 @@ flowchart LR
 
 ### P0-001 — Monorepo 与质量基线
 
+**状态：** DONE
+
 **目标：** 空目录可通过冻结锁文件安装，并具备统一 lint、typecheck、test、build、占位符扫描命令。
 
 **创建：**
@@ -343,4 +345,3 @@ git status --short
 ## 7. Phase 1 完成后的下一入口
 
 Phase 2 从以下顺序开始：Raw Item/Source Adapter → Durable Queue → AI Run/Candidate → Grounding → Dedup/Conflict → Human Review → Promotion/Audit/Outbox。Phase 0/1 不提前实现这些能力。
-

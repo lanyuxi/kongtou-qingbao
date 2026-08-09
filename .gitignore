@@ -1,0 +1,11 @@
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+.next/
+.env
+.env.local
+.env.*.local
+!.env.example
+supabase/.temp/
+packages/database/src/generated/database.types.ts
