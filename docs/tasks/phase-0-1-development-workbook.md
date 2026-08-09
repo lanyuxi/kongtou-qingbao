@@ -201,9 +201,11 @@ pnpm verify
 
 ### P1-001 — Extensions 与 Enum
 
+**状态：** DONE
+
 **迁移：** `20260809000100_extensions_and_types.sql`
 
-**内容：** `pgcrypto`；`app_role`、`project_lifecycle`、`source_status`、`signal_verification`、`signal_lifecycle`、`risk_level`、`recommendation`、`task_status`、`task_priority`。
+**内容：** `pgcrypto`；`app_role`、`project_lifecycle`、`source_type`、`source_status`、`signal_verification`、`signal_lifecycle`、`risk_level`、`recommendation`、`participation_status`、`task_status`、`task_priority`。
 
 **测试：** `001_schema.test.sql` 精确验证扩展与枚举值/顺序。
 
