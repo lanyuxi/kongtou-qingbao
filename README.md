@@ -2,77 +2,19 @@
 
 Airdrop Intelligence OS is a Web3 decision platform for evaluating legitimate public participation opportunities. It never asks for or stores seed phrases, private keys, wallet passwords, or signing secrets.
 
-## Prerequisites
+## Quick start
 
-- Node.js 22 or later
-- pnpm 11
-- Docker Desktop, for local Supabase
+Install Node.js 22+, pnpm 11, and Docker Desktop, then follow the [local development runbook](docs/runbooks/local-development.md). It covers local configuration, ports, startup, the local-only database reset, verification, and shutdown.
 
-## Install
+The root quality gate is:
 
 ```bash
 pnpm install --frozen-lockfile
-cp .env.example .env.local
-```
-
-Use local, non-production values in `.env.local`. Do not commit it. Confirm the required names are set without displaying their values:
-
-```bash
-pnpm verify-env
-```
-
-## Database
-
-Start the local Supabase stack:
-
-```bash
-pnpm db:start
-```
-
-Reset the local database and run database integration tests:
-
-```bash
-pnpm test:db
-```
-
-Generate local database types after schema changes:
-
-```bash
-pnpm db:types
-```
-
-## Development
-
-Start the web and worker applications together after their workspace packages are present:
-
-```bash
-pnpm dev
-```
-
-## Verification
-
-Run the root quality gate:
-
-```bash
 pnpm verify
 ```
 
-Run the full gate, including the local database suite:
+After Phase 1 database files are present, `pnpm verify:full` also starts from the local Supabase database integration suite. `pnpm test:db` resets the local database and must never target shared, staging, or production data.
 
-```bash
-pnpm verify:full
-```
+## Architecture
 
-Check the repository for unfinished implementation markers:
-
-```bash
-pnpm check:placeholders
-```
-
-## Shutdown
-
-Stop the local Supabase stack when finished:
-
-```bash
-pnpm db:stop
-```
+See [the Phase 0/1 architecture](docs/architecture/phase-0-1.md) for module boundaries, dependency direction, trust boundaries, and the execution model.

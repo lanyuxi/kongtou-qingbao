@@ -180,6 +180,8 @@ pnpm --filter @airdrop/worker build
 
 ### P0-005 — CI、架构说明与本地 Runbook
 
+**状态：** DONE
+
 **目标：** 新环境可依据文档完成安装、验证、启动和停止；PR 自动执行质量门。
 
 **创建：** `.github/workflows/ci.yml`、`docs/architecture/phase-0-1.md`、`docs/runbooks/local-development.md`。
