@@ -151,13 +151,15 @@ profiles
   updated_at timestamptz NOT NULL DEFAULT now()
 
 user_roles
-  user_id uuid NOT NULL -> profiles.id ON DELETE CASCADE
+  user_id uuid NOT NULL -> profiles.id ON DELETE RESTRICT
   role app_role NOT NULL
-  granted_by uuid NULL -> profiles.id ON DELETE SET NULL
+  granted_by uuid NULL -> profiles.id ON DELETE RESTRICT
   granted_at timestamptz NOT NULL DEFAULT now()
   revoked_at timestamptz NULL, later than granted_at when present
   PK (user_id, role, granted_at)
 ```
+
+Both `user_roles` foreign keys restrict profile deletion so neither grant ownership nor grant provenance can be physically deleted or silently rewritten.
 
 ### Catalog and decision-history tables
 
@@ -429,6 +431,7 @@ export type WorkerHealth = {
 - [ ] Run database tests; observe identity failures.
 - [ ] Implement tables, triggers, active-role index, explicit grants, and RLS.
 - [ ] Keep revocation as `revoked_at`; never delete role history.
+- [ ] Restrict deletion of profiles referenced by role history, including grant provenance.
 
 **Acceptance:** `pnpm test:db`
 
