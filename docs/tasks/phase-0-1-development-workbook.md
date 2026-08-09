@@ -271,13 +271,17 @@ pnpm verify
 
 ### P1-005 — Watchlist、User Project 与 Task
 
+**状态：** DONE
+
 **迁移：** `20260809000500_execution.sql`
 
 **表：** `watchlists`、`watchlist_projects`、`user_projects`、`user_tasks`。  
-**函数：** `update_user_task(task_id, expected_version, patch)`。  
+**函数：** `update_user_task(task_id, expected_version, patch)`；仅允许严格类型化字段，material patch 原子递增版本，no-op 保持版本与时间。
 **约束：** 每用户仅一个默认 watchlist；完成任务必须有 `completed_at`；owner 不可被更新。
 
-**测试：** owner/non-owner、跨用户关联、RLS `using`/`with check`、stale version conflict、admin 私密笔记拒绝。
+**测试：** exact schema/FK/ACL、owner/non-owner、跨用户关联、RLS `using`/`with check`、JSON patch 类型、稳定 PT404/PT409、stale version conflict、admin/service role 私密数据拒绝。
+
+**安全边界：** `user_tasks` 不开放直接 UPDATE；authenticated owner 只能通过 fixed-search-path command 更新自己的任务。普通 admin 角色不获得私有数据支持权限，`service_role` 也无表权限或函数 EXECUTE。
 
 **验收：** `pnpm test:db`
 

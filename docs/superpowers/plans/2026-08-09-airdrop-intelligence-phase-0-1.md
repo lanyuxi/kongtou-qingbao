@@ -485,17 +485,19 @@ Published signals require `published_at`. Signal supersession uses a same-projec
 
 ## Task 1.5: Add private watchlists, tracking, and tasks
 
-**Files:** Create `supabase/migrations/20260809000500_execution.sql`, `supabase/tests/004_execution_rls.test.sql`.
+**Files:** Create `supabase/migrations/20260809000500_execution.sql`, `supabase/tests/005_execution_rls.test.sql`.
 
 **Tables:** `watchlists`, `watchlist_projects`, `user_projects`, `user_tasks`; every private aggregate carries or resolves to `user_id`.
 
-- [ ] Test owner-only CRUD, cross-owner denial, immutable ownership, and cross-owner watchlist attachment denial.
-- [ ] Test one default watchlist per user via partial unique index.
-- [ ] Test `completed_at` is present exactly for completed tasks.
-- [ ] Test versioned `update_user_task(task_id, expected_version, patch)` rejects stale versions with a stable conflict code.
-- [ ] Run database tests; observe failures.
-- [ ] Implement constraints, both `using` and `with check` RLS clauses, safe function search path, and allowed patch fields.
-- [ ] Confirm admin cannot read private notes without a separately approved support workflow.
+- [x] Test owner-only CRUD, cross-owner denial, immutable ownership, and cross-owner watchlist attachment denial.
+- [x] Test one default watchlist per user via partial unique index.
+- [x] Test `completed_at` is present exactly for completed tasks.
+- [x] Test versioned `update_user_task(task_id, expected_version, patch)` rejects stale versions with a stable conflict code.
+- [x] Run database tests; observe missing-table failures.
+- [x] Implement constraints, both `using` and `with check` RLS clauses, safe function search path, and strictly typed allowed patch fields.
+- [x] Confirm admin and service role cannot read private notes without a separately approved support workflow.
+
+`update_user_task` is the only task update path. It validates JSON value types, normalizes malformed scalar values to `22023 / user_task_patch_invalid`, returns stable `PT404`/`PT409` errors, and increments the version atomically only for material changes. Empty and value-identical patches are no-ops.
 
 **Acceptance:** `pnpm test:db`
 
