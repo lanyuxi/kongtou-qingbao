@@ -113,6 +113,8 @@ pnpm check:placeholders
 
 ### P0-002 — Contracts 与纯 Domain
 
+**状态：** DONE
+
 **目标：** 建立 API/Job 唯一契约来源和不依赖基础设施的领域原语。
 
 **创建：** `packages/contracts/**`、`packages/domain/**`。
