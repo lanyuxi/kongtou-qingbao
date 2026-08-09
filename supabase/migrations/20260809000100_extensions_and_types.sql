@@ -1,3 +1,20 @@
+do $$
+declare
+  existing_schema text;
+begin
+  select extension_namespace.nspname::text
+  into existing_schema
+  from pg_catalog.pg_extension as installed_extension
+  join pg_catalog.pg_namespace as extension_namespace on extension_namespace.oid = installed_extension.extnamespace
+  where installed_extension.extname = 'pgcrypto';
+
+  if existing_schema is not null and existing_schema <> 'extensions' then
+    raise exception 'pgcrypto must be installed in the extensions schema, found %', existing_schema
+      using errcode = 'invalid_schema_name';
+  end if;
+end
+$$;
+
 create extension if not exists pgcrypto with schema extensions;
 
 create type public.app_role as enum (

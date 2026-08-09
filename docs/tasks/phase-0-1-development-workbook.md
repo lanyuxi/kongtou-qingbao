@@ -207,7 +207,9 @@ pnpm verify
 
 **内容：** `pgcrypto`；`app_role`、`project_lifecycle`、`source_type`、`source_status`、`signal_verification`、`signal_lifecycle`、`risk_level`、`recommendation`、`participation_status`、`task_status`、`task_priority`。
 
-**测试：** `001_schema.test.sql` 精确验证扩展与枚举值/顺序。
+**契约：** `packages/contracts` 是 11 个枚举 Schema/Type 的唯一定义源；`packages/domain` 仅保留同一 Schema 实例的兼容性重导出。
+
+**测试：** `001_schema.test.sql` 精确验证 `pgcrypto` 位于 `extensions` Schema 以及枚举值/顺序。
 
 **验收：** `pnpm db:start && pnpm test:db`
 

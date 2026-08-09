@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@airdrop/contracts": "workspace:*",
     "zod": "^4.1.12"
   }
 }

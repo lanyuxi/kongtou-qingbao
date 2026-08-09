@@ -400,13 +400,13 @@ export type WorkerHealth = {
 
 ## Task 1.1: Add Supabase extensions and enums
 
-**Files:** Create `supabase/config.toml`, `supabase/seed.sql`, `supabase/migrations/20260809000100_extensions_and_types.sql`, `supabase/tests/001_schema.test.sql`, `packages/domain/src/source.ts`, `packages/domain/src/signal.ts`, `packages/domain/src/task.ts`; modify `packages/domain/src/index.ts`; extend domain tests.
+**Files:** Create `supabase/config.toml`, `supabase/seed.sql`, `supabase/migrations/20260809000100_extensions_and_types.sql`, `supabase/tests/001_schema.test.sql`, `packages/contracts/src/enums.ts`, `packages/contracts/src/tests/enums.test.ts`, `packages/domain/src/source.ts`, `packages/domain/src/signal.ts`, `packages/domain/src/task.ts`; modify both package roots, domain compatibility modules, and workspace dependency metadata; extend domain tests.
 
 **Schema:** `pgcrypto` and every enum listed in the Phase 1 Schema Contract.
 
 - [ ] Run `pnpm exec supabase init` only if config is absent; pin and document local ports.
-- [ ] Add strict domain schemas for every enum before adding its PostgreSQL equivalent.
-- [ ] Write pgTAP tests for the extension and exact enum values/order.
+- [ ] Add strict canonical schemas in `packages/contracts` for every enum before adding its PostgreSQL equivalent; `packages/domain` compatibility-imports and re-exports those same schema instances.
+- [ ] Write pgTAP tests for the extension's exact `extensions` namespace and exact enum values/order.
 - [ ] Run `pnpm test:db`; expect missing-schema failure.
 - [ ] Implement only extensions and enums in this migration; rerun to green.
 

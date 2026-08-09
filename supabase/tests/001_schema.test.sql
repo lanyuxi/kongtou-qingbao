@@ -1,6 +1,6 @@
 begin;
 
-select plan(12);
+select plan(13);
 
 select ok(
   exists (
@@ -9,6 +9,17 @@ select ok(
     where extname = 'pgcrypto'
   ),
   'pgcrypto extension is installed'
+);
+
+select is(
+  (
+    select extension_namespace.nspname::text
+    from pg_catalog.pg_extension as installed_extension
+    join pg_catalog.pg_namespace as extension_namespace on extension_namespace.oid = installed_extension.extnamespace
+    where installed_extension.extname = 'pgcrypto'
+  ),
+  'extensions',
+  'pgcrypto extension is installed in the extensions schema'
 );
 
 with expected(enum_name, labels) as (

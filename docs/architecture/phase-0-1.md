@@ -13,10 +13,10 @@ Dependencies point inward:
 ```text
 apps/web, apps/worker -> packages/*
 packages/database -> packages/contracts, packages/domain
-packages/domain -> no infrastructure
+packages/domain -> packages/contracts (enum compatibility exports only), no infrastructure
 ```
 
-`packages/contracts` is the single source for API, AI-output, job-payload, domain-event, and enum contracts. `packages/domain` contains pure business rules and must not import Next.js, database clients, OpenAI SDKs, or HTTP frameworks. `packages/database` owns repositories, transactions, migrations, read models, and outbox access; it may consume contracts and domain rules but must not make applications depend on database internals.
+`packages/contracts` is the single source for API, AI-output, job-payload, domain-event, and enum contracts. `packages/domain` contains pure business rules and must not import Next.js, database clients, OpenAI SDKs, or HTTP frameworks. Its explicit `@airdrop/contracts` workspace dependency preserves existing domain enum imports by re-exporting the exact canonical contract schemas; a platform primitive cannot provide that package-level compatibility without duplicating enum values. `packages/database` owns repositories, transactions, migrations, read models, and outbox access; it may consume contracts and domain rules but must not make applications depend on database internals.
 
 ## Trust and write boundaries
 
