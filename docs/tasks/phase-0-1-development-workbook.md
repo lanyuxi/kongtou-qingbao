@@ -136,6 +136,8 @@ pnpm --filter @airdrop/domain test
 
 ### P0-003 — Web Shell 与 Health API
 
+**状态：** DONE
+
 **目标：** Next.js 应用可构建，`GET /api/v1/health` 遵循共享 envelope。
 
 **创建：** `apps/web/**`，包括 root layout/page、环境解析、Route Handler 和 contract test。
