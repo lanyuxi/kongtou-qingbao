@@ -157,6 +157,8 @@ pnpm --filter @airdrop/web build
 
 ### P0-004 — Worker Shell 与进程生命周期
 
+**状态：** DONE
+
 **目标：** Worker 具备可测试的 `starting/ready/stopping` 状态和安全退出。
 
 **创建：** `apps/worker/**`。
