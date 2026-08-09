@@ -253,13 +253,17 @@ pnpm verify
 
 ### P1-004 — Signal 与 Project Score History
 
+**状态：** DONE
+
 **迁移：** `20260809000400_intelligence_and_scores.sql`
 
 **表：** `signals`、`project_scores`。  
 **幂等：** score unique `(project_id, model_version, input_version)`。  
-**历史：** 不开放 update/delete；修正使用 superseding signal 或新 input version。
+**历史：** 不开放 insert/update/delete/truncate；修正使用同项目 superseding signal 或新 input version。
 
-**测试：** 分数边界、过期时间、自引用、重复输入、published-only read、update/delete denial。
+**测试：** 分数边界、过期时间、自引用/跨项目引用、重复输入、published time、published-only read、全主体 mutation denial。
+
+**安全边界：** browser 仅可读取 active project 的 published signal；raw score 仅后端读取。`service_role` 在 Promotion Service、audit 与 transactional outbox 落地前保持 canonical history 只读。
 
 **验收：** `pnpm test:db`
 

@@ -464,18 +464,20 @@ export type WorkerHealth = {
 
 ## Task 1.4: Add append-only signals and scores
 
-**Files:** Create `supabase/migrations/20260809000400_intelligence_and_scores.sql`; extend schema/catalog tests.
+**Files:** Create `supabase/migrations/20260809000400_intelligence_and_scores.sql`, `supabase/tests/004_intelligence_history.test.sql`.
 
 **Tables:**
 
 - `signals(id, project_id, signal_type, title, summary, verification, lifecycle, confidence, occurred_at, published_at, expires_at, supersedes_signal_id, created_at)`
 - `project_scores(id, project_id, model_version, input_version, opportunity_score, risk_score, confidence, recommendation, explanation, calculated_at, created_at)`; unique `(project_id, model_version, input_version)`.
 
-- [ ] Test score/confidence bounds, no self-supersede, valid expiry order, duplicate input rejection.
-- [ ] Test ordinary/reviewer update-delete denial and published-only public signal reads.
-- [ ] Run database tests; observe failures.
-- [ ] Implement constraints and project/time/version indexes without generic update policies.
-- [ ] Model corrections as superseding signals or new score inputs.
+- [x] Test score/confidence bounds, same-project/non-self supersession, valid expiry order, and duplicate input rejection.
+- [x] Test ordinary/reviewer update-delete denial and published-only public signal reads.
+- [x] Run database tests; observe missing-table failures.
+- [x] Implement constraints and project/time/version indexes without generic update policies.
+- [x] Model corrections as same-project superseding signals or new score inputs.
+
+Published signals require `published_at`. Signal supersession uses a same-project composite foreign key and preserves referenced history with `ON DELETE RESTRICT`. Browser roles can read only published signals for active projects; raw score inputs and explanations remain backend-only. `service_role` is read-only until Promotion Service, audit events, and transactional outbox delivery exist.
 
 **Acceptance:** `pnpm test:db`
 
