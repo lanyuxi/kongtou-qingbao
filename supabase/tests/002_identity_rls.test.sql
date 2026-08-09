@@ -1,6 +1,6 @@
 begin;
 
-select plan(57);
+select plan(61);
 
 select has_table('public', 'profiles', 'profiles table exists');
 select has_table('public', 'user_roles', 'user_roles table exists');
@@ -83,6 +83,16 @@ select is(
   3,
   'automatic profiles use the UTC timezone default'
 );
+select ok(
+  not exists (
+    select 1
+    from auth.users as auth_user
+    full join public.profiles as profile on profile.id = auth_user.id
+    where auth_user.id is null
+      or profile.id is null
+  ),
+  'every auth user has exactly one profile and every profile belongs to an auth user'
+);
 
 insert into public.user_roles (user_id, role, granted_by, granted_at, revoked_at)
 values
@@ -139,33 +149,25 @@ select throws_like(
   'avatar URLs must use HTTPS'
 );
 
+with expected(signature, is_security_definer, volatility) as (
+  values
+    ('public.handle_new_user()', true, 'v'),
+    ('public.has_active_role(public.app_role)', true, 's'),
+    ('public.set_updated_at()', true, 'v'),
+    ('public.enforce_user_role_history()', false, 'v')
+)
 select ok(
-  (
-    select procedure.prosecdef
-      and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.handle_new_user()'::regprocedure
-  ),
-  'handle_new_user is security definer with a fixed safe search_path'
-);
-select ok(
-  (
-    select procedure.prosecdef
-      and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.has_active_role(public.app_role)'::regprocedure
-  ),
-  'has_active_role is security definer with a fixed safe search_path'
-);
-select ok(
-  (
-    select procedure.prosecdef
-      and procedure.proconfig @> array['search_path=pg_catalog, public']::text[]
-    from pg_catalog.pg_proc as procedure
-    where procedure.oid = 'public.set_updated_at()'::regprocedure
-  ),
-  'set_updated_at is security definer with a fixed safe search_path'
-);
+  pg_catalog.pg_get_userbyid(procedure.proowner) = 'postgres'
+    and procedure.prosecdef = expected.is_security_definer
+    and procedure.provolatile::text = expected.volatility
+    and procedure.proconfig @> array['search_path=pg_catalog, public']::text[],
+  pg_catalog.format(
+    '%s has the controlled owner, fixed search_path, expected volatility, and expected security mode',
+    expected.signature
+  )
+)
+from expected
+join pg_catalog.pg_proc as procedure on procedure.oid = expected.signature::regprocedure;
 
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -189,9 +191,11 @@ select throws_like(
 reset role;
 select set_config('request.jwt.claims', '{}', true);
 
+alter table public.profiles disable trigger profiles_set_updated_at;
 update public.profiles
 set updated_at = '2000-01-01 00:00:00+00'
 where id = '11111111-1111-4111-8111-111111111111';
+alter table public.profiles enable trigger profiles_set_updated_at;
 
 set local role authenticated;
 select set_config(
@@ -279,11 +283,21 @@ select results_eq(
   $$values ('33333333-3333-4333-8333-333333333333'::uuid)$$,
   'a browser admin cannot read another user profile'
 );
+select results_eq(
+  $$select role::text from public.user_roles order by granted_at$$,
+  $$values ('admin'::text)$$,
+  'a browser admin can read only their own role history'
+);
 select ok(public.has_active_role('admin'), 'an active admin grant is returned for its owner');
 select throws_like(
   $$insert into public.user_roles (user_id, role) values ('22222222-2222-4222-8222-222222222222', 'admin')$$,
   'permission denied for table user_roles',
   'a browser admin cannot grant roles'
+);
+select throws_like(
+  $$update public.user_roles set revoked_at = now() where user_id = '33333333-3333-4333-8333-333333333333'$$,
+  'permission denied for table user_roles',
+  'a browser admin cannot revoke roles'
 );
 
 reset role;

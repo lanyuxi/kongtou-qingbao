@@ -104,6 +104,11 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
 
+insert into public.profiles (id)
+select auth_user.id
+from auth.users as auth_user
+on conflict (id) do nothing;
+
 create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute function public.set_updated_at();

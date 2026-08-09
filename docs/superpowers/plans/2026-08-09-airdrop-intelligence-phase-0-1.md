@@ -430,6 +430,7 @@ export type WorkerHealth = {
 - [ ] Write tests with two users and one admin: automatic profile, self read/update, cross-user denial, ordinary role-grant denial, active admin lookup, revoked role denial.
 - [ ] Run database tests; observe identity failures.
 - [ ] Implement tables, triggers, active-role index, explicit grants, and RLS.
+- [ ] Install the auth-user trigger before idempotently backfilling profiles for pre-existing auth users.
 - [ ] Keep revocation as `revoked_at`; never delete role history.
 - [ ] Restrict deletion of profiles referenced by role history, including grant provenance.
 

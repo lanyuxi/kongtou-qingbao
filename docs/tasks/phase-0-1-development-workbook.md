@@ -223,7 +223,7 @@ pnpm verify
 
 **表：** `profiles`、`user_roles`。  
 **函数：** `handle_new_user()`、`has_active_role(app_role)`、`set_updated_at()`。  
-**测试：** `002_identity_rls.test.sql` 覆盖匿名、本人、他人、admin、service role；验证 revoked role 无效。
+**测试：** `002_identity_rls.test.sql` 覆盖匿名、本人、他人、admin、service role；验证 revoked role 无效；通过 `001 -> pre-existing auth user -> 002` 升级路径验证 profile 幂等回填。
 
 **安全条件：** security-definer 固定 `search_path`；普通用户不能授权；角色记录只追加/撤销，不删除；`user_id` 与 `granted_by` 外键均使用 `ON DELETE RESTRICT`，不允许删除 grant owner 或静默丢失 grant provenance。
 
