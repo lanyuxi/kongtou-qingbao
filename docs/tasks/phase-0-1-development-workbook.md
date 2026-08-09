@@ -289,6 +289,8 @@ pnpm verify
 
 ### P1-006 — RLS Matrix 与 Read Models
 
+**状态：** DONE
+
 **迁移：**
 
 ```text

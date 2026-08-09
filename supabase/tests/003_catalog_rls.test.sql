@@ -1111,8 +1111,8 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select results_eq(
   $$select slug from public.projects order by slug$$,
-  $$values ('active-project'::text)$$,
-  'anonymous users see only active projects'
+  $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
+  'anonymous users see active and rumored safe project rows'
 );
 select results_eq(
   $$select name from public.sources order by name$$,
@@ -1171,8 +1171,8 @@ select set_config(
 
 select results_eq(
   $$select slug from public.projects order by slug$$,
-  $$values ('active-project'::text)$$,
-  'an authenticated owner sees only active projects'
+  $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
+  'an authenticated owner sees active and rumored safe project rows'
 );
 select results_eq(
   $$select name from public.sources order by name$$,
@@ -1231,8 +1231,8 @@ select set_config(
 
 select results_eq(
   $$select slug from public.projects order by slug$$,
-  $$values ('active-project'::text)$$,
-  'an authenticated non-owner sees the same active public projects'
+  $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
+  'an authenticated non-owner sees the same active and rumored public projects'
 );
 select results_eq(
   $$select name from public.sources order by name$$,
@@ -1268,8 +1268,8 @@ select set_config(
 select ok(public.has_active_role('admin'), 'the browser principal has an active admin grant');
 select results_eq(
   $$select slug from public.projects order by slug$$,
-  $$values ('active-project'::text)$$,
-  'a browser admin still sees only active projects'
+  $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
+  'a browser admin still sees only active and rumored safe project rows'
 );
 select results_eq(
   $$select name from public.sources order by name$$,

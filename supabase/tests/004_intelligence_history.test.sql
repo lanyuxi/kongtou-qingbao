@@ -1,6 +1,6 @@
 begin;
 
-select plan(84);
+select plan(88);
 
 select has_table('public', 'signals', 'signals table exists');
 select has_table('public', 'project_scores', 'project_scores table exists');
@@ -128,12 +128,11 @@ select is(
     from pg_catalog.pg_policies
     where schemaname = 'public'
       and tablename = 'signals'
-      and policyname = 'signals_read_published_active_project'
       and cmd = 'SELECT'
-      and roles = array['anon', 'authenticated']::name[]
+      and policyname in ('signals_select_anon', 'signals_select_authenticated')
   ),
-  1,
-  'signals has exactly the public published-active-project read policy'
+  2,
+  'signals has one published-active-project read policy per browser principal'
 );
 select is(
   (
@@ -141,20 +140,25 @@ select is(
     from pg_catalog.pg_policies
     where schemaname = 'public'
       and tablename = 'project_scores'
+      and cmd = 'SELECT'
+      and policyname in ('project_scores_select_anon', 'project_scores_select_authenticated')
   ),
-  0,
-  'raw project score history has no browser policy before an approved read model exists'
+  2,
+  'project scores have one active-or-rumored read-model policy per browser principal'
 );
 select ok(
   has_table_privilege('anon', 'public.signals', 'SELECT')
     and has_table_privilege('authenticated', 'public.signals', 'SELECT')
     and has_table_privilege('service_role', 'public.signals', 'SELECT')
-    and not has_any_column_privilege('anon', 'public.project_scores', 'SELECT')
-    and not has_any_column_privilege('authenticated', 'public.project_scores', 'SELECT')
+    and has_column_privilege('anon', 'public.project_scores', 'opportunity_score', 'SELECT')
+    and has_column_privilege('authenticated', 'public.project_scores', 'calculated_at', 'SELECT')
+    and not has_column_privilege('anon', 'public.project_scores', 'model_version', 'SELECT')
+    and not has_column_privilege('authenticated', 'public.project_scores', 'input_version', 'SELECT')
+    and not has_column_privilege('authenticated', 'public.project_scores', 'explanation', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'model_version', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'input_version', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'explanation', 'SELECT'),
-  'published signal columns are public while raw score inputs and explanations remain backend-only'
+  'browser roles receive safe score columns while raw inputs and explanations remain backend-only'
 );
 select ok(
   not has_any_column_privilege('anon', 'public.signals', 'INSERT,UPDATE')
@@ -981,6 +985,11 @@ select throws_like(
   'permission denied for table project_scores',
   'anonymous users cannot read raw score history'
 );
+select results_eq(
+  $$select id from public.project_scores order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'anonymous users can read only safe score columns for active or rumored projects'
+);
 select throws_like(
   $$
     insert into public.signals (project_id, signal_type, title, summary, confidence)
@@ -1024,6 +1033,16 @@ select throws_like(
   $$select explanation from public.project_scores$$,
   'permission denied for table project_scores',
   'an ordinary user cannot read raw score explanations'
+);
+select results_eq(
+  $$select id from public.project_scores order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'an ordinary user can read only safe score columns for active or rumored projects'
+);
+select throws_like(
+  $$select input_version from public.project_scores$$,
+  'permission denied for table project_scores',
+  'an ordinary user cannot read raw score input versions'
 );
 select throws_like(
   $$
@@ -1118,6 +1137,11 @@ select results_eq(
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc5'::uuid)
   $$,
   'a browser admin still sees only published signals for active projects'
+);
+select throws_like(
+  $$select explanation from public.project_scores$$,
+  'permission denied for table project_scores',
+  'a browser admin cannot read raw score explanations'
 );
 select throws_like(
   $$

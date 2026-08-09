@@ -67,7 +67,7 @@
 │       ├── 002_identity_rls.test.sql
 │       ├── 003_catalog_rls.test.sql
 │       ├── 004_execution_rls.test.sql
-│       └── 005_read_models.test.sql
+│       └── 006_read_models.test.sql
 └── docs/{architecture,runbooks,superpowers/plans,tasks}/
 ```
 
@@ -505,16 +505,16 @@ Published signals require `published_at`. Signal supersession uses a same-projec
 
 ## Task 1.6: Consolidate RLS and add read models
 
-**Files:** Create `supabase/migrations/20260809000600_rls.sql`, `supabase/migrations/20260809000700_read_models.sql`, `supabase/tests/005_read_models.test.sql`; extend prior RLS tests.
+**Files:** Create `supabase/migrations/20260809000600_rls.sql`, `supabase/migrations/20260809000700_read_models.sql`, `supabase/tests/006_read_models.test.sql`; extend prior RLS tests.
 
 **Views:** `project_current_state` selects the deterministic latest score and latest published signal time; `opportunity_list` contains only active/rumored scored projects and no private fields.
 
-- [ ] Test RLS enabled on every public table, no anon mutations, no broad authenticated private reads.
-- [ ] Test latest score ordering by `calculated_at desc, id desc` including tied timestamps.
-- [ ] Test paused/ended/archived/unscored projects are absent from opportunities.
-- [ ] Run tests; observe policy/view failures.
-- [ ] Consolidate policies with names `<table>_<operation>_<principal>` and comments.
-- [ ] Implement invoker-safe views, deterministic ordering, narrow select grants, and no private columns.
+- [x] Test RLS enabled on every public table, no anon mutations, no broad authenticated private reads.
+- [x] Test latest score ordering by `calculated_at desc, id desc` including tied timestamps.
+- [x] Test paused/ended/archived/unscored projects are absent from opportunities.
+- [x] Run tests; observe policy/view failures.
+- [x] Consolidate policies with names `<table>_<operation>_<principal>` and comments.
+- [x] Implement invoker-safe views, deterministic ordering, narrow select grants, and no private columns.
 
 **Acceptance:** `pnpm test:db`
 
