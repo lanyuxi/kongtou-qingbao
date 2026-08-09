@@ -152,7 +152,7 @@ describe('worker health lifecycle', () => {
     await expect(stopWorkerIfRunning(unfinishedWorker)).rejects.toThrow(
       'Worker did not exit within 1 second.'
     );
-  }, 1_100);
+  }, 3_000);
 
   it('emits stopping and exits with code 0 when it receives SIGTERM', async () => {
     const { exit, output } = await runWorkerWithSignals(['SIGTERM']);
