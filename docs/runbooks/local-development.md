@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 22 or later.
+- Node.js 22.
 - pnpm 11 (the repository pins pnpm 11.16.0).
 - Docker Desktop running before starting local Supabase.
 

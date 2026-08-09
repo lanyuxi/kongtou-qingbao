@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "dev": "pnpm --parallel --filter @airdrop/web --filter @airdrop/worker dev",
     "build": "pnpm -r build",

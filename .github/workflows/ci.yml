@@ -3,8 +3,6 @@ name: CI
 on:
   pull_request:
   push:
-    branches:
-      - main
 
 permissions:
   contents: read
@@ -13,6 +11,9 @@ jobs:
   verify:
     name: Repository verify
     runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event_name == 'pull_request' ||
+      github.ref_name == github.event.repository.default_branch }}
     steps:
       - uses: actions/checkout@v4
 
@@ -32,23 +33,38 @@ jobs:
   database-integration:
     name: Database integration
     runs-on: ubuntu-latest
-    # Phase 1 adds this configuration and the migrations/tests consumed below.
-    if: ${{ hashFiles('supabase/config.toml') != '' }}
+    if: >-
+      ${{ github.event_name == 'pull_request' ||
+      github.ref_name == github.event.repository.default_branch }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v4
+      - id: supabase
+        name: Detect Phase 1 Supabase configuration
+        run: |
+          if test -f supabase/config.toml; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.supabase.outputs.enabled == 'true'
+        uses: pnpm/action-setup@v4
         with:
           version: 11.16.0
 
-      - uses: actions/setup-node@v4
+      - if: steps.supabase.outputs.enabled == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm db:start
-      - run: pnpm test:db
-      - if: ${{ always() }}
+      - if: steps.supabase.outputs.enabled == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.supabase.outputs.enabled == 'true'
+        run: pnpm db:start
+      - if: steps.supabase.outputs.enabled == 'true'
+        run: pnpm test:db
+      - if: ${{ always() && steps.supabase.outputs.enabled == 'true' }}
         run: pnpm db:stop
