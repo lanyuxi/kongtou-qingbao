@@ -1,4 +1,4 @@
-import { once } from 'node:events';
+import { EventEmitter, once } from 'node:events';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -34,7 +34,7 @@ const stopWorkerIfRunning = async (worker: ChildProcess): Promise<void> => {
   }
 
   worker.kill('SIGKILL');
-  await once(worker, 'exit');
+  await waitForWorkerExit(worker);
 };
 
 const runWorkerWithSignals = async (signals: readonly NodeJS.Signals[]): Promise<{
@@ -141,6 +141,18 @@ describe('worker health lifecycle', () => {
       WorkerLifecycleTransitionError
     );
   });
+
+  it('fails cleanup when a SIGKILLed child does not exit within its bound', async () => {
+    const unfinishedWorker = Object.assign(new EventEmitter(), {
+      exitCode: null,
+      signalCode: null,
+      kill: () => true
+    }) as unknown as ChildProcess;
+
+    await expect(stopWorkerIfRunning(unfinishedWorker)).rejects.toThrow(
+      'Worker did not exit within 1 second.'
+    );
+  }, 1_100);
 
   it('emits stopping and exits with code 0 when it receives SIGTERM', async () => {
     const { exit, output } = await runWorkerWithSignals(['SIGTERM']);
