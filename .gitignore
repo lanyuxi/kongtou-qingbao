@@ -8,4 +8,3 @@ coverage/
 .env.*.local
 !.env.example
 supabase/.temp/
-packages/database/src/generated/database.types.ts

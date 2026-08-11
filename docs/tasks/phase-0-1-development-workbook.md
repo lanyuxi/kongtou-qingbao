@@ -308,6 +308,8 @@ pnpm verify
 
 ### P1-007 — 生成类型与 Project Repository
 
+**状态：** DONE
+
 **创建：** `packages/database/**`；生成 `packages/database/src/generated/database.types.ts`。
 
 **接口：** `ProjectRepository.listOpportunities({ limit, afterScore, afterProjectId })`。  

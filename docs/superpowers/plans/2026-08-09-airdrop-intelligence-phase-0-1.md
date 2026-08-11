@@ -534,12 +534,12 @@ export interface ProjectRepository {
 }
 ```
 
-- [ ] Reset local DB and run `pnpm db:types`; commit generated types.
-- [ ] Write integration fixtures for active, rumored, paused, scored, and unscored projects.
-- [ ] Test ordering `opportunity_score desc, project_id asc` and cursor continuation without gaps/duplicates.
-- [ ] Run package tests; expect missing-repository failure.
-- [ ] Implement browser-safe anon client and separate server-only service entry point.
-- [ ] Implement limit range `1..100`, explicit cursor inputs, view query, and snake-to-camel mapping.
+- [x] Reset local DB and run `pnpm db:types`; commit generated types.
+- [x] Write integration fixtures for active, rumored, paused, scored, and unscored projects.
+- [x] Test ordering `opportunity_score desc, project_id asc` and cursor continuation without gaps/duplicates.
+- [x] Run package tests; observe the missing-repository failure.
+- [x] Implement browser-safe anon client and separate server-only service entry point.
+- [x] Implement limit range `1..100`, explicit cursor inputs, view query, and snake-to-camel mapping.
 
 **Acceptance:** `pnpm db:types && git diff --exit-code packages/database/src/generated/database.types.ts && pnpm --filter @airdrop/database typecheck && pnpm --filter @airdrop/database test`
 
