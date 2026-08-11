@@ -1,5 +1,18 @@
 begin;
 
+delete from public.project_scores
+where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
+delete from public.signals
+where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
+delete from public.project_sources
+where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
+delete from public.sources
+where id in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid);
+delete from public.projects
+where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
+delete from auth.users
+where id = '90000000-0000-4000-8000-000000000001'::uuid;
+
 select plan(61);
 
 select has_table('public', 'profiles', 'profiles table exists');

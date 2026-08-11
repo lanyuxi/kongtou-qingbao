@@ -44,7 +44,7 @@ The planned local Supabase configuration uses the standard ports below. Do not b
 
 1. Start Docker Desktop and confirm it is ready.
 2. Install dependencies and configure `.env.local` as above.
-3. Start the local Supabase stack after Phase 1 configuration has been added:
+3. Start the local Supabase stack:
 
    ```bash
    pnpm db:start
@@ -70,7 +70,38 @@ The planned local Supabase configuration uses the standard ports below. Do not b
 pnpm test:db
 ```
 
-Use `pnpm verify:full` when both the repository and local database gates are needed.
+The reset applies `supabase/seed.sql`; its records are fixed fictional fixtures and never represent verified production opportunities. Regenerate the committed database types after schema work and confirm generation is reproducible:
+
+```bash
+pnpm db:types
+git diff --exit-code packages/database/src/generated/database.types.ts
+```
+
+Run the PostgREST repository integration test only against the local PostgreSQL + Kong + PostgREST topology. It requires these three environment-variable names together: `AIRDROP_DATABASE_TEST_URL`, `AIRDROP_ANON_SUPABASE_URL`, and `AIRDROP_ANON_SUPABASE_KEY`. After `pnpm db:start`, the following local-only command derives them in shell variables and never prints their values:
+
+```bash
+set -euo pipefail
+database_container='supabase_db_airdrop-intelligence-os'
+kong_container='supabase_kong_airdrop-intelligence-os'
+database_password="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$database_container" | sed -n 's/^POSTGRES_PASSWORD=//p')"
+anon_key="$(docker exec "$kong_container" sh -c "grep -o 'sb_publishable_[A-Za-z0-9_-]*' /home/kong/kong.yml | head -n 1")"
+encoded_database_password="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$database_password")"
+
+AIRDROP_DATABASE_TEST_URL="postgresql://postgres:${encoded_database_password}@127.0.0.1:54322/postgres" \
+  AIRDROP_ANON_SUPABASE_URL='http://127.0.0.1:54321' \
+  AIRDROP_ANON_SUPABASE_KEY="$anon_key" \
+  pnpm --filter @airdrop/database test:integration
+
+unset database_password anon_key encoded_database_password
+```
+
+The command fails instead of skipping when any required integration variable is absent. Do not print, commit, or reuse these local values outside the local stack.
+
+Use `pnpm verify:full` when both the repository and local database gates are needed:
+
+```bash
+pnpm verify:full
+```
 
 ## Shutdown
 

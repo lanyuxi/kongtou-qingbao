@@ -549,11 +549,12 @@ export interface ProjectRepository {
 
 **Files:** Modify `supabase/seed.sql`, `README.md`, `docs/architecture/phase-0-1.md`, `docs/runbooks/local-development.md`.
 
-- [ ] Seed fixed fictional UUIDs: active scored project, rumored scored project, paused project; verified official source; independent source; two published and one non-public signal; two score versions.
-- [ ] Add pgTAP smoke assertions for exact seed and opportunity view rows; observe failure before completing seed.
-- [ ] Make seed deterministic and free of real user, wallet, contract, and credential data.
-- [ ] Restart/reset Supabase, run all database tests, regenerate types, and confirm no diff.
-- [ ] Run repository verification and inspect `git status --short` for intended files only.
+- [x] Seed fixed fictional UUIDs: active scored project, rumored scored project, paused project; verified official source; independent source; two published and one non-public signal; two score versions.
+- [x] Add pgTAP smoke assertions for exact seed and opportunity view rows; observe failure before completing seed.
+- [x] Make seed deterministic and free of real user, wallet, contract, and credential data.
+- [x] Restart/reset Supabase, run all database tests, regenerate types, and confirm no diff.
+- [x] Run the three-variable PostgREST repository integration with zero skipped tests.
+- [x] Run repository verification and inspect `git status --short` for intended files only.
 
 **Acceptance:**
 
@@ -572,17 +573,17 @@ pnpm verify
 
 ## Phase 0/1 Exit Criteria
 
-- [ ] Fresh clone installs with frozen lockfile.
-- [ ] `pnpm verify` passes without Supabase; `pnpm verify:full` passes with local Supabase.
-- [ ] Web health and worker shutdown contracts pass.
-- [ ] Every exposed table has a tested RLS principal matrix.
-- [ ] Anonymous users cannot mutate; users access only their private rows.
-- [ ] Browser admins cannot directly mutate canonical catalog, signal, or score data.
-- [ ] Signal and score histories are append-only through exposed roles.
-- [ ] Opportunity view is deterministic and contains no private fields.
-- [ ] Generated types are committed and reproducible.
-- [ ] Fixtures contain no real secrets, keys, personal data, wallets, or contracts.
-- [ ] CI separates repository verification from database integration tests.
+- [x] Fresh clone installs with frozen lockfile.
+- [x] `pnpm verify` passes without Supabase; `pnpm verify:full` passes with local Supabase.
+- [x] Web health and worker shutdown contracts pass.
+- [x] Every exposed table has a tested RLS principal matrix.
+- [x] Anonymous users cannot mutate; users access only their private rows.
+- [x] Browser admins cannot directly mutate canonical catalog, signal, or score data.
+- [x] Signal and score histories are append-only through exposed roles.
+- [x] Opportunity view is deterministic and contains no private fields.
+- [x] Generated types are committed and reproducible.
+- [x] Fixtures contain no real secrets, keys, personal data, wallets, or contracts.
+- [x] CI separates repository verification from database integration tests.
 
 ## Phase Boundary
 

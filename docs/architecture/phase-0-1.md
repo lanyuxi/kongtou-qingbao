@@ -33,3 +33,9 @@ The root commands define the supported developer and CI gates:
 - `pnpm verify:full` combines the repository gate with the local database suite.
 
 GitHub Actions keeps repository verification and database integration as distinct jobs. The database job activates when Phase 1's `supabase/config.toml` exists, then starts the local stack and runs the root database test command.
+
+## Local fixture boundary
+
+`supabase/seed.sql` is local test data, not intelligence content. It uses fixed fictional UUIDs and UTC timestamps for one active scored project, one rumored scored project, one paused project, two sources, three signals, and immutable score history. The only fixture identity exists solely to preserve the official-source verification foreign key. It is fictional and uses the reserved `.example.invalid` domain.
+
+The pgTAP seed smoke test asserts the exact records and the complete, deterministic `opportunity_list` result. This gives the repository a reproducible read-model check without treating seeded links or scores as real claims. Database resets apply the seed only to the local Docker topology.

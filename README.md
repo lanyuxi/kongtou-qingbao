@@ -13,7 +13,9 @@ pnpm install --frozen-lockfile
 pnpm verify
 ```
 
-After Phase 1 database files are present, `pnpm verify:full` also starts from the local Supabase database integration suite. `pnpm test:db` resets the local database and must never target shared, staging, or production data.
+`pnpm verify:full` also runs the local Supabase database integration suite. `pnpm test:db` resets the local database, applies migrations and the deterministic fictional seed, then runs pgTAP. It must never target shared, staging, or production data.
+
+The seed intentionally contains only fixed UUIDs, `.example.invalid` URLs, and fictional project/source/signal/score records. It contains no real people, wallets, contracts, credentials, or production domains.
 
 ## Architecture
 

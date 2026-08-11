@@ -329,9 +329,13 @@ pnpm --filter @airdrop/database test
 
 ### P1-008 — Seed 与总验收
 
+**状态：** DONE
+
 **Seed：** 固定虚构 UUID；active scored、rumored scored、paused 三个项目；官方/独立两个来源；两条公开与一条非公开 signal；active 项目两版 score。
 
 **禁止：** 真实邮箱、钱包、合约、API 密钥、生产域名数据。
+
+**测试：** `007_seed_smoke.test.sql` 精确断言固定虚构 seed、来源验证溯源、两条公开与一条非公开 signal、active 项目的两版 score，以及完整 `opportunity_list` 可见性和排序。
 
 **验收：**
 
@@ -342,6 +346,7 @@ pnpm test:db
 pnpm db:types
 git diff --exit-code packages/database/src/generated/database.types.ts
 pnpm verify
+pnpm --filter @airdrop/database test:integration
 git status --short
 ```
 
