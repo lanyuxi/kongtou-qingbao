@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "node scripts/require-integration-env.mjs && vitest run src/tests/project-repository.integration.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.2",

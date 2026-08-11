@@ -109,3 +109,44 @@ The full install path encountered official/mirror timeouts. The controller used 
 ## Commit
 
 `feat(database): add typed opportunity repository`
+
+## Fix Round 1 — required CI integration gate
+
+Review identified that the ordinary package test correctly preserves a local unit-test workflow by skipping unavailable integration tests, but the database CI job did not require the real anon/PostgREST repository test. This could allow the database job to pass without executing the two integration assertions.
+
+`@airdrop/database` now provides `test:integration`. It first runs a names-only environment preflight, then runs only `project-repository.integration.test.ts`; ordinary `test` remains appropriate for local unit verification. The CI database job invokes the required command after `pnpm test:db`. It derives the direct database password from the local database container and the publishable anon key from the current Kong container's `/home/kong/kong.yml`, validates both nonempty, URL-encodes the password only in-process, and never enables shell tracing or emits either value.
+
+### RED
+
+Before the script existed:
+
+```text
+pnpm --filter @airdrop/database test:integration
+
+exit 1
+ERR_PNPM_RECURSIVE_RUN_NO_SCRIPT
+```
+
+The initial preflight regression test also failed because `scripts/require-integration-env.mjs` did not exist.
+
+### GREEN
+
+The focused local regression test, package lint, typecheck, and YAML parse passed. The required command was then verified remotely in both modes:
+
+```text
+# no integration variables
+pnpm --filter @airdrop/database test:integration
+exit 1
+Database repository integration requires AIRDROP_DATABASE_TEST_URL, AIRDROP_ANON_SUPABASE_URL, and AIRDROP_ANON_SUPABASE_KEY.
+
+# minimal DB + Kong + PostgREST topology; values injected and not emitted
+pnpm --filter @airdrop/database test:integration
+exit 0
+Test Files 1 passed
+Tests 2 passed
+Integration tests 0 skipped
+```
+
+The Kong extraction was tested against the current Supabase 2.112 topology. Its container environment does not expose `ANON_KEY`; the verified source is the `sb_publishable_...` entry in `/home/kong/kong.yml`.
+
+**Fix commit:** `fix(ci): require database repository integration`

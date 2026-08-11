@@ -66,5 +66,20 @@ jobs:
         run: pnpm db:start
       - if: steps.supabase.outputs.enabled == 'true'
         run: pnpm test:db
+      - if: steps.supabase.outputs.enabled == 'true'
+        name: Require database repository PostgREST integration
+        run: |
+          set -euo pipefail
+          database_container='supabase_db_airdrop-intelligence-os'
+          kong_container='supabase_kong_airdrop-intelligence-os'
+          database_password="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$database_container" | sed -n 's/^POSTGRES_PASSWORD=//p')"
+          anon_key="$(docker exec "$kong_container" sh -c "grep -o 'sb_publishable_[A-Za-z0-9_-]*' /home/kong/kong.yml | head -n 1")"
+          test -n "$database_password"
+          test -n "$anon_key"
+          encoded_database_password="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$database_password")"
+          AIRDROP_DATABASE_TEST_URL="postgresql://postgres:${encoded_database_password}@127.0.0.1:54322/postgres" \
+            AIRDROP_ANON_SUPABASE_URL='http://127.0.0.1:54321' \
+            AIRDROP_ANON_SUPABASE_KEY="$anon_key" \
+            pnpm --filter @airdrop/database test:integration
       - if: ${{ always() && steps.supabase.outputs.enabled == 'true' }}
         run: pnpm db:stop
