@@ -1,6 +1,6 @@
 begin;
 
-select plan(72);
+select plan(75);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -105,8 +105,11 @@ select ok(
 
 select ok(
   pg_catalog.pg_get_userbyid(view_relation.relowner) = 'postgres'
-    and coalesce(view_relation.reloptions, '{}'::text[]) @> array['security_invoker=true']::text[],
-  pg_catalog.format('%s is postgres-owned and security-invoker', expected.view_name)
+    and coalesce(view_relation.reloptions, '{}'::text[]) @> array[
+      'security_invoker=true',
+      'security_barrier=true'
+    ]::text[],
+  pg_catalog.format('%s is postgres-owned security-invoker and security-barrier', expected.view_name)
 )
 from (values ('project_current_state'), ('opportunity_list')) as expected(view_name)
 join pg_catalog.pg_class as view_relation
@@ -176,6 +179,59 @@ select ok(
   pg_catalog.format('%s grants no view mutation path', expected.view_name)
 )
 from (values ('project_current_state'), ('opportunity_list')) as expected(view_name);
+
+select results_eq(
+  $actual_acl$
+    select
+      principal.role_name collate "C",
+      column_info.column_name::text collate "C",
+      has_column_privilege(
+        principal.role_name,
+        'public.project_scores',
+        column_info.column_name,
+        'SELECT'
+      )
+    from (
+      values ('anon'::text, 1), ('authenticated'::text, 2)
+    ) as principal(role_name, role_order)
+    cross join information_schema.columns as column_info
+    where column_info.table_schema = 'public'
+      and column_info.table_name = 'project_scores'
+    order by principal.role_order, column_info.ordinal_position
+  $actual_acl$,
+  $expected_acl$
+    select
+      expected.role_name collate "C",
+      expected.column_name collate "C",
+      expected.can_select
+    from (
+      values
+        ('anon'::text, 'id'::text, true),
+        ('anon'::text, 'project_id'::text, true),
+        ('anon'::text, 'model_version'::text, false),
+        ('anon'::text, 'input_version'::text, false),
+        ('anon'::text, 'opportunity_score'::text, true),
+        ('anon'::text, 'risk_score'::text, true),
+        ('anon'::text, 'confidence'::text, true),
+        ('anon'::text, 'recommendation'::text, true),
+        ('anon'::text, 'explanation'::text, false),
+        ('anon'::text, 'calculated_at'::text, true),
+        ('anon'::text, 'created_at'::text, false),
+        ('authenticated'::text, 'id'::text, true),
+        ('authenticated'::text, 'project_id'::text, true),
+        ('authenticated'::text, 'model_version'::text, false),
+        ('authenticated'::text, 'input_version'::text, false),
+        ('authenticated'::text, 'opportunity_score'::text, true),
+        ('authenticated'::text, 'risk_score'::text, true),
+        ('authenticated'::text, 'confidence'::text, true),
+        ('authenticated'::text, 'recommendation'::text, true),
+        ('authenticated'::text, 'explanation'::text, false),
+        ('authenticated'::text, 'calculated_at'::text, true),
+        ('authenticated'::text, 'created_at'::text, false)
+    ) as expected(role_name, column_name, can_select)
+  $expected_acl$,
+  'anon and authenticated have the exact seven-safe four-raw project score column ACL matrix'
+);
 
 select ok(
   to_regclass('public.project_scores_project_id_calculated_at_id_idx') is not null
@@ -326,7 +382,10 @@ values
   ('10000000-0000-4000-8000-000000000003', 'paused-read-model', 'Paused Read Model', null, 'paused', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
   ('10000000-0000-4000-8000-000000000004', 'ended-read-model', 'Ended Read Model', null, 'ended', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
   ('10000000-0000-4000-8000-000000000005', 'archived-read-model', 'Archived Read Model', null, 'archived', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
-  ('10000000-0000-4000-8000-000000000006', 'unscored-read-model', 'Unscored Read Model', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00');
+  ('10000000-0000-4000-8000-000000000006', 'unscored-read-model', 'Unscored Read Model', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
+  ('10000000-0000-4000-8000-000000000007', 'time-order-read-model', 'Time Order Read Model', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
+  ('10000000-0000-4000-8000-000000000009', 'equal-score-later-id', 'Equal Score Later ID', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
+  ('10000000-0000-4000-8000-000000000008', 'equal-score-earlier-id', 'Equal Score Earlier ID', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00');
 
 insert into public.project_scores (
   id, project_id, model_version, input_version, opportunity_score, risk_score,
@@ -338,7 +397,11 @@ values
   ('20000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000002', 'model-v1', 'rumored', 80, 30, 70, 'watch', 'Rumored score.', '2026-08-09 02:10:00+00', '2026-08-09 02:10:00+00'),
   ('20000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000003', 'model-v1', 'paused', 100, 10, 90, 'act_now', 'Paused score.', '2026-08-09 02:20:00+00', '2026-08-09 02:20:00+00'),
   ('20000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000004', 'model-v1', 'ended', 99, 10, 90, 'act_now', 'Ended score.', '2026-08-09 02:20:00+00', '2026-08-09 02:20:00+00'),
-  ('20000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000005', 'model-v1', 'archived', 98, 10, 90, 'act_now', 'Archived score.', '2026-08-09 02:20:00+00', '2026-08-09 02:20:00+00');
+  ('20000000-0000-4000-8000-000000000006', '10000000-0000-4000-8000-000000000005', 'model-v1', 'archived', 98, 10, 90, 'act_now', 'Archived score.', '2026-08-09 02:20:00+00', '2026-08-09 02:20:00+00'),
+  ('2fffffff-ffff-4fff-8fff-ffffffffffff', '10000000-0000-4000-8000-000000000007', 'model-v1', 'older-large-id', 15, 50, 60, 'research', 'Older score has the larger UUID.', '2026-08-09 02:00:00+00', '2026-08-09 02:00:00+00'),
+  ('20000000-0000-4000-8000-000000000007', '10000000-0000-4000-8000-000000000007', 'model-v1', 'newer-small-id', 75, 30, 80, 'watch', 'Newer score has the smaller UUID.', '2026-08-09 02:01:00+00', '2026-08-09 02:01:00+00'),
+  ('20000000-0000-4000-8000-000000000009', '10000000-0000-4000-8000-000000000009', 'model-v1', 'equal-later-id', 70, 20, 80, 'watch', 'Equal opportunity later project ID.', '2026-08-09 02:30:00+00', '2026-08-09 02:30:00+00'),
+  ('20000000-0000-4000-8000-000000000008', '10000000-0000-4000-8000-000000000008', 'model-v1', 'equal-earlier-id', 70, 20, 80, 'watch', 'Equal opportunity earlier project ID.', '2026-08-09 02:30:00+00', '2026-08-09 02:30:00+00');
 
 insert into public.signals (
   id, project_id, signal_type, title, summary, lifecycle, confidence, published_at, created_at
@@ -363,13 +426,18 @@ select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select results_eq(
   $$select project_id from public.project_current_state order by project_id$$,
-  $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid), ('10000000-0000-4000-8000-000000000006'::uuid)$$,
+  $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid), ('10000000-0000-4000-8000-000000000006'::uuid), ('10000000-0000-4000-8000-000000000007'::uuid), ('10000000-0000-4000-8000-000000000008'::uuid), ('10000000-0000-4000-8000-000000000009'::uuid)$$,
   'project current state respects active and rumored project visibility'
 );
 select is(
   (select opportunity_score from public.project_current_state where project_id = '10000000-0000-4000-8000-000000000001'),
   90.00::numeric,
   'latest score breaks calculated-at ties by descending score id'
+);
+select is(
+  (select opportunity_score from public.project_current_state where project_id = '10000000-0000-4000-8000-000000000007'),
+  75.00::numeric,
+  'latest score prefers newer calculated time even when its score id is smaller'
 );
 select is(
   (select latest_published_signal_at from public.project_current_state where project_id = '10000000-0000-4000-8000-000000000001'),
@@ -383,12 +451,12 @@ select is(
 );
 select results_eq(
   $$select project_id, opportunity_score from public.opportunity_list$$,
-  $$values ('10000000-0000-4000-8000-000000000001'::uuid, 90.00::numeric), ('10000000-0000-4000-8000-000000000002'::uuid, 80.00::numeric)$$,
+  $$values ('10000000-0000-4000-8000-000000000001'::uuid, 90.00::numeric), ('10000000-0000-4000-8000-000000000002'::uuid, 80.00::numeric), ('10000000-0000-4000-8000-000000000007'::uuid, 75.00::numeric), ('10000000-0000-4000-8000-000000000008'::uuid, 70.00::numeric), ('10000000-0000-4000-8000-000000000009'::uuid, 70.00::numeric)$$,
   'opportunities are scored active or rumored projects in deterministic score and project order'
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
-  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid)$$,
+  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
   'anonymous users can read safe score columns only for active and rumored projects'
 );
 select throws_like(
@@ -427,6 +495,12 @@ select set_config(
   true
 );
 
+select throws_like(
+  $$select model_version from public.project_scores$$,
+  'permission denied for table project_scores',
+  'an authenticated user cannot read score model versions at runtime'
+);
+
 select is((select count(*)::integer from public.watchlists), 0, 'an authenticated user cannot broadly read private watchlists');
 select is((select count(*)::integer from public.watchlist_projects), 0, 'an authenticated user cannot broadly read private watchlist projects');
 select is((select count(*)::integer from public.user_projects), 0, 'an authenticated user cannot broadly read private user projects');
@@ -448,7 +522,7 @@ select is((select count(*)::integer from public.user_projects), 0, 'a browser ad
 select is((select count(*)::integer from public.user_tasks), 0, 'a browser admin cannot read another user tasks');
 select results_eq(
   $$select project_id from public.opportunity_list$$,
-  $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid)$$,
+  $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid), ('10000000-0000-4000-8000-000000000007'::uuid), ('10000000-0000-4000-8000-000000000008'::uuid), ('10000000-0000-4000-8000-000000000009'::uuid)$$,
   'a browser admin receives only the public deterministic opportunity list'
 );
 
