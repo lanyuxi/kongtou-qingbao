@@ -45,10 +45,14 @@ as $$
       select 1
       from pg_catalog.jsonb_array_elements(candidate) as redirect_hop(value)
       where pg_catalog.jsonb_typeof(redirect_hop.value) <> 'object'
-        or (
-          select pg_catalog.array_agg(object_key order by object_key)
+        or not redirect_hop.value ? 'hop'
+        or not redirect_hop.value ? 'status'
+        or not redirect_hop.value ? 'url'
+        or exists (
+          select 1
           from pg_catalog.jsonb_object_keys(redirect_hop.value) as object_keys(object_key)
-        ) <> array['hop', 'status', 'url']::text[]
+          where object_key not in ('hop', 'status', 'url')
+        )
         or pg_catalog.jsonb_typeof(redirect_hop.value -> 'hop') <> 'number'
         or not (redirect_hop.value ->> 'hop' ~ '^(0|[1-9][0-9]*)$')
         or (redirect_hop.value ->> 'hop')::numeric > 20

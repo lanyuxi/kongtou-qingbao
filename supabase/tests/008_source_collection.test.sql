@@ -1,6 +1,6 @@
 begin;
 
-select plan(44);
+select plan(45);
 
 select has_table('public', 'collection_attempts', 'collection attempts table exists');
 select has_table('public', 'raw_items', 'raw items table exists');
@@ -71,6 +71,34 @@ select results_eq(
     ) as expected(enum_name, enum_value)
   $$,
   'collection enums have the exact ordered values'
+);
+
+select results_eq(
+  $$
+    select fixture.case_name::text collate "C",
+      public.valid_collection_redirect_chain(fixture.candidate)
+    from (
+      values
+        ('exact redirect hop'::text, '[{"hop":0,"status":302,"url":"https://collection.example/"}]'::jsonb),
+        ('empty redirect hop', '[{}]'::jsonb),
+        ('missing hop', '[{"status":302,"url":"https://collection.example/"}]'::jsonb),
+        ('missing status', '[{"hop":0,"url":"https://collection.example/"}]'::jsonb),
+        ('missing url', '[{"hop":0,"status":302}]'::jsonb)
+    ) as fixture(case_name, candidate)
+    order by fixture.case_name
+  $$,
+  $$
+    select expected.case_name collate "C", expected.is_valid
+    from (
+      values
+        ('empty redirect hop'::text, false),
+        ('exact redirect hop', true),
+        ('missing hop', false),
+        ('missing status', false),
+        ('missing url', false)
+    ) as expected(case_name, is_valid)
+  $$,
+  'redirect hops require the exact complete hop status and URL key set'
 );
 
 select columns_are(
