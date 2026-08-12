@@ -11,7 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@airdrop/domain": "workspace:*"
+    "@airdrop/domain": "workspace:*",
+    "saxes": "6.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.0"

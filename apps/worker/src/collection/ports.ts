@@ -26,3 +26,23 @@ export interface SafeHttpResponse {
 export interface SafeHttpClient {
   get(input: SafeHttpRequest): Promise<SafeHttpResponse>;
 }
+
+export interface FeedEntryCandidate {
+  readonly externalId: string | null;
+  readonly url: string | null;
+  readonly title: string | null;
+  readonly summary: string | null;
+  readonly author: string | null;
+  readonly publishedAt: string | null;
+  readonly updatedAt: string | null;
+}
+
+export interface ParsedFeed {
+  readonly kind: 'rss_feed' | 'atom_feed';
+  readonly entries: readonly FeedEntryCandidate[];
+  readonly invalidEntryCount: number;
+}
+
+export interface FeedParser {
+  parse(xml: string): ParsedFeed;
+}
