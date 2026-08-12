@@ -69,6 +69,12 @@ importers:
 
   apps/worker:
     dependencies:
+      '@airdrop/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@airdrop/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@airdrop/domain':
         specifier: workspace:*
         version: link:../../packages/domain

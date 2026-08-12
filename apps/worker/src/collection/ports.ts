@@ -27,6 +27,18 @@ export interface SafeHttpClient {
   get(input: SafeHttpRequest): Promise<SafeHttpResponse>;
 }
 
+export interface ContentHasher {
+  sha256(bytes: Uint8Array): string;
+}
+
+export interface Clock {
+  now(): Date;
+}
+
+export interface IdGenerator {
+  generate(): string;
+}
+
 export interface FeedEntryCandidate {
   readonly externalId: string | null;
   readonly url: string | null;

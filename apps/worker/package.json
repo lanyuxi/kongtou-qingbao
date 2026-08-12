@@ -11,6 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@airdrop/contracts": "workspace:*",
+    "@airdrop/database": "workspace:*",
     "@airdrop/domain": "workspace:*",
     "saxes": "6.0.0"
   },
