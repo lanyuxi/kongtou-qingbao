@@ -31,3 +31,19 @@ export {
   taskStatusSchema,
 } from './task.js';
 export type { AppRole, ParticipationStatus, TaskPriority, TaskStatus } from './task.js';
+export {
+  CollectionNetworkPolicyError,
+  CONNECT_TIMEOUT_MS,
+  isWithinAuthorityDomains,
+  MAX_DECOMPRESSED_BYTES,
+  MAX_REDIRECTS,
+  TOTAL_TIMEOUT_MS,
+  validateConfiguredCollectionUrl,
+  validateRedirectUrl,
+  validateResolvedAddresses,
+} from './collection/network-policy.js';
+export type {
+  ResolvedAddress,
+  ValidatedAddress,
+  ValidatedCollectionUrl,
+} from './collection/network-policy.js';
