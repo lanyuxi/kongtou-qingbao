@@ -68,6 +68,10 @@ importers:
         version: 19.2.4(@types/react@19.2.18)
 
   apps/worker:
+    dependencies:
+      '@airdrop/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
     devDependencies:
       '@types/node':
         specifier: ^24.10.0
