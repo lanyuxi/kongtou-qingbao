@@ -63,6 +63,71 @@ describe('SourceCollectionRepository', () => {
     ]);
   });
 
+  it('references an existing raw item without inserting it for unchanged endpoint content', async () => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(
+      repository.commitEndpoint({
+        attempt: { ...attemptInput(), outcome: 'unchanged_content' },
+        rawItem: null,
+        existingRawItemId: rawItemId,
+      }),
+    ).resolves.toEqual(result({ outcome: 'unchanged_content' }));
+
+    expect(harness.transactions.at(-1)).toEqual([
+      'set local role collection_worker',
+      'lock idempotency collect:one',
+      'find committed collect:one',
+      `insert attempt ${attemptId}:${rawItemId}`,
+    ]);
+  });
+
+  it('fails closed when an endpoint supplies both new and existing Raw Items', async () => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(
+      repository.commitEndpoint({
+        ...endpointInput(),
+        existingRawItemId: rawItemId,
+      }),
+    ).rejects.toMatchObject({ code: 'persistence_failed' });
+
+    expect(harness.transactions.at(-1)).not.toContain(`insert raw ${rawItemId}`);
+  });
+
+  it.each([
+    {
+      name: 'stored content without a new Raw Item',
+      input: { attempt: attemptInput(), rawItem: null, existingRawItemId: null },
+    },
+    {
+      name: 'unchanged content without an existing Raw Item',
+      input: {
+        attempt: { ...attemptInput(), outcome: 'unchanged_content' as const },
+        rawItem: null,
+        existingRawItemId: null,
+      },
+    },
+    {
+      name: 'a failure with an existing Raw Item',
+      input: {
+        attempt: { ...attemptInput(), outcome: 'http_error' as const },
+        rawItem: null,
+        existingRawItemId: rawItemId,
+      },
+    },
+  ])('fails closed for $name', async ({ input }) => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(repository.commitEndpoint(input)).rejects.toMatchObject({
+      code: 'persistence_failed',
+    });
+    expect(harness.transactions.at(-1)).toEqual(['set local role collection_worker']);
+  });
+
   it('returns an existing committed result without inserting another attempt', async () => {
     const prior = result({ outcome: 'not_modified', rawItemId: null });
     const harness = createHarness({ committed: prior });
@@ -187,7 +252,7 @@ describe('SourceCollectionRepository', () => {
 });
 
 function endpointInput(): CommitEndpointInput {
-  return { attempt: attemptInput(), rawItem: rawItemInput() };
+  return { attempt: attemptInput(), rawItem: rawItemInput(), existingRawItemId: null };
 }
 
 function feedInput(): CommitFeedInput {

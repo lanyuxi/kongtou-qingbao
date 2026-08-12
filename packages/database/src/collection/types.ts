@@ -94,6 +94,7 @@ export interface DiscoveredItemInput {
 export interface CommitEndpointInput {
   readonly attempt: CollectionAttemptInput;
   readonly rawItem: RawItemInput | null;
+  readonly existingRawItemId: string | null;
 }
 
 export interface CommitFeedInput {

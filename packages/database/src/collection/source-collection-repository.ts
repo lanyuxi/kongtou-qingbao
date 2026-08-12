@@ -67,7 +67,9 @@ export function createSourceCollectionRepositoryFromTransactions(
   };
 
   const commitEndpoint = (input: CommitEndpointInput): Promise<CollectSourceResult> =>
-    run((transaction) => commitAttempt(transaction, input.attempt, input.rawItem));
+    run((transaction) =>
+      commitAttempt(transaction, input.attempt, input.rawItem, input.existingRawItemId),
+    );
 
   return {
     loadContext: (projectId, sourceId) =>
@@ -124,14 +126,33 @@ async function commitAttempt(
   transaction: CollectionTransaction,
   attempt: CollectionAttemptInput,
   rawItem: RawItemInput | null,
+  existingRawItemId: string | null,
 ): Promise<CollectSourceResult> {
+  validateEndpointRawItemReference(attempt, rawItem, existingRawItemId);
   const committed = await findForCommit(transaction, attempt);
   if (committed !== null) {
     return committed;
   }
-  const rawItemId = rawItem === null ? null : await transaction.insertRawItem(rawItem);
+  const rawItemId = rawItem === null ? existingRawItemId : await transaction.insertRawItem(rawItem);
   await transaction.insertAttempt(attempt, rawItemId);
   return buildResult(attempt, rawItemId);
+}
+
+function validateEndpointRawItemReference(
+  attempt: CollectionAttemptInput,
+  rawItem: RawItemInput | null,
+  existingRawItemId: string | null,
+): void {
+  const expectsNew = attempt.outcome === 'stored_new_content';
+  const expectsExisting =
+    attempt.outcome === 'not_modified' || attempt.outcome === 'unchanged_content';
+  if (
+    (expectsNew && (rawItem === null || existingRawItemId !== null)) ||
+    (expectsExisting && (rawItem !== null || existingRawItemId === null)) ||
+    (!expectsNew && !expectsExisting && (rawItem !== null || existingRawItemId !== null))
+  ) {
+    throw new Error('endpoint_raw_item_reference_invalid');
+  }
 }
 
 async function findForCommit(

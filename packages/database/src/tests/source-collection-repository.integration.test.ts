@@ -112,7 +112,11 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
 
   it('rolls back an endpoint attempt when its raw item is invalid', async () => {
     if (repository === null || owner === null) throw new Error('Database integration environment is unavailable.');
-    await expect(repository.commitEndpoint({ attempt: endpointAttempt(), rawItem: { ...rawItem(), sha256: 'bad' } }))
+    await expect(repository.commitEndpoint({
+      attempt: endpointAttempt(),
+      rawItem: { ...rawItem(), sha256: 'bad' },
+      existingRawItemId: null,
+    }))
       .rejects.toMatchObject({ code: 'persistence_failed', message: 'persistence_failed' });
     const attempts = await owner`select id from public.collection_attempts where id = ${attemptId}::uuid`;
     expect(attempts).toHaveLength(0);
@@ -120,10 +124,13 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
 
   it('replays idempotently and reuses matching content hashes', async () => {
     if (repository === null || owner === null) throw new Error('Database integration environment is unavailable.');
-    const first = await repository.commitEndpoint({ attempt: endpointAttempt(), rawItem: rawItem() });
+    const first = await repository.commitEndpoint({
+      attempt: endpointAttempt(), rawItem: rawItem(), existingRawItemId: null,
+    });
     const replay = await repository.commitEndpoint({
       attempt: { ...endpointAttempt(), id: '81000000-0000-4000-8000-000000000099' },
       rawItem: { ...rawItem(), id: '81000000-0000-4000-8000-000000000098' },
+      existingRawItemId: null,
     });
     await expect(repository.commitEndpoint({
       attempt: {
@@ -131,20 +138,43 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
         projectId: '81000000-0000-4000-8000-000000000099',
       },
       rawItem: null,
+      existingRawItemId: null,
     })).rejects.toMatchObject({ code: 'persistence_failed' });
     const reuse = await repository.commitEndpoint({
       attempt: { ...endpointAttempt(), id: '81000000-0000-4000-8000-000000000097', idempotencyKey: 'repository:hash-reuse' },
       rawItem: { ...rawItem(), id: '81000000-0000-4000-8000-000000000096' },
+      existingRawItemId: null,
     });
+    const revalidated = await repository.commitEndpoint({
+      attempt: {
+        ...endpointAttempt(),
+        id: '81000000-0000-4000-8000-000000000095',
+        idempotencyKey: 'repository:not-modified',
+        httpStatus: 304,
+        etag: '"v2"',
+        outcome: 'not_modified',
+        completedAt: '2026-08-12T00:00:02.000Z',
+        collectedAt: '2026-08-12T00:00:02.000Z',
+      },
+      rawItem: null,
+      existingRawItemId: rawItemId,
+    });
+    const latest = await repository.loadLatest(
+      'https://repository-collection.example/',
+      projectId,
+      sourceId,
+    );
 
     expect(replay).toEqual(first);
     expect(reuse.rawItemId).toBe(rawItemId);
+    expect(revalidated.rawItemId).toBe(rawItemId);
+    expect(latest).toMatchObject({ id: rawItemId, etag: '"v2"' });
     const rows = await owner`
       select
         (select count(*)::integer from public.collection_attempts where project_id = ${projectId}::uuid) as attempts,
         (select count(*)::integer from public.raw_items where project_id = ${projectId}::uuid) as raws
     `;
-    expect(rows[0]).toMatchObject({ attempts: 2, raws: 1 });
+    expect(rows[0]).toMatchObject({ attempts: 3, raws: 1 });
   });
 
   it('atomically commits feed discovery and an article successor', async () => {

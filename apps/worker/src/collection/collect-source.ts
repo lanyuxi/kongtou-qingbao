@@ -123,6 +123,7 @@ export function createCollectSource(
             errorDetail: FAILURE_DETAILS[failure],
           }),
           null,
+          null,
         );
       }
 
@@ -152,12 +153,14 @@ export function createCollectSource(
             errorDetail: FAILURE_DETAILS[failure],
           }),
           null,
+          null,
         );
       }
 
       if (response.status === 304) {
         const completedAt = dependencies.clock.now().toISOString();
         attemptId = dependencies.ids.generate();
+        const outcome = latest === null ? 'http_error' : 'not_modified';
         return await commitAndParse(
           dependencies.repository,
           buildEndpointInput({
@@ -167,11 +170,12 @@ export function createCollectSource(
             startedAt,
             completedAt,
             response,
-            outcome: 'not_modified',
-            errorCode: null,
-            errorDetail: null,
+            outcome,
+            errorCode: latest === null ? 'http_error' : null,
+            errorDetail: latest === null ? FAILURE_DETAILS.http_error : null,
           }),
           null,
+          latest?.id ?? null,
         );
       }
 
@@ -213,6 +217,7 @@ export function createCollectSource(
             errorDetail: FAILURE_DETAILS[failure],
           }),
           null,
+          null,
         );
       }
 
@@ -245,6 +250,7 @@ export function createCollectSource(
           errorDetail: null,
         }),
         rawItem,
+        storageOutcome === 'unchanged_content' ? latest?.id ?? null : null,
       );
     } catch {
       attemptId ??= dependencies.ids.generate();
@@ -276,8 +282,9 @@ async function commitAndParse(
   repository: SourceCollectionRepository,
   attempt: CollectionAttemptInput,
   rawItem: RawItemInput | null,
+  existingRawItemId: string | null,
 ): Promise<CollectSourceResult> {
-  const result = await repository.commitEndpoint({ attempt, rawItem });
+  const result = await repository.commitEndpoint({ attempt, rawItem, existingRawItemId });
   return collectSourceResultSchema.parse(result);
 }
 

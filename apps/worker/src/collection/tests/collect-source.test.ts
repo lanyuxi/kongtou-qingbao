@@ -11,7 +11,7 @@ import type {
   SourceCollectionRepository,
 } from '@airdrop/database/collection-worker';
 
-import { createCollectSource } from '../collect-source.js';
+import { createCollectSource, createNodeContentHasher } from '../collect-source.js';
 import type {
   Clock,
   ContentHasher,
@@ -172,9 +172,10 @@ describe('collect source', () => {
 
     await expect(fixture.collect(validJob)).resolves.toMatchObject({
       outcome: 'not_modified',
-      rawItemId: null,
+      rawItemId: PREVIOUS_RAW_ITEM_ID,
     });
     expect(fixture.repository.commits[0]?.rawItem).toBeNull();
+    expect(fixture.repository.commits[0]?.existingRawItemId).toBe(PREVIOUS_RAW_ITEM_ID);
     expect(fixture.repository.commits[0]?.attempt).toMatchObject({
       httpStatus: 304,
       outcome: 'not_modified',
@@ -184,15 +185,41 @@ describe('collect source', () => {
     expect(fixture.hasher.inputs).toEqual([]);
   });
 
+  it('fails safely when HTTP 304 has no latest Raw Item to reference', async () => {
+    const fixture = createFixture();
+    fixture.http.response = httpResponse({
+      status: 304,
+      body: null,
+      decompressedBytes: 0,
+    });
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'http_error',
+      rawItemId: null,
+    });
+    expect(fixture.repository.commits[0]).toMatchObject({
+      rawItem: null,
+      existingRawItemId: null,
+      attempt: { errorCode: 'http_error' },
+    });
+  });
+
   it('persists no Raw Item when the exact byte hash is unchanged', async () => {
     const fixture = createFixture();
     fixture.repository.latest = latestRawItem({ sha256: HTML_SHA256 });
 
     await expect(fixture.collect(validJob)).resolves.toMatchObject({
       outcome: 'unchanged_content',
-      rawItemId: null,
+      rawItemId: PREVIOUS_RAW_ITEM_ID,
     });
     expect(fixture.repository.commits[0]?.rawItem).toBeNull();
+    expect(fixture.repository.commits[0]?.existingRawItemId).toBe(PREVIOUS_RAW_ITEM_ID);
+  });
+
+  it('hashes a known SHA-256 vector with the Node production adapter', () => {
+    const digest = createNodeContentHasher().sha256(new TextEncoder().encode('abc'));
+
+    expect(digest).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
 
   it('hashes the exact decompressed bytes before fatal UTF-8 decoding', async () => {
@@ -354,6 +381,7 @@ class InMemoryRepository implements SourceCollectionRepository {
       sourceId: SOURCE_ID,
       outcome: input.attempt.outcome,
       rawItemId: input.rawItem?.id ?? null,
+      ...(input.existingRawItemId === null ? {} : { rawItemId: input.existingRawItemId }),
       discoveredCount: 0,
       bodyFetchCount: 0,
       ...(this.resultExtra === null ? {} : { rawText: this.resultExtra }),
