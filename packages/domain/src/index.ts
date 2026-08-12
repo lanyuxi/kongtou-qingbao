@@ -1,5 +1,23 @@
-export { parseEvidenceId, parseProjectId, parseSignalId, parseUserId } from './ids.js';
-export type { EvidenceId, ProjectId, SignalId, UserId } from './ids.js';
+export {
+  parseCollectionAttemptId,
+  parseDiscoveredItemId,
+  parseEvidenceId,
+  parseProjectId,
+  parseRawItemId,
+  parseSignalId,
+  parseSourceId,
+  parseUserId
+} from './ids.js';
+export type {
+  CollectionAttemptId,
+  DiscoveredItemId,
+  EvidenceId,
+  ProjectId,
+  RawItemId,
+  SignalId,
+  SourceId,
+  UserId
+} from './ids.js';
 export { projectLifecycleSchema, recommendationSchema } from './project.js';
 export type { ProjectLifecycle, Recommendation } from './project.js';
 export { riskLevelSchema, signalLifecycleSchema, signalVerificationSchema } from './signal.js';

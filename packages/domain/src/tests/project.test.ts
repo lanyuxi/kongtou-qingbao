@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  parseCollectionAttemptId,
+  parseDiscoveredItemId,
   parseEvidenceId,
   parseProjectId,
+  parseRawItemId,
   parseSignalId,
+  parseSourceId,
   parseUserId,
   projectLifecycleSchema,
   recommendationSchema
@@ -12,11 +16,15 @@ import {
 const uuid = 'd46cf20b-70cd-4dc9-a20a-ab3d8dc2d3d9';
 
 describe('branded IDs', () => {
-  it('parses UUID-backed project, signal, evidence, and user IDs', () => {
+  it('parses UUID-backed project, signal, evidence, user, and collection IDs', () => {
     expect(parseProjectId(uuid)).toBe(uuid);
     expect(parseSignalId(uuid)).toBe(uuid);
     expect(parseEvidenceId(uuid)).toBe(uuid);
     expect(parseUserId(uuid)).toBe(uuid);
+    expect(parseSourceId(uuid)).toBe(uuid);
+    expect(parseCollectionAttemptId(uuid)).toBe(uuid);
+    expect(parseRawItemId(uuid)).toBe(uuid);
+    expect(parseDiscoveredItemId(uuid)).toBe(uuid);
   });
 
   it('rejects a non-UUID ID', () => {

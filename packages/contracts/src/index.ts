@@ -1,6 +1,20 @@
 export { apiErrorSchema, createApiSuccessSchema } from './api/envelope.js';
 export type { ApiError, ApiSuccess } from './api/envelope.js';
 export {
+  collectSourceJobSchema,
+  collectSourcePayloadSchema,
+  collectSourceResultSchema,
+  collectionContentKindSchema,
+  collectionOutcomeSchema,
+} from './collection/source-collection.js';
+export type {
+  CollectSourceJob,
+  CollectSourcePayload,
+  CollectSourceResult,
+  CollectionContentKind,
+  CollectionOutcome,
+} from './collection/source-collection.js';
+export {
   appRoleSchema,
   participationStatusSchema,
   projectLifecycleSchema,
