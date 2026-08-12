@@ -124,6 +124,21 @@ describe('isWithinAuthorityDomains', () => {
       ]),
     ).toBe(true);
   });
+
+  it.each(['127.0.0.1', '2130706433', '0177.0.0.1'])(
+    'rejects an IP literal or legacy numeric candidate hostname %s',
+    (hostname) => {
+      expect(isWithinAuthorityDomains(hostname, [hostname])).toBe(false);
+    },
+  );
+
+  it.each([
+    ['feeds.127.0.0.1', '127.0.0.1'],
+    ['feeds.2130706433', '2130706433'],
+    ['feeds.0177.0.0.1', '0177.0.0.1'],
+  ])('rejects an IP literal or legacy numeric authority domain %s', (hostname, domain) => {
+    expect(isWithinAuthorityDomains(hostname, [domain])).toBe(false);
+  });
 });
 
 describe('validateRedirectUrl', () => {
@@ -194,6 +209,8 @@ describe('validateResolvedAddresses', () => {
     '::ffff:127.0.0.1',
     'ff02::1',
     '::',
+    '4000::1',
+    '8000::1',
   ])('rejects non-global resolved address %s', (address) => {
     expectPolicyError(
       () => validateResolvedAddresses([{ address, family: address.includes(':') ? 6 : 4 }]),

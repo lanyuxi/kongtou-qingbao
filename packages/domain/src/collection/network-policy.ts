@@ -41,6 +41,7 @@ interface RedirectUrlInput {
 
 const CANONICAL_HOSTNAME =
   /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const IPV6_GLOBAL_UNICAST_PREFIX = ipaddr.IPv6.parse('2000::');
 
 export function validateConfiguredCollectionUrl(
   input: ConfiguredCollectionUrlInput,
@@ -70,13 +71,14 @@ export function isWithinAuthorityDomains(
   hostname: string,
   domains: readonly string[],
 ): boolean {
-  if (!isCanonicalHostname(hostname)) {
+  if (!isCanonicalAuthorityHostname(hostname)) {
     return false;
   }
 
   return domains.some(
     (domain) =>
-      isCanonicalHostname(domain) && (hostname === domain || hostname.endsWith(`.${domain}`)),
+      isCanonicalAuthorityHostname(domain) &&
+      (hostname === domain || hostname.endsWith(`.${domain}`)),
   );
 }
 
@@ -94,7 +96,11 @@ export function validateResolvedAddresses(
         ? address.toIPv4Address()
         : address;
 
-    if (publicAddress.range() !== 'unicast') {
+    if (
+      publicAddress.range() !== 'unicast' ||
+      (publicAddress instanceof ipaddr.IPv6 &&
+        !publicAddress.match(IPV6_GLOBAL_UNICAST_PREFIX, 3))
+    ) {
       throw rejectedDnsTarget(`DNS resolution returned a non-public address: ${record.address}`);
     }
 
@@ -155,6 +161,10 @@ function validateUrl(
 
 function isCanonicalHostname(hostname: string): boolean {
   return CANONICAL_HOSTNAME.test(hostname) && hostname === hostname.toLowerCase();
+}
+
+function isCanonicalAuthorityHostname(hostname: string): boolean {
+  return isCanonicalHostname(hostname) && !ipaddr.isValid(hostname);
 }
 
 function parseAddressForFamily(record: ResolvedAddress): ipaddr.IPv4 | ipaddr.IPv6 {
