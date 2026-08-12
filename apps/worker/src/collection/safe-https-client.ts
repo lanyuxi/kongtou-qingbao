@@ -86,6 +86,8 @@ interface SafeHttpsClientDependencies {
 interface RequestContext {
   currentRequest: HttpsRequest | null;
   currentResponse: Readable | null;
+  currentDecoder: Readable | null;
+  abortError: CollectionHttpError | null;
 }
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -110,7 +112,12 @@ export function createSafeHttpsClient(dependencies: SafeHttpsClientDependencies)
 
   return {
     get(input) {
-      const context: RequestContext = { currentRequest: null, currentResponse: null };
+      const context: RequestContext = {
+        currentRequest: null,
+        currentResponse: null,
+        currentDecoder: null,
+        abortError: null,
+      };
       let rejectDeadline: ((error: Error) => void) | undefined;
       const deadline = new Promise<never>((_resolve, reject) => {
         rejectDeadline = reject;
@@ -118,7 +125,8 @@ export function createSafeHttpsClient(dependencies: SafeHttpsClientDependencies)
       const timeoutError = () => new CollectionHttpError('timeout', 'Collection request timed out.');
       const deadlineHandle = timer.setTimeout(() => {
         const error = timeoutError();
-        context.currentResponse?.destroy(error);
+        context.abortError = error;
+        destroyActiveBody(context);
         context.currentRequest?.destroy(error);
         rejectDeadline?.(error);
       }, TOTAL_TIMEOUT_MS);
@@ -148,12 +156,16 @@ async function performGet(
   const redirects: Array<{ hop: number; status: number; url: string }> = [];
 
   for (;;) {
-    const addresses = validateResolvedAddresses(await resolver.resolve(validatedUrl.hostname));
+    throwIfAborted(context);
+    const resolvedAddresses = await resolver.resolve(validatedUrl.hostname);
+    throwIfAborted(context);
+    const addresses = validateResolvedAddresses(resolvedAddresses);
     const selectedAddress = addresses[0];
     if (selectedAddress === undefined) {
       throw new CollectionHttpError('http_error', 'Validated DNS answer was unexpectedly empty.');
     }
 
+    throwIfAborted(context);
     const response = await requestHop(
       validatedUrl,
       selectedAddress,
@@ -161,15 +173,18 @@ async function performGet(
       requestFactory,
       context,
     );
+    throwIfAborted(context);
     const status = response.statusCode;
     if (status === undefined) {
       discardResponse(response);
+      clearActiveBody(context);
       throw new CollectionHttpError('http_error', 'HTTPS response omitted its status code.');
     }
 
     if (REDIRECT_STATUSES.has(status)) {
       const location = boundedHeader(response.headers.location, MAX_LOCATION_LENGTH);
       discardResponse(response);
+      clearActiveBody(context);
       if (location === null) {
         throw new CollectionHttpError('http_error', 'Redirect response omitted a valid Location header.');
       }
@@ -189,6 +204,7 @@ async function performGet(
     const responseMetadata = readResponseMetadata(response.headers);
     if (status === 304) {
       discardResponse(response);
+      clearActiveBody(context);
       return {
         requestedUrl,
         finalUrl: validatedUrl.url.href,
@@ -202,12 +218,19 @@ async function performGet(
 
     if (status < 200 || status >= 300) {
       discardResponse(response);
+      clearActiveBody(context);
       throw new CollectionHttpError('http_error', `Collection endpoint returned HTTP ${status}.`);
     }
 
+    throwIfAborted(context);
     context.currentResponse = response;
-    const body = await readBoundedBody(response, response.headers['content-encoding']);
-    context.currentResponse = null;
+    const body = await readBoundedBody(
+      response,
+      response.headers['content-encoding'],
+      context,
+    );
+    throwIfAborted(context);
+    clearActiveBody(context);
     return {
       requestedUrl,
       finalUrl: validatedUrl.url.href,
@@ -228,41 +251,56 @@ function requestHop(
   context: RequestContext,
 ): Promise<HttpsResponse> {
   return new Promise((resolve, reject) => {
-    const request = requestFactory(
-      {
-        protocol: 'https:',
-        hostname: validatedUrl.hostname,
-        servername: validatedUrl.hostname,
-        port: 443,
-        path: `${validatedUrl.url.pathname}${validatedUrl.url.search}`,
-        method: 'GET',
-        rejectUnauthorized: true,
-        agent: false,
-        family: selectedAddress.family,
-        autoSelectFamily: false,
-        headers,
-        lookup(hostname, _options, callback) {
-          if (hostname !== validatedUrl.hostname) {
-            callback(
-              Object.assign(new Error('Pinned lookup received an unexpected hostname.'), {
-                code: 'EINVAL',
-              }),
-              selectedAddress.address,
-              selectedAddress.family,
-            );
-            return;
-          }
-          callback(null, selectedAddress.address, selectedAddress.family);
+    throwIfAborted(context);
+    let request: HttpsRequest;
+    try {
+      request = requestFactory(
+        {
+          protocol: 'https:',
+          hostname: validatedUrl.hostname,
+          servername: validatedUrl.hostname,
+          port: 443,
+          path: `${validatedUrl.url.pathname}${validatedUrl.url.search}`,
+          method: 'GET',
+          rejectUnauthorized: true,
+          agent: false,
+          family: selectedAddress.family,
+          autoSelectFamily: false,
+          headers,
+          lookup(hostname, _options, callback) {
+            if (hostname !== validatedUrl.hostname) {
+              callback(
+                Object.assign(new Error('Pinned lookup received an unexpected hostname.'), {
+                  code: 'EINVAL',
+                }),
+                selectedAddress.address,
+                selectedAddress.family,
+              );
+              return;
+            }
+            callback(null, selectedAddress.address, selectedAddress.family);
+          },
         },
-      },
-      (response) => {
-        request.setTimeout(0, () => undefined);
-        context.currentRequest = null;
-        resolve(response);
-      },
-    );
+        (response) => {
+          request.setTimeout(0, () => undefined);
+          context.currentRequest = null;
+          context.currentResponse = response;
+          resolve(response);
+        },
+      );
+    } catch {
+      reject(new CollectionHttpError('http_error', 'HTTPS request failed.'));
+      return;
+    }
     context.currentRequest = request;
-    request.once('error', reject);
+    request.once('error', (error) => {
+      context.currentRequest = null;
+      reject(
+        error instanceof CollectionHttpError
+          ? error
+          : new CollectionHttpError('http_error', 'HTTPS request failed.'),
+      );
+    });
     request.setTimeout(CONNECT_TIMEOUT_MS, () => {
       request.destroy(new CollectionHttpError('timeout', 'HTTPS connection timed out.'));
     });
@@ -286,6 +324,7 @@ function buildRequestHeaders(input: SafeHttpRequest): Readonly<Record<string, st
 async function readBoundedBody(
   response: HttpsResponse,
   contentEncodingHeader: string | string[] | undefined,
+  context: RequestContext,
 ): Promise<Uint8Array> {
   const contentEncoding = boundedHeader(contentEncodingHeader, MAX_CONTENT_ENCODING_LENGTH);
   if (contentEncodingHeader !== undefined && contentEncoding === null) {
@@ -301,11 +340,13 @@ async function readBoundedBody(
     discardResponse(response);
     throw new CollectionHttpError('http_error', 'Collection response uses unsupported content encoding.');
   }
+  context.currentDecoder = stream === response ? null : stream;
 
   const chunks: Uint8Array[] = [];
   let decompressedBytes = 0;
   try {
     for await (const rawChunk of stream) {
+      throwIfAborted(context);
       const chunk = toUint8Array(rawChunk);
       decompressedBytes += chunk.byteLength;
       if (decompressedBytes > MAX_DECOMPRESSED_BYTES) {
@@ -313,13 +354,15 @@ async function readBoundedBody(
           'response_too_large',
           `Decompressed response exceeds ${MAX_DECOMPRESSED_BYTES} bytes.`,
         );
-        stream.destroy();
-        response.destroy();
+        destroyActiveBody(context);
         throw error;
       }
       chunks.push(chunk);
     }
+    throwIfAborted(context);
   } catch (error) {
+    destroyActiveBody(context);
+    if (context.abortError !== null) throw context.abortError;
     if (error instanceof CollectionHttpError) throw error;
     throw new CollectionHttpError('http_error', 'Collection response body could not be decoded.');
   }
@@ -331,6 +374,21 @@ async function readBoundedBody(
     offset += chunk.byteLength;
   }
   return body;
+}
+
+function throwIfAborted(context: RequestContext): void {
+  if (context.abortError !== null) throw context.abortError;
+}
+
+function destroyActiveBody(context: RequestContext): void {
+  context.currentDecoder?.destroy();
+  context.currentResponse?.destroy();
+  clearActiveBody(context);
+}
+
+function clearActiveBody(context: RequestContext): void {
+  context.currentDecoder = null;
+  context.currentResponse = null;
 }
 
 function readResponseMetadata(headers: IncomingHttpHeaders): Pick<

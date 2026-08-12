@@ -243,6 +243,104 @@ describe('createSafeHttpsClient', () => {
     response.destroy();
   });
 
+  it('does not connect when the deadline fires while DNS resolution is pending', async () => {
+    let resolveDns: ((addresses: readonly [{ readonly address: string; readonly family: 4 }]) => void) | undefined;
+    const resolver: SafeDnsResolver = {
+      resolve() {
+        return new Promise((resolve) => { resolveDns = resolve; });
+      },
+    };
+    let requestCount = 0;
+    const factory: HttpsRequestFactory = () => {
+      requestCount += 1;
+      return new FakeRequest(() => undefined);
+    };
+    let fireDeadline: (() => void) | undefined;
+    const timer: TimerPort = {
+      setTimeout(callback) { fireDeadline = callback; return 1; },
+      clearTimeout() {},
+    };
+    const pending = createSafeHttpsClient({ requestFactory: factory, resolver, timer }).get(BASE_INPUT);
+    fireDeadline!();
+    await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+
+    resolveDns!([{ address: '93.184.216.34', family: 4 }]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(requestCount).toBe(0);
+  });
+
+  it('maps native request failures to a stable adapter error without leaking details', async () => {
+    const nativeMessage = 'certificate CN and socket 10.0.0.7:443 mismatch';
+    let nativeRequest: FakeRequest;
+    const factory: HttpsRequestFactory = () => {
+      nativeRequest = new FakeRequest(() => {
+        nativeRequest.emit('error', new Error(nativeMessage));
+      });
+      return nativeRequest;
+    };
+    const resolver: SafeDnsResolver = { async resolve() { return [{ address: '93.184.216.34', family: 4 }]; } };
+
+    await expect(createSafeHttpsClient({ requestFactory: factory, resolver }).get(BASE_INPUT))
+      .rejects.toSatisfy((error: unknown) => {
+        expectCode(error, 'http_error');
+        expect((error as Error).message).not.toContain(nativeMessage);
+        expect((error as Error).message).toBe('HTTPS request failed.');
+        return true;
+      });
+  });
+
+  it('destroys the raw response when its decoder fails', async () => {
+    const response = new PassThrough();
+    let decoder: NodeJS.WritableStream | undefined;
+    const originalPipe = response.pipe.bind(response);
+    response.pipe = ((destination, options) => {
+      decoder = destination;
+      return originalPipe(destination, options);
+    }) as typeof response.pipe;
+    let responseClosed = false;
+    response.once('close', () => { responseClosed = true; });
+    const factory: HttpsRequestFactory = (_options, onResponse) => new FakeRequest(() => {
+      onResponse(withResponseMetadata(response, 200, { 'content-encoding': 'gzip' }));
+      response.write(Buffer.from('not a gzip stream'));
+    });
+    const resolver: SafeDnsResolver = { async resolve() { return [{ address: '93.184.216.34', family: 4 }]; } };
+
+    await expect(createSafeHttpsClient({ requestFactory: factory, resolver }).get(BASE_INPUT))
+      .rejects.toMatchObject({ code: 'http_error' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(responseClosed).toBe(true);
+    expect(decoder).toMatchObject({ destroyed: true });
+  });
+
+  it('destroys the active decoder when the total deadline fires', async () => {
+    const response = new PassThrough();
+    let decoder: NodeJS.WritableStream | undefined;
+    const originalPipe = response.pipe.bind(response);
+    response.pipe = ((destination, options) => {
+      decoder = destination;
+      return originalPipe(destination, options);
+    }) as typeof response.pipe;
+    const factory: HttpsRequestFactory = (_options, onResponse) => new FakeRequest(() => {
+      onResponse(withResponseMetadata(response, 200, { 'content-encoding': 'gzip' }));
+    });
+    const resolver: SafeDnsResolver = { async resolve() { return [{ address: '93.184.216.34', family: 4 }]; } };
+    let fireDeadline: (() => void) | undefined;
+    const timer: TimerPort = {
+      setTimeout(callback) { fireDeadline = callback; return 1; },
+      clearTimeout() {},
+    };
+    const pending = createSafeHttpsClient({ requestFactory: factory, resolver, timer }).get(BASE_INPUT);
+    await Promise.resolve();
+    await Promise.resolve();
+    fireDeadline!();
+
+    await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(response.destroyed).toBe(true);
+    expect(decoder).toMatchObject({ destroyed: true });
+  });
+
   it('returns bounded response metadata and a null body for 304', async () => {
     const harness = createHarness([{ status: 304, headers: {
       etag: '"v2"', 'last-modified': 'Wed, 12 Aug 2026 07:00:00 GMT', 'content-type': 'application/rss+xml',
