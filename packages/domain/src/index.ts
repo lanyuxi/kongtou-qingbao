@@ -47,3 +47,23 @@ export type {
   ValidatedAddress,
   ValidatedCollectionUrl,
 } from './collection/network-policy.js';
+export {
+  CollectionContentPolicyError,
+  createStableFeedEntryKey,
+  decodeUtf8,
+  decideContentStorage,
+  decideFeedArticleDisposition,
+  parseCollectionMediaType,
+  sanitizeCollectionEtag,
+  sanitizeCollectionLastModified,
+  selectArticleFetches,
+  selectFeedEntries,
+} from './collection/content-policy.js';
+export type {
+  CollectionMediaType,
+  ContentPolicyErrorCode,
+  ContentStorageInput,
+  FeedArticleDisposition,
+  FeedArticleDispositionInput,
+  StableFeedEntryKeyInput,
+} from './collection/content-policy.js';
