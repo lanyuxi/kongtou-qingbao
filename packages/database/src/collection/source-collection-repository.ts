@@ -20,6 +20,7 @@ export interface CollectionTransaction {
   lockIdempotencyKey(idempotencyKey: string): Promise<void>;
   loadContext(projectId: string, sourceId: string): Promise<SourceCollectionContext | null>;
   findCommitted(idempotencyKey: string): Promise<CollectSourceResult | null>;
+  loadDiscoveryIds(feedRawItemId: string): Promise<readonly string[]>;
   loadLatest(logicalUrl: string, projectId: string, sourceId: string): Promise<LatestRawItem | null>;
   insertRawItem(rawItem: RawItemInput): Promise<string>;
   insertAttempt(attempt: CollectionAttemptInput, rawItemId: string | null): Promise<void>;
@@ -78,9 +79,15 @@ export function createSourceCollectionRepositoryFromTransactions(
     commitEndpoint,
     commitFeed: (input) =>
       run(async (transaction) => {
-        const committed = await findForCommit(transaction, input.attempt.idempotencyKey);
+        const committed = await findForCommit(transaction, input.attempt);
         if (committed !== null) {
-          return { result: committed, discoveryIds: [] };
+          if (committed.rawItemId === null) {
+            throw new Error('committed_feed_raw_item_required');
+          }
+          return {
+            result: committed,
+            discoveryIds: await transaction.loadDiscoveryIds(committed.rawItemId),
+          };
         }
         const rawItemId = await transaction.insertRawItem(input.rawItem);
         await transaction.insertAttempt(input.attempt, rawItemId);
@@ -96,7 +103,7 @@ export function createSourceCollectionRepositoryFromTransactions(
       }),
     commitArticleOutcome: (input) =>
       run(async (transaction) => {
-        const committed = await findForCommit(transaction, input.attempt.idempotencyKey);
+        const committed = await findForCommit(transaction, input.attempt);
         if (committed !== null) {
           return;
         }
@@ -118,7 +125,7 @@ async function commitAttempt(
   attempt: CollectionAttemptInput,
   rawItem: RawItemInput | null,
 ): Promise<CollectSourceResult> {
-  const committed = await findForCommit(transaction, attempt.idempotencyKey);
+  const committed = await findForCommit(transaction, attempt);
   if (committed !== null) {
     return committed;
   }
@@ -129,10 +136,17 @@ async function commitAttempt(
 
 async function findForCommit(
   transaction: CollectionTransaction,
-  idempotencyKey: string,
+  attempt: CollectionAttemptInput,
 ): Promise<CollectSourceResult | null> {
-  await transaction.lockIdempotencyKey(idempotencyKey);
-  return transaction.findCommitted(idempotencyKey);
+  await transaction.lockIdempotencyKey(attempt.idempotencyKey);
+  const committed = await transaction.findCommitted(attempt.idempotencyKey);
+  if (
+    committed !== null &&
+    (committed.projectId !== attempt.projectId || committed.sourceId !== attempt.sourceId)
+  ) {
+    throw new Error('committed_aggregate_mismatch');
+  }
+  return committed;
 }
 
 function buildResult(attempt: CollectionAttemptInput, rawItemId: string | null): CollectSourceResult {
@@ -179,6 +193,15 @@ function createPostgresTransaction(sql: TransactionSql): CollectionTransaction {
         select * from public.collection_attempts where idempotency_key = ${idempotencyKey} limit 1
       `;
       return rows[0] === undefined ? null : resultFromRow(rows[0]);
+    },
+    loadDiscoveryIds: async (feedRawItemId) => {
+      const rows = await sql<readonly { id: string }[]>`
+        select id from public.discovered_items
+        where feed_raw_item_id = ${feedRawItemId}::uuid
+          and version = 1
+        order by created_at, id
+      `;
+      return rows.map(({ id }) => id);
     },
     loadLatest: async (logicalUrl, projectId, sourceId) => {
       const rows = await sql<

@@ -127,6 +127,36 @@ describe('SourceCollectionRepository', () => {
     ]);
   });
 
+  it('returns the original discovery identifiers when replaying a committed feed', async () => {
+    const prior = result({ discoveredCount: 1 });
+    const harness = createHarness({ committed: prior, discoveryIds: [discoveredItemId] });
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(repository.commitFeed(feedInput())).resolves.toEqual({
+      result: prior,
+      discoveryIds: [discoveredItemId],
+    });
+    expect(harness.transactions.at(-1)).toContain(`load discovery ids ${rawItemId}`);
+  });
+
+  it.each(['endpoint', 'feed', 'article'] as const)(
+    'fails closed when a committed %s replay belongs to another aggregate',
+    async (operation) => {
+      const harness = createHarness({
+        committed: result({ projectId: '50000000-0000-4000-8000-000000000099' }),
+      });
+      const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+      const promise = operation === 'endpoint'
+        ? repository.commitEndpoint(endpointInput())
+        : operation === 'feed'
+          ? repository.commitFeed(feedInput())
+          : repository.commitArticleOutcome(articleInput());
+
+      await expect(promise).rejects.toMatchObject({ code: 'persistence_failed' });
+    },
+  );
+
   it('commits an article attempt, optional raw item, and successor atomically', async () => {
     const harness = createHarness();
     const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
@@ -260,7 +290,11 @@ function result(overrides: Partial<CollectSourceResult> = {}): CollectSourceResu
   };
 }
 
-function createHarness(options: { committed?: CollectSourceResult; reusedRawItemId?: string } = {}): {
+function createHarness(options: {
+  committed?: CollectSourceResult;
+  reusedRawItemId?: string;
+  discoveryIds?: readonly string[];
+} = {}): {
   readonly run: CollectionTransactionRunner;
   readonly transactions: string[][];
 } {
@@ -276,13 +310,18 @@ function createHarness(options: { committed?: CollectSourceResult; reusedRawItem
 
 function createHarnessTransaction(
   events: string[],
-  options: { committed?: CollectSourceResult; reusedRawItemId?: string } = {},
+  options: {
+    committed?: CollectSourceResult;
+    reusedRawItemId?: string;
+    discoveryIds?: readonly string[];
+  } = {},
 ): CollectionTransaction {
   return {
     setCollectionWorkerRole: async () => { events.push('set local role collection_worker'); },
     lockIdempotencyKey: async (key) => { events.push(`lock idempotency ${key}`); },
     loadContext: async () => null,
     findCommitted: async (key) => { events.push(`find committed ${key}`); return options.committed ?? null; },
+    loadDiscoveryIds: async (feedRawItemId) => { events.push(`load discovery ids ${feedRawItemId}`); return options.discoveryIds ?? []; },
     loadLatest: async () => null,
     insertRawItem: async (rawItem) => { events.push(`insert raw ${rawItem.id}`); return options.reusedRawItemId ?? rawItem.id; },
     insertAttempt: async (attempt, committedRawItemId) => { events.push(`insert attempt ${attempt.id}:${committedRawItemId ?? 'null'}`); },

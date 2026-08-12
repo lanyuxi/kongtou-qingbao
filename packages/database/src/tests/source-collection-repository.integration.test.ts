@@ -17,17 +17,31 @@ const discoveryId = '81000000-0000-4000-8000-000000000003';
 const successorId = '81000000-0000-4000-8000-000000000004';
 const articleAttemptId = '81000000-0000-4000-8000-000000000005';
 const articleRawItemId = '81000000-0000-4000-8000-000000000006';
+const workerRole = 'source_collection_repository_test_worker';
+const workerPassword = 'source-collection-repository-test-only';
 
 const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
 const describeIntegration = integrationDatabaseUrl === undefined ? describe.skip : describe;
 
 describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
   const owner = integrationDatabaseUrl === undefined ? null : postgres(integrationDatabaseUrl, { max: 1 });
-  const worker = integrationDatabaseUrl === undefined ? null : postgres(integrationDatabaseUrl, { max: 1 });
+  const worker = integrationDatabaseUrl === undefined
+    ? null
+    : postgres(integrationDatabaseUrl, { max: 1, user: workerRole, password: workerPassword });
   const repository = worker === null ? null : createSourceCollectionRepository(worker);
 
   beforeAll(async () => {
     if (owner === null) throw new Error('Database integration environment is unavailable.');
+    await dropWorkerRole(owner);
+    await owner`
+      create role source_collection_repository_test_worker
+      login noinherit nosuperuser nobypassrls nocreatedb nocreaterole noreplication
+      password 'source-collection-repository-test-only'
+    `;
+    await owner`
+      grant collection_worker to source_collection_repository_test_worker
+      with admin false, inherit false, set true
+    `;
     await removeFixtures(owner);
     await owner`
       insert into auth.users (
@@ -57,8 +71,33 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
 
   afterAll(async () => {
     if (owner === null || worker === null) return;
-    await removeFixtures(owner);
-    await Promise.all([owner.end({ timeout: 5 }), worker.end({ timeout: 5 })]);
+    try {
+      await removeFixtures(owner);
+    } finally {
+      await worker.end({ timeout: 5 });
+      try {
+        await dropWorkerRole(owner);
+      } finally {
+        await owner.end({ timeout: 5 });
+      }
+    }
+  });
+
+  it('uses a non-privileged login that may set only its granted collection role', async () => {
+    if (worker === null) throw new Error('Database integration environment is unavailable.');
+    const rows = await worker`
+      select current_user::text, session_user::text,
+        usesuper, usebypassrls,
+        pg_catalog.pg_has_role(session_user, 'collection_worker', 'SET') as may_set_worker
+      from pg_catalog.pg_user where usename = session_user
+    `;
+    expect(rows[0]).toEqual({
+      current_user: workerRole,
+      session_user: workerRole,
+      usesuper: false,
+      usebypassrls: false,
+      may_set_worker: true,
+    });
   });
 
   it('loads context through real collection_worker RLS', async () => {
@@ -86,6 +125,13 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
       attempt: { ...endpointAttempt(), id: '81000000-0000-4000-8000-000000000099' },
       rawItem: { ...rawItem(), id: '81000000-0000-4000-8000-000000000098' },
     });
+    await expect(repository.commitEndpoint({
+      attempt: {
+        ...endpointAttempt(),
+        projectId: '81000000-0000-4000-8000-000000000099',
+      },
+      rawItem: null,
+    })).rejects.toMatchObject({ code: 'persistence_failed' });
     const reuse = await repository.commitEndpoint({
       attempt: { ...endpointAttempt(), id: '81000000-0000-4000-8000-000000000097', idempotencyKey: 'repository:hash-reuse' },
       rawItem: { ...rawItem(), id: '81000000-0000-4000-8000-000000000096' },
@@ -106,7 +152,9 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
     const feedRaw = { ...rawItem(), id: '81000000-0000-4000-8000-000000000012', contentKind: 'rss_feed' as const, sha256: 'b'.repeat(64) };
     const feedAttempt = { ...endpointAttempt(), id: '81000000-0000-4000-8000-000000000011', idempotencyKey: 'repository:feed', discoveredCount: 1 };
     const discovery = discoveryInput(feedRaw.id);
-    await repository.commitFeed({ attempt: feedAttempt, rawItem: feedRaw, discoveries: [discovery] });
+    const firstFeed = await repository.commitFeed({ attempt: feedAttempt, rawItem: feedRaw, discoveries: [discovery] });
+    const replayedFeed = await repository.commitFeed({ attempt: feedAttempt, rawItem: feedRaw, discoveries: [discovery] });
+    expect(replayedFeed).toEqual(firstFeed);
 
     await repository.commitArticleOutcome({
       attempt: {
@@ -152,6 +200,10 @@ function endpointAttempt(): CollectionAttemptInput {
     etag: '"v1"', lastModified: null, decompressedBytes: 15, outcome: 'stored_new_content',
     errorCode: null, errorDetail: null, discoveredCount: 0, bodyFetchCount: 0,
   };
+}
+
+async function dropWorkerRole(sql: postgres.Sql): Promise<void> {
+  await sql`drop role if exists source_collection_repository_test_worker`;
 }
 
 function rawItem(): RawItemInput {
