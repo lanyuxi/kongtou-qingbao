@@ -1,4 +1,8 @@
-import { isWithinAuthorityDomains, MAX_DECOMPRESSED_BYTES } from './network-policy.js';
+import {
+  isWithinAuthorityDomains,
+  MAX_DECOMPRESSED_BYTES,
+  type ValidatedCollectionUrl,
+} from './network-policy.js';
 
 export type ContentPolicyErrorCode =
   | 'unsupported_content_type'
@@ -28,7 +32,7 @@ export interface ContentStorageInput {
 
 export interface StableFeedEntryKeyInput {
   readonly id: string | null;
-  readonly url: string | null;
+  readonly validatedUrl: ValidatedCollectionUrl | null;
 }
 
 export interface FeedArticleDispositionInput {
@@ -49,7 +53,8 @@ const MAX_STABLE_ENTRY_KEY_LENGTH = 4_096;
 const MAX_FEED_ENTRIES = 100;
 const MAX_ARTICLE_FETCHES = 20;
 const TOKEN = "[!#$%&'*+.^_`|~0-9A-Za-z-]+";
-const QUOTED_STRING = '"(?:[\\t !#-\\[\\]-~]|\\\\[\\t -~])*"';
+const QUOTED_STRING = '"(?:[\\t !#-\\[\\]-~\\x80-\\xff]|\\\\[\\t -~\\x80-\\xff])*"';
+const HTTP_FIELD_VALUE = /^[\t\x20-\x7e\x80-\xff]+$/;
 const MEDIA_TYPE_PATTERN = new RegExp(
   `^(${TOKEN})/(${TOKEN})(?:[\\t ]*;[\\t ]*${TOKEN}[\\t ]*=[\\t ]*(?:${TOKEN}|${QUOTED_STRING}))*[\\t ]*$`,
 );
@@ -118,16 +123,11 @@ export function createStableFeedEntryKey(input: StableFeedEntryKeyInput): string
     return `id:${id}`;
   }
 
-  if (input.url === null) {
+  if (input.validatedUrl === null) {
     return null;
   }
 
-  let normalizedUrl: URL;
-  try {
-    normalizedUrl = new URL(input.url);
-  } catch {
-    return null;
-  }
+  const normalizedUrl = new URL(input.validatedUrl.url);
   normalizedUrl.hash = '';
 
   const key = `url:${normalizedUrl.href}`;
@@ -184,7 +184,12 @@ export function selectArticleFetches<T extends FeedEntryEligibility>(
 }
 
 function boundedOpaqueValidator(value: string | null, maximumLength: number): string | null {
-  if (value === null || value.trim().length === 0 || value.length > maximumLength) {
+  if (
+    value === null ||
+    value.trim().length === 0 ||
+    value.length > maximumLength ||
+    !HTTP_FIELD_VALUE.test(value)
+  ) {
     return null;
   }
   return value;

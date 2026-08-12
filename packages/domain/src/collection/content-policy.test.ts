@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { MAX_DECOMPRESSED_BYTES } from './network-policy.js';
+import {
+  MAX_DECOMPRESSED_BYTES,
+  validateConfiguredCollectionUrl,
+  type ValidatedCollectionUrl,
+} from './network-policy.js';
 import {
   CollectionContentPolicyError,
   createStableFeedEntryKey,
@@ -29,6 +33,14 @@ function expectPolicyError(
   expect(thrown).toMatchObject({ code });
 }
 
+function validatedUrl(url: string): ValidatedCollectionUrl {
+  return validateConfiguredCollectionUrl({
+    candidateUrl: url,
+    configuredUrl: url,
+    authorityDomains: ['official.example'],
+  });
+}
+
 describe('parseCollectionMediaType', () => {
   it.each([
     ['text/html; charset=utf-8', 'html'],
@@ -55,6 +67,20 @@ describe('parseCollectionMediaType', () => {
     'text/html; charset="unterminated',
   ])('rejects malformed media type parameters in %s', (header) => {
     expectPolicyError(() => parseCollectionMediaType(header), 'unsupported_content_type');
+  });
+
+  it('accepts RFC HTTP obs-text inside a quoted parameter', () => {
+    expect(parseCollectionMediaType('text/html; note="café"')).toEqual({
+      family: 'html',
+      mediaType: 'text/html',
+    });
+  });
+
+  it('rejects an illegal field-value control inside a quoted parameter', () => {
+    expectPolicyError(
+      () => parseCollectionMediaType('text/html; note="bad\u000bvalue"'),
+      'unsupported_content_type',
+    );
   });
 });
 
@@ -141,44 +167,70 @@ describe('conditional response validators', () => {
     expect(sanitizeCollectionEtag(value)).toBeNull();
     expect(sanitizeCollectionLastModified(value)).toBeNull();
   });
+
+  it.each([
+    ['carriage return', 'safe\rInjected: true'],
+    ['line feed', 'safe\nInjected: true'],
+    ['NUL', 'safe\u0000value'],
+    ['C0 control', 'safe\u000bvalue'],
+    ['DEL', 'safe\u007fvalue'],
+  ])('rejects %s in opaque validators', (_name, value) => {
+    expect(sanitizeCollectionEtag(value)).toBeNull();
+    expect(sanitizeCollectionLastModified(value)).toBeNull();
+  });
+
+  it('preserves horizontal tabs and obs-text allowed in HTTP field values', () => {
+    expect(sanitizeCollectionEtag('\tW/"café"\t')).toBe('\tW/"café"\t');
+    expect(sanitizeCollectionLastModified('café\tGMT')).toBe('café\tGMT');
+  });
 });
 
 describe('feed entry identity and fetch disposition', () => {
   it('prefers a trimmed GUID or Atom ID and otherwise uses a normalized URL', () => {
     expect(
-      createStableFeedEntryKey({ id: ' urn:item:1 ', url: 'https://official.example/a' }),
+      createStableFeedEntryKey({
+        id: ' urn:item:1 ',
+        validatedUrl: validatedUrl('https://official.example/ignored'),
+      }),
     ).toBe('id:urn:item:1');
-    expect(createStableFeedEntryKey({ id: null, url: 'https://official.example/a' })).toBe(
-      'url:https://official.example/a',
-    );
-    expect(createStableFeedEntryKey({ id: null, url: null })).toBeNull();
+    expect(
+      createStableFeedEntryKey({
+        id: null,
+        validatedUrl: validatedUrl('https://official.example/a'),
+      }),
+    ).toBe('url:https://official.example/a');
+    expect(createStableFeedEntryKey({ id: null, validatedUrl: null })).toBeNull();
   });
 
   it('falls back from an empty identifier and strips URL fragments while preserving query data', () => {
     expect(
       createStableFeedEntryKey({
         id: '   ',
-        url: 'https://official.example/a/../entry?part=1#section-two',
+        validatedUrl: validatedUrl(
+          'https://official.example/a/../entry?part=1#section-two',
+        ),
       }),
     ).toBe('url:https://official.example/entry?part=1');
   });
 
   it('accepts an identifier at 2,048 characters and falls back when it is longer', () => {
-    expect(createStableFeedEntryKey({ id: 'i'.repeat(2_048), url: null })).toBe(
+    expect(createStableFeedEntryKey({ id: 'i'.repeat(2_048), validatedUrl: null })).toBe(
       `id:${'i'.repeat(2_048)}`,
     );
     expect(
-      createStableFeedEntryKey({ id: 'i'.repeat(2_049), url: 'https://official.example/fallback' }),
+      createStableFeedEntryKey({
+        id: 'i'.repeat(2_049),
+        validatedUrl: validatedUrl('https://official.example/fallback'),
+      }),
     ).toBe('url:https://official.example/fallback');
-    expect(createStableFeedEntryKey({ id: 'i'.repeat(2_049), url: null })).toBeNull();
+    expect(createStableFeedEntryKey({ id: 'i'.repeat(2_049), validatedUrl: null })).toBeNull();
   });
 
-  it('rejects an invalid URL and a normalized URL key over 4,096 characters', () => {
-    expect(createStableFeedEntryKey({ id: null, url: 'not a URL' })).toBeNull();
+  it('rejects a normalized validated URL key over 4,096 characters', () => {
     expect(
       createStableFeedEntryKey({
         id: null,
-        url: `https://official.example/${'p'.repeat(4_096)}`,
+        validatedUrl: validatedUrl(`https://official.example/${'p'.repeat(4_096)}`),
       }),
     ).toBeNull();
   });
