@@ -355,7 +355,8 @@ function parseCandidateUrl(value: string | null, base: string | null): string | 
     return null;
   }
   try {
-    return boundedUrl(base === null ? new URL(trimmed).href : new URL(trimmed, base).href, null);
+    const candidate = base === null ? new URL(trimmed) : new URL(trimmed, base);
+    return candidate.protocol === 'https:' ? boundedUrl(candidate.href, null) : null;
   } catch {
     return null;
   }
@@ -378,7 +379,7 @@ function boundedUrl(value: string | undefined, base: string | null): string | nu
 
 function boundedIdentity(value: string | undefined, maximumLength: number): string | null {
   const trimmed = value?.trim();
-  return trimmed !== undefined && trimmed.length > 0 && codePointLength(trimmed) <= maximumLength
+  return trimmed !== undefined && trimmed.length > 0 && trimmed.length <= maximumLength
     ? trimmed
     : null;
 }
@@ -424,9 +425,103 @@ function isValidAtomTimestampShape(value: string): boolean {
 }
 
 function isValidRssTimestampShape(value: string): boolean {
-  return /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s(?:0?[1-9]|[12]\d|3[01])\s(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s\d{2,4}\s(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\s(?:UT|GMT|[ECMP][SD]T|[+-]\d{4})$/.test(
+  const match = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s(0?[1-9]|[12]\d|3[01])\s(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s(\d{2}|\d{4})\s([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\s(UT|GMT|[ECMP][SD]T|[+-]\d{4})$/.exec(
     value,
   );
+  if (match === null) {
+    return false;
+  }
+
+  const [, weekday, dayText, monthName, yearText, hourText, minuteText, secondText, zone] =
+    match;
+  const month = monthName === undefined ? 0 : RSS_MONTH_INDEX[monthName] ?? 0;
+  const year = parseRssYear(yearText);
+  const offsetMinutes = parseRssOffset(zone);
+  const milliseconds = Date.parse(value);
+  if (
+    year === null ||
+    offsetMinutes === null ||
+    !validCalendarDate(String(year), String(month), dayText) ||
+    !Number.isFinite(milliseconds)
+  ) {
+    return false;
+  }
+
+  const local = new Date(milliseconds + offsetMinutes * 60_000);
+  return (
+    RSS_WEEKDAYS[local.getUTCDay()] === weekday &&
+    local.getUTCFullYear() === year &&
+    local.getUTCMonth() + 1 === month &&
+    local.getUTCDate() === Number(dayText) &&
+    local.getUTCHours() === Number(hourText) &&
+    local.getUTCMinutes() === Number(minuteText) &&
+    local.getUTCSeconds() === Number(secondText ?? '0')
+  );
+}
+
+const RSS_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+const RSS_MONTH_INDEX: Readonly<Record<string, number>> = Object.fromEntries(
+  RSS_MONTHS.map((month, index) => [month, index + 1]),
+);
+const RSS_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const RSS_NAMED_ZONE_OFFSETS: Readonly<Record<string, number>> = {
+  UT: 0,
+  GMT: 0,
+  EST: -5 * 60,
+  EDT: -4 * 60,
+  CST: -6 * 60,
+  CDT: -5 * 60,
+  MST: -7 * 60,
+  MDT: -6 * 60,
+  PST: -8 * 60,
+  PDT: -7 * 60,
+};
+
+function parseRssYear(value: string | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+  const year = Number(value);
+  if (value.length === 4) {
+    return year;
+  }
+  return year < 50 ? 2_000 + year : 1_900 + year;
+}
+
+function parseRssOffset(value: string | undefined): number | null {
+  if (value === undefined) {
+    return null;
+  }
+  const namedOffset = RSS_NAMED_ZONE_OFFSETS[value];
+  if (namedOffset !== undefined) {
+    return namedOffset;
+  }
+
+  const match = /^([+-])(\d{2})(\d{2})$/.exec(value);
+  if (match === null) {
+    return null;
+  }
+  const [, sign, hourText, minuteText] = match;
+  const hours = Number(hourText);
+  const minutes = Number(minuteText);
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+  const magnitude = hours * 60 + minutes;
+  return sign === '+' ? magnitude : -magnitude;
 }
 
 function validCalendarDate(

@@ -150,6 +150,52 @@ describe('strict Feed parser', () => {
     expect(feed.invalidEntryCount).toBe(3);
   });
 
+  it('aligns parser identity with downstream HTTPS URL and UTF-16 ID bounds', () => {
+    const astralId = '🪂'.repeat(1_025);
+    const feed = parser.parse(`
+      <rss version="2.0"><channel>
+        <item><link>ftp://official.example/not-fetchable</link></item>
+        <item><guid>${astralId}</guid></item>
+        <item><link>https://official.example/fetchable</link></item>
+      </channel></rss>
+    `);
+
+    expect(feed.entries).toEqual([
+      {
+        externalId: null,
+        url: 'https://official.example/fetchable',
+        title: null,
+        summary: null,
+        author: null,
+        publishedAt: null,
+        updatedAt: null,
+      },
+    ]);
+    expect(feed.invalidEntryCount).toBe(2);
+  });
+
+  it('rejects an impossible RSS calendar date without rolling it into March', () => {
+    const feed = parser.parse(`
+      <rss version="2.0"><channel><item>
+        <guid>entry-1</guid>
+        <pubDate>Wed, 31 Feb 2015 07:28:00 GMT</pubDate>
+      </item></channel></rss>
+    `);
+
+    expect(feed.entries[0]?.publishedAt).toBeNull();
+  });
+
+  it('round-trips a valid RFC 822 timestamp with a numeric timezone offset', () => {
+    const feed = parser.parse(`
+      <rss version="2.0"><channel><item>
+        <guid>entry-1</guid>
+        <pubDate>Wed, 21 Oct 2015 15:28:00 +0800</pubDate>
+      </item></channel></rss>
+    `);
+
+    expect(feed.entries[0]?.publishedAt).toBe('2015-10-21T07:28:00.000Z');
+  });
+
   it('clamps extracted fields to persistence bounds and ignores feed content bodies', () => {
     const feed = parser.parse(`
       <feed xmlns="http://www.w3.org/2005/Atom">
