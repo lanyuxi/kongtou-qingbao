@@ -67,7 +67,7 @@ jobs:
       - if: steps.supabase.outputs.enabled == 'true'
         run: pnpm test:db
       - if: steps.supabase.outputs.enabled == 'true'
-        name: Require database repository PostgREST integration
+        name: Require database repository integration
         run: |
           set -euo pipefail
           database_container='supabase_db_airdrop-intelligence-os'

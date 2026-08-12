@@ -8,7 +8,7 @@ const preflightScript = fileURLToPath(
 );
 
 describe('database integration environment preflight', () => {
-  it('fails with stable variable names without printing environment values', () => {
+  it('fails both repository integration suites with stable variable names without printing values', () => {
     const result = spawnSync(process.execPath, [preflightScript], {
       encoding: 'utf8',
       env: {},
