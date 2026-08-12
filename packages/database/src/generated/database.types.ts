@@ -34,6 +34,264 @@ export type Database = {
   }
   public: {
     Tables: {
+      collection_attempts: {
+        Row: {
+          body_fetch_count: number
+          collected_at: string
+          completed_at: string
+          created_at: string
+          decompressed_bytes: number | null
+          discovered_count: number
+          error_code: string | null
+          error_detail: string | null
+          etag: string | null
+          final_url: string | null
+          http_status: number | null
+          id: string
+          idempotency_key: string
+          last_modified: string | null
+          media_type: string | null
+          outcome: Database["public"]["Enums"]["collection_outcome"]
+          parent_discovered_item_id: string | null
+          project_id: string
+          raw_item_id: string | null
+          redirect_chain: Json
+          requested_url: string
+          source_id: string
+          started_at: string
+        }
+        Insert: {
+          body_fetch_count?: number
+          collected_at: string
+          completed_at: string
+          created_at?: string
+          decompressed_bytes?: number | null
+          discovered_count?: number
+          error_code?: string | null
+          error_detail?: string | null
+          etag?: string | null
+          final_url?: string | null
+          http_status?: number | null
+          id: string
+          idempotency_key: string
+          last_modified?: string | null
+          media_type?: string | null
+          outcome: Database["public"]["Enums"]["collection_outcome"]
+          parent_discovered_item_id?: string | null
+          project_id: string
+          raw_item_id?: string | null
+          redirect_chain?: Json
+          requested_url: string
+          source_id: string
+          started_at: string
+        }
+        Update: {
+          body_fetch_count?: number
+          collected_at?: string
+          completed_at?: string
+          created_at?: string
+          decompressed_bytes?: number | null
+          discovered_count?: number
+          error_code?: string | null
+          error_detail?: string | null
+          etag?: string | null
+          final_url?: string | null
+          http_status?: number | null
+          id?: string
+          idempotency_key?: string
+          last_modified?: string | null
+          media_type?: string | null
+          outcome?: Database["public"]["Enums"]["collection_outcome"]
+          parent_discovered_item_id?: string | null
+          project_id?: string
+          raw_item_id?: string | null
+          redirect_chain?: Json
+          requested_url?: string
+          source_id?: string
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_attempts_parent_identity_fkey"
+            columns: ["parent_discovered_item_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_items"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_raw_item_identity_fkey"
+            columns: ["raw_item_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "raw_items"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovered_items: {
+        Row: {
+          article_collection_attempt_id: string | null
+          article_raw_item_id: string | null
+          author: string | null
+          created_at: string
+          disposition: Database["public"]["Enums"]["discovery_disposition"]
+          entry_url: string | null
+          external_entry_id: string | null
+          feed_raw_item_id: string
+          id: string
+          is_authority_domain: boolean
+          project_id: string
+          published_at: string | null
+          source_id: string
+          stable_entry_key: string
+          summary: string | null
+          supersedes_discovered_item_id: string | null
+          title: string | null
+          updated_at: string | null
+          version: number
+        }
+        Insert: {
+          article_collection_attempt_id?: string | null
+          article_raw_item_id?: string | null
+          author?: string | null
+          created_at?: string
+          disposition: Database["public"]["Enums"]["discovery_disposition"]
+          entry_url?: string | null
+          external_entry_id?: string | null
+          feed_raw_item_id: string
+          id: string
+          is_authority_domain: boolean
+          project_id: string
+          published_at?: string | null
+          source_id: string
+          stable_entry_key: string
+          summary?: string | null
+          supersedes_discovered_item_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version: number
+        }
+        Update: {
+          article_collection_attempt_id?: string | null
+          article_raw_item_id?: string | null
+          author?: string | null
+          created_at?: string
+          disposition?: Database["public"]["Enums"]["discovery_disposition"]
+          entry_url?: string | null
+          external_entry_id?: string | null
+          feed_raw_item_id?: string
+          id?: string
+          is_authority_domain?: boolean
+          project_id?: string
+          published_at?: string | null
+          source_id?: string
+          stable_entry_key?: string
+          summary?: string | null
+          supersedes_discovered_item_id?: string | null
+          title?: string | null
+          updated_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovered_items_article_attempt_identity_fkey"
+            columns: [
+              "article_collection_attempt_id",
+              "project_id",
+              "source_id",
+            ]
+            isOneToOne: false
+            referencedRelation: "collection_attempts"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_article_raw_identity_fkey"
+            columns: ["article_raw_item_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "raw_items"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_feed_raw_identity_fkey"
+            columns: ["feed_raw_item_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "raw_items"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_items_supersedes_identity_fkey"
+            columns: [
+              "supersedes_discovered_item_id",
+              "project_id",
+              "source_id",
+              "stable_entry_key",
+            ]
+            isOneToOne: false
+            referencedRelation: "discovered_items"
+            referencedColumns: [
+              "id",
+              "project_id",
+              "source_id",
+              "stable_entry_key",
+            ]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -229,6 +487,90 @@ export type Database = {
           version?: number
         }
         Relationships: []
+      }
+      raw_items: {
+        Row: {
+          collected_at: string
+          content_kind: Database["public"]["Enums"]["collection_content_kind"]
+          created_at: string
+          final_url: string
+          id: string
+          logical_url: string
+          media_type: string
+          parent_discovered_item_id: string | null
+          project_id: string
+          published_at: string | null
+          raw_text: string
+          sha256: string
+          source_id: string
+        }
+        Insert: {
+          collected_at: string
+          content_kind: Database["public"]["Enums"]["collection_content_kind"]
+          created_at?: string
+          final_url: string
+          id: string
+          logical_url: string
+          media_type: string
+          parent_discovered_item_id?: string | null
+          project_id: string
+          published_at?: string | null
+          raw_text: string
+          sha256: string
+          source_id: string
+        }
+        Update: {
+          collected_at?: string
+          content_kind?: Database["public"]["Enums"]["collection_content_kind"]
+          created_at?: string
+          final_url?: string
+          id?: string
+          logical_url?: string
+          media_type?: string
+          parent_discovered_item_id?: string | null
+          project_id?: string
+          published_at?: string | null
+          raw_text?: string
+          sha256?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_items_parent_identity_fkey"
+            columns: ["parent_discovered_item_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_items"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+          {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       signals: {
         Row: {
@@ -632,6 +974,15 @@ export type Database = {
         Args: { requested_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
       }
+      load_source_collection_context: {
+        Args: { requested_project_id: string; requested_source_id: string }
+        Returns: {
+          authority_domains: string[]
+          canonical_url: string
+          project_id: string
+          source_id: string
+        }[]
+      }
       update_user_task: {
         Args: { expected_version: number; patch: Json; task_id: string }
         Returns: {
@@ -655,6 +1006,10 @@ export type Database = {
         }
       }
       valid_authority_domains: { Args: { domains: string[] }; Returns: boolean }
+      valid_collection_redirect_chain: {
+        Args: { candidate: Json }
+        Returns: boolean
+      }
       valid_https_url: { Args: { candidate_url: string }; Returns: boolean }
     }
     Enums: {
@@ -664,6 +1019,33 @@ export type Database = {
         | "senior_reviewer"
         | "security_reviewer"
         | "admin"
+      collection_content_kind:
+        | "official_html"
+        | "rss_feed"
+        | "atom_feed"
+        | "feed_article_html"
+      collection_outcome:
+        | "stored_new_content"
+        | "not_modified"
+        | "unchanged_content"
+        | "discovered_only"
+        | "body_fetch_budget_exhausted"
+        | "rejected_url"
+        | "rejected_dns_target"
+        | "redirect_rejected"
+        | "unsupported_content_type"
+        | "invalid_text_encoding"
+        | "response_too_large"
+        | "timeout"
+        | "http_error"
+        | "invalid_feed"
+        | "persistence_failed"
+      discovery_disposition:
+        | "eligible"
+        | "discovered_only"
+        | "body_fetch_budget_exhausted"
+        | "fetched"
+        | "fetch_failed"
       participation_status:
         | "interested"
         | "researching"
@@ -843,6 +1225,36 @@ export const Constants = {
         "senior_reviewer",
         "security_reviewer",
         "admin",
+      ],
+      collection_content_kind: [
+        "official_html",
+        "rss_feed",
+        "atom_feed",
+        "feed_article_html",
+      ],
+      collection_outcome: [
+        "stored_new_content",
+        "not_modified",
+        "unchanged_content",
+        "discovered_only",
+        "body_fetch_budget_exhausted",
+        "rejected_url",
+        "rejected_dns_target",
+        "redirect_rejected",
+        "unsupported_content_type",
+        "invalid_text_encoding",
+        "response_too_large",
+        "timeout",
+        "http_error",
+        "invalid_feed",
+        "persistence_failed",
+      ],
+      discovery_disposition: [
+        "eligible",
+        "discovered_only",
+        "body_fetch_budget_exhausted",
+        "fetched",
+        "fetch_failed",
       ],
       participation_status: [
         "interested",

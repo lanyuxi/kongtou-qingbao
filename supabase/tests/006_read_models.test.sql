@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(75);
+select plan(78);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -31,6 +31,9 @@ from (
     ('project_sources'),
     ('signals'),
     ('project_scores'),
+    ('collection_attempts'),
+    ('raw_items'),
+    ('discovered_items'),
     ('watchlists'),
     ('watchlist_projects'),
     ('user_projects'),
@@ -54,6 +57,10 @@ select results_eq(
       expected.policyname collate "C"
     from (
       values
+      ('collection_attempts'::text, 'collection_attempts_insert_collection_worker'::text),
+      ('collection_attempts'::text, 'collection_attempts_select_collection_worker'::text),
+      ('discovered_items'::text, 'discovered_items_insert_collection_worker'::text),
+      ('discovered_items'::text, 'discovered_items_select_collection_worker'::text),
       ('profiles'::text, 'profiles_select_authenticated'::text),
       ('profiles'::text, 'profiles_update_authenticated'::text),
       ('project_scores'::text, 'project_scores_select_anon'::text),
@@ -62,6 +69,8 @@ select results_eq(
       ('project_sources'::text, 'project_sources_select_authenticated'::text),
       ('projects'::text, 'projects_select_anon'::text),
       ('projects'::text, 'projects_select_authenticated'::text),
+      ('raw_items'::text, 'raw_items_insert_collection_worker'::text),
+      ('raw_items'::text, 'raw_items_select_collection_worker'::text),
       ('signals'::text, 'signals_select_anon'::text),
       ('signals'::text, 'signals_select_authenticated'::text),
       ('sources'::text, 'sources_select_anon'::text),
