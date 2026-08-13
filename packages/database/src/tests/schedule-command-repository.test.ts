@@ -104,15 +104,25 @@ describe('ScheduleCommandRepository', () => {
   });
 
   it.each([
-    ['schedule_version_conflict', 'schedule_version_conflict'],
-    ['idempotency_conflict', 'idempotency_conflict'],
-    ['schedule_not_found', 'schedule_not_found'],
-    ['admin_required', 'admin_required'],
-  ])('maps protected command rejection %s to the stable code', async (message, code) => {
-    const client = new RecordingClient([], Object.assign(new Error(message), { code: 'P0001' }));
+    ['AQ101', 'schedule_version_conflict'],
+    ['AQ102', 'idempotency_conflict'],
+    ['AQ103', 'schedule_not_found'],
+    ['AQ104', 'admin_required'],
+  ])('maps protected command SQLSTATE %s to the stable code without trusting its message', async (sqlState, code) => {
+    const client = new RecordingClient([], Object.assign(new Error('untrusted changed wording'), { code: sqlState }));
 
     await expect(createScheduleCommandRepositoryFromClient(client).execute(commandInput()))
       .rejects.toMatchObject({ code });
+  });
+
+  it('does not map a generic P0001 merely because its message resembles a command error', async () => {
+    const client = new RecordingClient([], Object.assign(
+      new Error('schedule_version_conflict'),
+      { code: 'P0001' },
+    ));
+
+    await expect(createScheduleCommandRepositoryFromClient(client).execute(commandInput()))
+      .rejects.toBeInstanceOf(ScheduleCommandPersistenceError);
   });
 
   it('conceals unexpected SQL failures behind the persistence code', async () => {

@@ -182,15 +182,13 @@ function oneRow(value: unknown): Record<string, unknown> {
 }
 
 function scheduleCommandRejection(error: unknown): ScheduleCommandErrorCode | undefined {
-  if (sqlState(error) !== 'P0001' || !(error instanceof Error)) return undefined;
-  return isScheduleCommandErrorCode(error.message) ? error.message : undefined;
-}
-
-function isScheduleCommandErrorCode(value: string): value is ScheduleCommandErrorCode {
-  return value === 'schedule_version_conflict'
-    || value === 'idempotency_conflict'
-    || value === 'schedule_not_found'
-    || value === 'admin_required';
+  switch (sqlState(error)) {
+    case 'AQ101': return 'schedule_version_conflict';
+    case 'AQ102': return 'idempotency_conflict';
+    case 'AQ103': return 'schedule_not_found';
+    case 'AQ104': return 'admin_required';
+    default: return undefined;
+  }
 }
 
 function sqlState(error: unknown): string | undefined {

@@ -479,6 +479,18 @@ values (
 insert into public.user_roles (user_id, role, granted_at)
 values ('81000000-0000-4000-8000-000000000001', 'admin', '2026-08-13 10:00:00+00');
 
+insert into auth.users (
+  id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at
+)
+values (
+  '81000000-0000-4000-8000-000000000002',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', 'queue-non-admin@example.invalid',
+  '{"provider":"email","providers":["email"]}', '{}',
+  '2026-08-13 10:00:00+00', '2026-08-13 10:00:00+00'
+);
+
 insert into public.projects (id, slug, name, lifecycle)
 values
   ('11111111-1111-4111-8111-111111111111', 'queue-active-one', 'Queue Active One', 'active'),
@@ -642,6 +654,62 @@ select results_eq(
   'scheduled job is available at scheduler time plus deterministic jitter'
 );
 
+insert into public.projects (id, slug, name, lifecycle)
+values ('55555555-5555-4555-8555-555555555555', 'queue-microsecond-scheduled', 'Queue Microsecond Scheduled', 'active');
+
+insert into public.sources (id, source_type, name, canonical_url, status)
+values ('66666666-6666-4666-8666-666666666666', 'official_web', 'Queue Microsecond Scheduled', 'https://queue-microsecond.example.invalid/', 'active');
+
+insert into public.project_sources (
+  project_id, source_id, authority_domains, is_official, verified_at, verified_by
+)
+values (
+  '55555555-5555-4555-8555-555555555555',
+  '66666666-6666-4666-8666-666666666666',
+  array['queue-microsecond.example.invalid'], true,
+  '2026-08-13 10:00:00+00', '81000000-0000-4000-8000-000000000001'
+);
+
+insert into public.source_collection_schedules (
+  id, project_id, source_id, next_run_at, created_at, updated_at
+)
+values (
+  '77777777-7777-4777-8777-777777777777',
+  '55555555-5555-4555-8555-555555555555',
+  '66666666-6666-4666-8666-666666666666',
+  '2026-08-13 12:00:00.654321+00',
+  '2026-08-13 10:00:00+00', '2026-08-13 10:00:00+00'
+);
+
+set local role collection_queue_worker;
+
+create temporary table microsecond_scheduled_reconcile_result on commit drop as
+select * from public.reconcile_due_source_schedules('2026-08-13 12:00:00.654321+00', 100);
+
+reset role;
+
+select results_eq(
+  $$
+    select created_schedule_count, enqueued_count, canceled_count, lock_acquired
+    from pg_temp.microsecond_scheduled_reconcile_result
+  $$,
+  $$ values (0, 1, 0, true) $$,
+  'an isolated scheduled microsecond fixture enqueues exactly its already-created schedule'
+);
+
+select results_eq(
+  $$
+    select
+      job.payload ->> 'scheduledFor',
+      job.scheduled_for,
+      (job.payload ->> 'scheduledFor')::timestamptz = job.scheduled_for
+    from public.durable_jobs as job
+    where job.schedule_id = '77777777-7777-4777-8777-777777777777'
+  $$,
+  $$ values ('2026-08-13T12:00:00.654321Z'::text, '2026-08-13 12:00:00.654321+00'::timestamptz, true) $$,
+  'scheduled microsecond payload scheduledFor round-trips exactly to normalized scheduled_for'
+);
+
 create temporary table queue_test_ids (
   key text primary key,
   value uuid not null
@@ -686,6 +754,51 @@ grant insert on pg_temp.queue_role_observations
 to collection_schedule_admin, collection_queue_worker;
 
 set local role collection_schedule_admin;
+
+do $body$
+declare
+  error_state text;
+  error_message text;
+begin
+  begin
+    perform *
+    from public.execute_source_schedule_command(
+      '81000000-0000-4000-8000-000000000001',
+      '88888888-8888-4888-8888-888888888888',
+      (select payload from pg_temp.queue_command_inputs where key = 'pause'),
+      'missing-queue-schedule-1',
+      (select input_hash from pg_temp.queue_command_inputs where key = 'pause'),
+      '2026-08-13 12:04:58+00'
+    );
+  exception
+    when others then
+      get stacked diagnostics
+        error_state = returned_sqlstate,
+        error_message = message_text;
+      insert into pg_temp.queue_role_observations (key, sqlstate, message)
+      values ('schedule_not_found', error_state, error_message);
+  end;
+
+  begin
+    perform *
+    from public.execute_source_schedule_command(
+      '81000000-0000-4000-8000-000000000002',
+      (select value from pg_temp.queue_test_ids where key = 'schedule_one'),
+      (select payload from pg_temp.queue_command_inputs where key = 'pause'),
+      'non-admin-queue-schedule-1',
+      (select input_hash from pg_temp.queue_command_inputs where key = 'pause'),
+      '2026-08-13 12:04:59+00'
+    );
+  exception
+    when others then
+      get stacked diagnostics
+        error_state = returned_sqlstate,
+        error_message = message_text;
+      insert into pg_temp.queue_role_observations (key, sqlstate, message)
+      values ('admin_required', error_state, error_message);
+  end;
+end;
+$body$;
 
 create temporary table pause_command_result on commit drop as
 select *
@@ -772,8 +885,20 @@ reset role;
 
 select results_eq(
   $$ select sqlstate, message from pg_temp.queue_role_observations where key = 'idempotency_conflict' $$,
-  $$ values ('P0001'::text, 'idempotency_conflict'::text) $$,
+  $$ values ('AQ102'::text, 'idempotency_conflict'::text) $$,
   'a reused key with different input is rejected with the stable conflict error'
+);
+
+select results_eq(
+  $$ select sqlstate, message from pg_temp.queue_role_observations where key = 'schedule_not_found' $$,
+  $$ values ('AQ103'::text, 'schedule_not_found'::text) $$,
+  'a missing schedule uses its dedicated stable SQLSTATE'
+);
+
+select results_eq(
+  $$ select sqlstate, message from pg_temp.queue_role_observations where key = 'admin_required' $$,
+  $$ values ('AQ104'::text, 'admin_required'::text) $$,
+  'a non-admin actor uses its dedicated stable SQLSTATE'
 );
 
 select results_eq(
@@ -1135,7 +1260,7 @@ select results_eq(
 
 select results_eq(
   $$ select sqlstate, message from pg_temp.queue_role_observations where key = 'version_conflict' $$,
-  $$ values ('P0001'::text, 'schedule_version_conflict'::text) $$,
+  $$ values ('AQ101'::text, 'schedule_version_conflict'::text) $$,
   'stale administrator commands fail closed with the stable version conflict'
 );
 

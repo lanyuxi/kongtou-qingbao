@@ -24,7 +24,12 @@ export function createSourceScheduleCommandHandler(deps: {
     if (!isBearerHeader(request.headers.get('authorization'))) {
       return errorResponse(401, 'unauthorized', requestId);
     }
-    const user = await deps.auth.verifyAuthorizationHeader(request.headers.get('authorization'));
+    let user: { userId: string } | null;
+    try {
+      user = await deps.auth.verifyAuthorizationHeader(request.headers.get('authorization'));
+    } catch {
+      return errorResponse(500, 'schedule_command_persistence_failed', requestId);
+    }
     if (user === null) return errorResponse(401, 'unauthorized', requestId);
 
     const idempotencyKey = request.headers.get('idempotency-key');

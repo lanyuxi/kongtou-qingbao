@@ -1021,7 +1021,7 @@ begin
       and role_grant.role = 'admin'
       and role_grant.revoked_at is null
   ) then
-    raise exception 'admin_required' using errcode = 'P0001';
+    raise exception 'admin_required' using errcode = 'AQ104';
   end if;
 
   command_type := (p_command_payload ->> 'command')::public.source_schedule_command_type;
@@ -1041,7 +1041,7 @@ begin
     if receipt_record.input_hash <> p_input_hash
       or receipt_record.command_type <> command_type
     then
-      raise exception 'idempotency_conflict' using errcode = 'P0001';
+      raise exception 'idempotency_conflict' using errcode = 'AQ102';
     end if;
 
     return query select receipt_record.schedule_id, receipt_record.command_type,
@@ -1057,7 +1057,7 @@ begin
   for update;
 
   if not found then
-    raise exception 'schedule_not_found' using errcode = 'P0001';
+    raise exception 'schedule_not_found' using errcode = 'AQ103';
   end if;
 
   select * into receipt_record
@@ -1070,7 +1070,7 @@ begin
     if receipt_record.input_hash <> p_input_hash
       or receipt_record.command_type <> command_type
     then
-      raise exception 'idempotency_conflict' using errcode = 'P0001';
+      raise exception 'idempotency_conflict' using errcode = 'AQ102';
     end if;
 
     return query select receipt_record.schedule_id, receipt_record.command_type,
@@ -1081,7 +1081,7 @@ begin
   end if;
 
   if schedule_record.version <> expected_version then
-    raise exception 'schedule_version_conflict' using errcode = 'P0001';
+    raise exception 'schedule_version_conflict' using errcode = 'AQ101';
   end if;
 
   next_version := schedule_record.version + 1;

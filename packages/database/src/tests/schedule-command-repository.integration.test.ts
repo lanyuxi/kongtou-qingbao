@@ -11,6 +11,7 @@ import {
 const projectId = '83000000-0000-4000-8000-000000000010';
 const sourceId = '83000000-0000-4000-8000-000000000020';
 const adminId = '83000000-0000-4000-8000-000000000090';
+const nonAdminId = '83000000-0000-4000-8000-000000000091';
 const baseTime = '2026-08-14T00:00:00.000Z';
 
 const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
@@ -43,6 +44,16 @@ describeIntegration('ScheduleCommandRepository PostgreSQL integration', () => {
       )
     `;
     await database`insert into public.user_roles (user_id, role, granted_at) values (${adminId}::uuid, 'admin', ${baseTime}::timestamptz)`;
+    await database`
+      insert into auth.users (
+        id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+      ) values (
+        ${nonAdminId}::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+        'authenticated', 'authenticated', 'schedule-command-non-admin@example.invalid',
+        '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+        ${baseTime}::timestamptz, ${baseTime}::timestamptz
+      )
+    `;
     await database`insert into public.projects (id, slug, name, lifecycle) values (${projectId}::uuid, 'schedule-command-repository', 'Schedule Command Repository', 'active')`;
     await database`insert into public.sources (id, source_type, name, canonical_url, status) values (${sourceId}::uuid, 'official_web', 'Schedule Command', 'https://schedule-command.example/', 'active')`;
     await database`
@@ -94,15 +105,28 @@ describeIntegration('ScheduleCommandRepository PostgreSQL integration', () => {
       .rejects.toMatchObject({ code: 'schedule_version_conflict' });
   });
 
+  it('maps the protected function dedicated SQLSTATEs for receipt, missing-schedule, and admin rejections', async () => {
+    const commands = requireRepository(repository);
+    await commands.execute(command(scheduleId, pauseCommand(1), 'dedicated-errors-pause'));
+
+    await expect(commands.execute(command(scheduleId, resumeCommand(2), 'dedicated-errors-pause')))
+      .rejects.toMatchObject({ code: 'idempotency_conflict' });
+    await expect(commands.execute(command('83000000-0000-4000-8000-000000000099', pauseCommand(1), 'missing-schedule')))
+      .rejects.toMatchObject({ code: 'schedule_not_found' });
+    await expect(commands.execute(command(scheduleId, pauseCommand(2), 'non-admin', nonAdminId)))
+      .rejects.toMatchObject({ code: 'admin_required' });
+  });
+
 });
 
 function command(
   scheduleId: string,
   command: SourceScheduleCommand,
   idempotencyKey: string,
+  actorId = adminId,
 ): ExecuteScheduleCommandInput {
   return {
-    actorId: adminId,
+    actorId,
     scheduleId,
     idempotencyKey,
     command,
@@ -149,5 +173,7 @@ async function removeFixtures(sql: postgres.Sql): Promise<void> {
     await transaction`delete from public.user_roles where user_id = ${adminId}::uuid`;
     await transaction`delete from public.profiles where id = ${adminId}::uuid`;
     await transaction`delete from auth.users where id = ${adminId}::uuid`;
+    await transaction`delete from public.profiles where id = ${nonAdminId}::uuid`;
+    await transaction`delete from auth.users where id = ${nonAdminId}::uuid`;
   });
 }

@@ -5,16 +5,23 @@ import { parsePublicEnvironment } from '../../../../../../lib/env.js';
 import { createSourceScheduleCommandHandler } from '../../../../../../lib/source-schedule-command-handler.js';
 import { parseServerEnvironment } from '../../../../../../lib/server-env.js';
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ scheduleId: string }> },
-): Promise<Response> {
+let handler: ReturnType<typeof createSourceScheduleCommandHandler> | undefined;
+
+function getHandler(): ReturnType<typeof createSourceScheduleCommandHandler> {
+  if (handler !== undefined) return handler;
   const publicEnvironment = parsePublicEnvironment();
   const serverEnvironment = parseServerEnvironment();
-  const handler = createSourceScheduleCommandHandler({
+  handler = createSourceScheduleCommandHandler({
     auth: createAuthenticatedUserVerifier(publicEnvironment),
     schedules: createScheduleCommandRepository(serverEnvironment.queueAdminDatabaseUrl),
     ids: { generate: () => crypto.randomUUID() },
   });
-  return handler(request, context);
+  return handler;
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ scheduleId: string }> },
+): Promise<Response> {
+  return getHandler()(request, context);
 }

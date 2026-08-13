@@ -30,6 +30,27 @@ describe('POST /api/v1/admin/source-collection-schedules/:scheduleId', () => {
     await expectError(response, 401, 'unauthorized');
   });
 
+  it('returns a sanitized shared 500 when bearer verification throws', async () => {
+    const response = await invoke(createSourceScheduleCommandHandler({
+      auth: new ThrowingAuth(),
+      schedules: new RecordingRepository(),
+      ids: { generate: () => requestId },
+    }), request());
+    const body = await response.json() as { error: { code: string; requestId: string } };
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({
+      ok: false,
+      error: {
+        code: 'schedule_command_persistence_failed',
+        message: 'The schedule command could not be persisted.',
+        requestId,
+        details: null,
+      },
+    });
+    expect(JSON.stringify(body)).not.toMatch(/local-test-token|postgres|password|secret/i);
+  });
+
   it.each([
     ['missing', null],
     ['blank', '   '],
@@ -146,6 +167,12 @@ class StaticAuth implements AuthenticatedUserVerifier {
 
   async verifyAuthorizationHeader(): Promise<{ userId: string } | null> {
     return this.user;
+  }
+}
+
+class ThrowingAuth implements AuthenticatedUserVerifier {
+  async verifyAuthorizationHeader(): Promise<never> {
+    throw new Error('postgres password=secret local-test-token');
   }
 }
 
