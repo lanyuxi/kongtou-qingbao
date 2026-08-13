@@ -38,7 +38,7 @@ describe('API envelopes', () => {
 describe('job envelopes', () => {
   const schema = createJobEnvelopeSchema('collect.project', z.object({ projectId: z.string() }).strict());
 
-  it('rejects unknown keys, blank idempotency keys, invalid timestamps, and non-one versions', () => {
+  it('rejects unknown keys, invalid bounded idempotency keys, invalid timestamps, and non-one versions', () => {
     const base = {
       jobId,
       type: 'collect.project',
@@ -51,6 +51,7 @@ describe('job envelopes', () => {
 
     expect(schema.safeParse({ ...base, unexpected: true }).success).toBe(false);
     expect(schema.safeParse({ ...base, idempotencyKey: '   ' }).success).toBe(false);
+    expect(schema.safeParse({ ...base, idempotencyKey: 'a'.repeat(256) }).success).toBe(false);
     expect(schema.safeParse({ ...base, occurredAt: 'not-a-timestamp' }).success).toBe(false);
     expect(schema.safeParse({ ...base, version: 2 }).success).toBe(false);
   });
