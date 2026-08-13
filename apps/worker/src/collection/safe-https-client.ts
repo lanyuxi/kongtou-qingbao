@@ -81,6 +81,7 @@ interface SafeHttpsClientDependencies {
   readonly resolver: SafeDnsResolver;
   readonly requestFactory?: HttpsRequestFactory;
   readonly timer?: TimerPort;
+  readonly userAgent?: string;
 }
 
 interface RequestContext {
@@ -132,7 +133,13 @@ export function createSafeHttpsClient(dependencies: SafeHttpsClientDependencies)
       }, TOTAL_TIMEOUT_MS);
 
       return Promise.race([
-        performGet(input, dependencies.resolver, requestFactory, context),
+        performGet(
+          input,
+          dependencies.resolver,
+          requestFactory,
+          context,
+          dependencies.userAgent ?? USER_AGENT,
+        ),
         deadline,
       ]).finally(() => {
         timer.clearTimeout(deadlineHandle);
@@ -146,6 +153,7 @@ async function performGet(
   resolver: SafeDnsResolver,
   requestFactory: HttpsRequestFactory,
   context: RequestContext,
+  userAgent: string,
 ): Promise<SafeHttpResponse> {
   const requestedUrl = input.url;
   let validatedUrl = validateConfiguredCollectionUrl({
@@ -169,7 +177,7 @@ async function performGet(
     const response = await requestHop(
       validatedUrl,
       selectedAddress,
-      buildRequestHeaders(input),
+      buildRequestHeaders(input, userAgent),
       requestFactory,
       context,
     );
@@ -308,11 +316,14 @@ function requestHop(
   });
 }
 
-function buildRequestHeaders(input: SafeHttpRequest): Readonly<Record<string, string>> {
+function buildRequestHeaders(
+  input: SafeHttpRequest,
+  userAgent: string,
+): Readonly<Record<string, string>> {
   const headers: Record<string, string> = {
     Accept: ACCEPT_HEADER,
     'Accept-Encoding': 'gzip, deflate, br',
-    'User-Agent': USER_AGENT,
+    'User-Agent': userAgent,
   };
   const etag = sanitizeCollectionEtag(input.ifNoneMatch);
   const lastModified = sanitizeCollectionLastModified(input.ifModifiedSince);

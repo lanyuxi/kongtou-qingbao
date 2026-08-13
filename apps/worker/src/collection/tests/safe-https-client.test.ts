@@ -64,7 +64,11 @@ class FakeRequest extends EventEmitter {
   }
 }
 
-function createHarness(specs: readonly ResponseSpec[], addresses = ['93.184.216.34']) {
+function createHarness(
+  specs: readonly ResponseSpec[],
+  addresses = ['93.184.216.34'],
+  userAgent?: string,
+) {
   const options: HttpsRequestOptions[] = [];
   const requests: FakeRequest[] = [];
   let responseIndex = 0;
@@ -85,7 +89,16 @@ function createHarness(specs: readonly ResponseSpec[], addresses = ['93.184.216.
       return addresses.map((address) => ({ address, family: address.includes(':') ? 6 : 4 } as const));
     },
   };
-  return { client: createSafeHttpsClient({ requestFactory: factory, resolver }), options, requests, resolvedHostnames };
+  return {
+    client: createSafeHttpsClient({
+      requestFactory: factory,
+      resolver,
+      ...(userAgent === undefined ? {} : { userAgent }),
+    }),
+    options,
+    requests,
+    resolvedHostnames,
+  };
 }
 
 function invokePinnedLookup(options: HttpsRequestOptions): Promise<LookupAddress> {
@@ -138,6 +151,20 @@ describe('createSafeHttpsClient', () => {
       if (previous === undefined) delete process.env.HTTPS_PROXY;
       else process.env.HTTPS_PROXY = previous;
     }
+  });
+
+  it('emits the configured collector user agent on the Safe HTTP request', async () => {
+    const harness = createHarness(
+      [{ status: 200 }],
+      ['93.184.216.34'],
+      'Airdrop Intelligence OS Collector/2.0',
+    );
+
+    await harness.client.get(BASE_INPUT);
+
+    expect(harness.options[0]?.headers['User-Agent']).toBe(
+      'Airdrop Intelligence OS Collector/2.0',
+    );
   });
 
   it('revalidates policy and DNS on every manual redirect', async () => {

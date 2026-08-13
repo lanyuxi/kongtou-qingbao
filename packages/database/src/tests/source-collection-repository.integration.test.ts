@@ -197,7 +197,7 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
       },
       discovery: {
         ...discovery, id: successorId, version: 2, supersedesDiscoveredItemId: discoveryId,
-        disposition: 'fetched', articleCollectionAttemptId: articleAttemptId, articleRawItemId,
+        disposition: 'fetched', articleCollectionAttemptId: articleAttemptId, articleRawItemId: null,
       },
     });
 
@@ -264,6 +264,11 @@ async function removeFixtures(sql: postgres.Sql): Promise<void> {
     await transaction`delete from public.project_sources where project_id = ${projectId}::uuid`;
     await transaction`delete from public.sources where id = ${sourceId}::uuid`;
     await transaction`delete from public.projects where id = ${projectId}::uuid`;
+    await transaction`
+      delete from public.user_roles
+      where user_id = ${reviewerId}::uuid or granted_by = ${reviewerId}::uuid
+    `;
+    await transaction`delete from public.profiles where id = ${reviewerId}::uuid`;
     await transaction`delete from auth.users where id = ${reviewerId}::uuid`;
   });
 }

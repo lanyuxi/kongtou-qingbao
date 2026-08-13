@@ -238,6 +238,103 @@ describe('SourceCollectionRepository', () => {
     ]);
   });
 
+  it('retains an existing Raw Item reference for a not-modified article successor', async () => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+    const input = articleInput();
+
+    await repository.commitArticleOutcome({
+      attempt: { ...input.attempt, outcome: 'not_modified' },
+      rawItem: null,
+      discovery: { ...input.discovery, articleRawItemId: rawItemId },
+    });
+
+    expect(harness.transactions.at(-1)).toEqual([
+      'set local role collection_worker',
+      'lock idempotency collect:article:one',
+      'find committed collect:article:one',
+      `insert attempt ${attemptId}:${rawItemId}`,
+      `insert discoveries ${discoveredItemId}`,
+    ]);
+  });
+
+  it('retains an existing Raw Item reference for an unchanged article successor', async () => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+    const input = articleInput();
+
+    await repository.commitArticleOutcome({
+      attempt: { ...input.attempt, outcome: 'unchanged_content' },
+      rawItem: null,
+      discovery: { ...input.discovery, articleRawItemId: rawItemId },
+    });
+
+    expect(harness.transactions.at(-1)).toContain(`insert attempt ${attemptId}:${rawItemId}`);
+  });
+
+  it.each([
+    {
+      name: 'stored new content without a new Raw Item',
+      input: () => {
+        const input = articleInput();
+        return { ...input, rawItem: null, discovery: { ...input.discovery, articleRawItemId: null } };
+      },
+    },
+    {
+      name: 'stored new content with an existing Raw Item reference',
+      input: () => {
+        const input = articleInput();
+        return {
+          ...input,
+          discovery: { ...input.discovery, articleRawItemId: rawItemId },
+        };
+      },
+    },
+    {
+      name: 'not modified content without an existing Raw Item reference',
+      input: () => {
+        const input = articleInput();
+        return {
+          ...input,
+          attempt: { ...input.attempt, outcome: 'not_modified' as const },
+          rawItem: null,
+          discovery: { ...input.discovery, articleRawItemId: null },
+        };
+      },
+    },
+    {
+      name: 'a failure with an existing Raw Item reference',
+      input: () => {
+        const input = articleInput();
+        return {
+          ...input,
+          attempt: { ...input.attempt, outcome: 'timeout' as const },
+          rawItem: null,
+          discovery: { ...input.discovery, articleRawItemId: rawItemId },
+        };
+      },
+    },
+    {
+      name: 'a failure with a new Raw Item',
+      input: () => {
+        const input = articleInput();
+        return {
+          ...input,
+          attempt: { ...input.attempt, outcome: 'timeout' as const },
+          discovery: { ...input.discovery, articleRawItemId: null },
+        };
+      },
+    },
+  ])('fails closed for article $name', async ({ input }) => {
+    const harness = createHarness();
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(repository.commitArticleOutcome(input())).rejects.toMatchObject({
+      code: 'persistence_failed',
+    });
+    expect(harness.transactions.at(-1)).toEqual(['set local role collection_worker']);
+  });
+
   it('maps database failures to a stable persistence error without SQL details', async () => {
     const run: CollectionTransactionRunner = async () => {
       throw new Error('password=secret select * from public.raw_items at 10.0.0.4');
@@ -294,7 +391,7 @@ function articleInput(): CommitArticleOutcomeInput {
       supersedesDiscoveredItemId: discoveredItemId,
       disposition: 'fetched',
       articleCollectionAttemptId: attemptId,
-      articleRawItemId: rawItemId,
+      articleRawItemId: null,
     },
   };
 }

@@ -5,6 +5,7 @@ import type { Database } from '../generated/database.types.js';
 import {
   redirectChainAsJson,
   type CollectionAttemptInput,
+  type CommitArticleOutcomeInput,
   type CommitEndpointInput,
   type DiscoveredItemInput,
   type LatestRawItem,
@@ -105,11 +106,14 @@ export function createSourceCollectionRepositoryFromTransactions(
       }),
     commitArticleOutcome: (input) =>
       run(async (transaction) => {
+        validateArticleRawItemReference(input);
         const committed = await findForCommit(transaction, input.attempt);
         if (committed !== null) {
           return;
         }
-        const rawItemId = input.rawItem === null ? null : await transaction.insertRawItem(input.rawItem);
+        const rawItemId = input.rawItem === null
+          ? input.discovery.articleRawItemId
+          : await transaction.insertRawItem(input.rawItem);
         await transaction.insertAttempt(input.attempt, rawItemId);
         await transaction.insertDiscoveries([
           {
@@ -120,6 +124,22 @@ export function createSourceCollectionRepositoryFromTransactions(
         ]);
       }),
   };
+}
+
+function validateArticleRawItemReference(input: CommitArticleOutcomeInput): void {
+  const hasNewRawItem = input.rawItem !== null;
+  const hasExistingRawItem = input.discovery.articleRawItemId !== null;
+  const expectsNew = input.attempt.outcome === 'stored_new_content';
+  const expectsExisting =
+    input.attempt.outcome === 'not_modified' || input.attempt.outcome === 'unchanged_content';
+  if (
+    input.discovery.articleCollectionAttemptId !== input.attempt.id ||
+    (expectsNew && (!hasNewRawItem || hasExistingRawItem)) ||
+    (expectsExisting && (hasNewRawItem || !hasExistingRawItem)) ||
+    (!expectsNew && !expectsExisting && (hasNewRawItem || hasExistingRawItem))
+  ) {
+    throw new Error('article_raw_item_reference_invalid');
+  }
 }
 
 async function commitAttempt(

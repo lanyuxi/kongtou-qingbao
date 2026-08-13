@@ -17,6 +17,10 @@ pnpm verify
 
 The seed intentionally contains only fixed UUIDs, `.example.invalid` URLs, and fictional project/source/signal/score records. It contains no real people, wallets, contracts, credentials, or production domains.
 
+Phase 2 adds a dormant, queue-ready collector for exact configured official HTML and RSS/Atom sources. It is not scheduled or activated by the worker entry point. Server-side deployment will supply `AIRDROP_COLLECTION_DATABASE_URL` and `AIRDROP_COLLECTION_USER_AGENT` without committing or logging their values and must explicitly close the returned collector pool on shutdown.
+
 ## Architecture
 
 See [the Phase 0/1 architecture](docs/architecture/phase-0-1.md) for module boundaries, dependency direction, trust boundaries, and the execution model.
+
+See [the Phase 2 source collection architecture](docs/architecture/phase-2-source-collection.md) for SSRF controls, append-only persistence, Feed/article budgets, dependency rationale, and composition boundaries.

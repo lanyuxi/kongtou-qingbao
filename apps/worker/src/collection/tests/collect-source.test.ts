@@ -12,6 +12,7 @@ import type {
 } from '@airdrop/database/collection-worker';
 
 import { createCollectSource, createNodeContentHasher } from '../collect-source.js';
+import { createFeedParser } from '../feed-parser.js';
 import type {
   Clock,
   ContentHasher,
@@ -313,6 +314,270 @@ describe('collect source', () => {
       rawItemId: null,
     });
   });
+
+  it.each([
+    {
+      kind: 'rss_feed' as const,
+      mediaTypeHeader: 'application/rss+xml',
+      xml: '<rss version="2.0"><channel><title>Official</title></channel></rss>',
+    },
+    {
+      kind: 'atom_feed' as const,
+      mediaTypeHeader: 'application/atom+xml',
+      xml: '<feed xmlns="http://www.w3.org/2005/Atom"><title>Official</title></feed>',
+    },
+  ])('stores valid $kind XML as its own immutable Raw Item', async ({
+    kind,
+    mediaTypeHeader,
+    xml,
+  }) => {
+    const fixture = createFixture();
+    const bytes = new TextEncoder().encode(xml);
+    fixture.http.response = httpResponse({
+      mediaTypeHeader,
+      body: bytes,
+      decompressedBytes: bytes.byteLength,
+    });
+
+    await expect(fixture.collect(validJob)).resolves.toEqual({
+      attemptId: ATTEMPT_ID,
+      projectId: PROJECT_ID,
+      sourceId: SOURCE_ID,
+      outcome: 'stored_new_content',
+      rawItemId: RAW_ITEM_ID,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits[0]?.rawItem).toMatchObject({
+      id: RAW_ITEM_ID,
+      contentKind: kind,
+      mediaType: mediaTypeHeader,
+      rawText: xml,
+    });
+  });
+
+  it('persists invalid Feed XML as a body-free invalid_feed attempt without discoveries', async () => {
+    const fixture = createFixture();
+    const bytes = new TextEncoder().encode('<rss version="2.0"><channel>');
+    fixture.http.response = httpResponse({
+      mediaTypeHeader: 'application/rss+xml',
+      body: bytes,
+      decompressedBytes: bytes.byteLength,
+    });
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'invalid_feed',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.commits[0]).toMatchObject({
+      rawItem: null,
+      existingRawItemId: null,
+      attempt: { outcome: 'invalid_feed', errorCode: 'invalid_feed' },
+    });
+    expect(fixture.repository.feedCommits).toEqual([]);
+    expect(fixture.http.requests).toHaveLength(1);
+  });
+
+  it('processes the first 100 entries in order and isolates authority and body-fetch budgets', async () => {
+    const fixture = createFixture();
+    const items = [
+      '<item><guid>id-first</guid><link>https://official.example/id-first-url</link></item>',
+      '<item><link>https://news.official.example/url-fallback</link></item>',
+      '<item><guid>external</guid><link>https://external.example/story</link></item>',
+      '<item><guid>deceptive</guid><link>https://official.example.attacker.test/story</link></item>',
+      '<item><title>missing identity</title></item>',
+      ...Array.from(
+        { length: 98 },
+        (_, index) => `<item><guid>entry-${index + 6}</guid><link>https://official.example/${index + 6}</link></item>`,
+      ),
+    ];
+    const xml = `<rss version="2.0"><channel>${items.join('')}</channel></rss>`;
+    const bytes = new TextEncoder().encode(xml);
+    fixture.http.response = httpResponse({
+      mediaTypeHeader: 'application/rss+xml',
+      body: bytes,
+      decompressedBytes: bytes.byteLength,
+    });
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({ discoveredCount: 99, bodyFetchCount: 20 });
+    const discoveries = fixture.repository.feedCommits[0]?.discoveries ?? [];
+    expect(discoveries).toHaveLength(99);
+    expect(discoveries.slice(0, 5).map(({ stableEntryKey }) => stableEntryKey)).toEqual([
+      'id:id-first',
+      'url:https://news.official.example/url-fallback',
+      'id:external',
+      'id:deceptive',
+      'id:entry-6',
+    ]);
+    expect(discoveries.slice(0, 4).map(({ disposition }) => disposition)).toEqual([
+      'eligible',
+      'eligible',
+      'discovered_only',
+      'discovered_only',
+    ]);
+    expect(discoveries.filter(({ disposition }) => disposition === 'eligible')).toHaveLength(20);
+    expect(
+      discoveries.filter(({ disposition }) => disposition === 'body_fetch_budget_exhausted'),
+    ).toHaveLength(77);
+    expect(fixture.http.requests.slice(1).map(({ url }) => url)).toEqual([
+      'https://official.example/id-first-url',
+      'https://news.official.example/url-fallback',
+      ...Array.from({ length: 18 }, (_, index) => `https://official.example/${index + 6}`),
+    ]);
+    expect(fixture.http.requests.some(({ url }) => url.includes('external.example'))).toBe(false);
+    expect(fixture.http.requests.some(({ url }) => url.includes('attacker.test'))).toBe(false);
+  });
+
+  it('isolates sequential article success and failure with validators and bounded successors', async () => {
+    const fixture = createFixture();
+    const xml = `<rss version="2.0"><channel>
+      <item><guid>one</guid><link>https://official.example/one</link></item>
+      <item><guid>two</guid><link>https://official.example/two</link></item>
+      <item><guid>three</guid><link>https://official.example/three</link></item>
+    </channel></rss>`;
+    const feedBytes = new TextEncoder().encode(xml);
+    const articleBytes = new TextEncoder().encode('<html>article</html>');
+    fixture.repository.latestByUrl.set('https://official.example/one', latestRawItem({
+      logicalUrl: 'https://official.example/one',
+      etag: '"article-v1"',
+      lastModified: 'Wed, 12 Aug 2026 00:01:00 GMT',
+    }));
+    fixture.http.scripts.push(
+      { response: httpResponse({ mediaTypeHeader: 'application/rss+xml', body: feedBytes, decompressedBytes: feedBytes.byteLength }) },
+      { response: httpResponse({ requestedUrl: 'https://official.example/one', finalUrl: 'https://official.example/one', body: articleBytes, decompressedBytes: articleBytes.byteLength }) },
+      { failure: { code: 'timeout', message: '<html>failed body</html>' } },
+      { response: httpResponse({ requestedUrl: 'https://official.example/three', finalUrl: 'https://news.official.example/three', redirects: [{ hop: 1, status: 302, url: 'https://news.official.example/three' }], body: articleBytes, decompressedBytes: articleBytes.byteLength }) },
+    );
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({ discoveredCount: 3, bodyFetchCount: 3 });
+    expect(fixture.http.maximumActiveRequests).toBe(1);
+    expect(fixture.http.requests[1]).toEqual({
+      url: 'https://official.example/one',
+      authorityDomains: ['official.example'],
+      ifNoneMatch: '"article-v1"',
+      ifModifiedSince: 'Wed, 12 Aug 2026 00:01:00 GMT',
+    });
+    expect(fixture.repository.articleCommits).toHaveLength(3);
+    expect(fixture.repository.articleCommits.map(({ discovery }) => discovery.disposition)).toEqual([
+      'fetched',
+      'fetch_failed',
+      'fetched',
+    ]);
+    expect(fixture.repository.articleCommits[0]?.rawItem).toMatchObject({
+      contentKind: 'feed_article_html',
+      rawText: '<html>article</html>',
+      logicalUrl: 'https://official.example/one',
+    });
+    expect(fixture.repository.articleCommits[1]).toMatchObject({
+      rawItem: null,
+      attempt: { outcome: 'timeout', errorCode: 'timeout', errorDetail: 'Collection request timed out.' },
+    });
+    expect(JSON.stringify(fixture.repository.articleCommits[1])).not.toContain('failed body');
+    expect(fixture.repository.articleCommits[2]?.attempt.redirectChain).toEqual([
+      { hop: 1, status: 302, url: 'https://news.official.example/three' },
+    ]);
+  });
+
+  it('does not reprocess discoveries or articles for a new key with unchanged Feed content', async () => {
+    const fixture = createFixture();
+    const xml = '<rss version="2.0"><channel><item><guid>one</guid><link>https://official.example/one</link></item></channel></rss>';
+    const bytes = new TextEncoder().encode(xml);
+    fixture.repository.latest = latestRawItem({ sha256: HTML_SHA256 });
+    fixture.http.response = httpResponse({
+      mediaTypeHeader: 'application/rss+xml',
+      body: bytes,
+      decompressedBytes: bytes.byteLength,
+    });
+
+    await expect(fixture.collect({ ...validJob, idempotencyKey: 'collect:new-key' })).resolves.toMatchObject({
+      outcome: 'unchanged_content',
+      rawItemId: PREVIOUS_RAW_ITEM_ID,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits).toEqual([]);
+    expect(fixture.repository.commits).toHaveLength(1);
+    expect(fixture.http.requests).toHaveLength(1);
+    expect(fixture.feedParserInputs).toEqual([]);
+  });
+
+  it('prevents every article request when the atomic Feed commit fails', async () => {
+    const fixture = feedWithArticlesFixture(2);
+    fixture.repository.failureOperation = 'commitFeed';
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'persistence_failed',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.http.requests).toHaveLength(1);
+    expect(fixture.repository.articleCommits).toEqual([]);
+  });
+
+  it('continues after an article persistence failure and preserves committed Feed counts', async () => {
+    const fixture = feedWithArticlesFixture(3);
+    fixture.repository.failArticleCommitAt = 1;
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({
+      outcome: 'stored_new_content',
+      rawItemId: RAW_ITEM_ID,
+      discoveredCount: 3,
+      bodyFetchCount: 3,
+    });
+    expect(fixture.http.requests).toHaveLength(4);
+    expect(fixture.repository.articleCommitAttempts).toBe(4);
+    expect(fixture.repository.articleCommits).toHaveLength(3);
+    expect(fixture.repository.articleCommits.map(({ discovery }) => discovery.stableEntryKey)).toEqual([
+      'id:entry-1',
+      'id:entry-2',
+      'id:entry-3',
+    ]);
+    expect(fixture.repository.articleCommits[0]).toMatchObject({
+      rawItem: null,
+      attempt: {
+        outcome: 'persistence_failed',
+        errorCode: 'persistence_failed',
+        errorDetail: 'Article outcome persistence failed.',
+      },
+      discovery: { disposition: 'fetch_failed' },
+    });
+    expect(fixture.repository.articleCommits.every(({ attempt }) => attempt.idempotencyKey.length <= 255)).toBe(true);
+    expect(fixture.repository.articleCommits.every(({ attempt }) => /^article:[0-9a-f]{64}$/.test(attempt.idempotencyKey))).toBe(true);
+  });
+
+  it('records a bounded persistence failure when article validators cannot load and continues', async () => {
+    const fixture = feedWithArticlesFixture(2);
+    fixture.repository.failLatestUrls.add('https://official.example/1');
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({ discoveredCount: 2, bodyFetchCount: 2 });
+    expect(fixture.http.requests.map(({ url }) => url)).toEqual([
+      CANONICAL_URL,
+      'https://official.example/2',
+    ]);
+    expect(fixture.repository.articleCommits).toHaveLength(2);
+    expect(fixture.repository.articleCommits[0]).toMatchObject({
+      rawItem: null,
+      attempt: {
+        requestedUrl: 'https://official.example/1',
+        outcome: 'persistence_failed',
+        errorCode: 'persistence_failed',
+        errorDetail: 'Article validator persistence failed.',
+      },
+      discovery: { disposition: 'fetch_failed' },
+    });
+    expect(fixture.repository.articleCommits[1]?.discovery.stableEntryKey).toBe('id:entry-2');
+  });
 });
 
 type FailureCode =
@@ -336,9 +601,15 @@ class InMemoryRepository implements SourceCollectionRepository {
     authorityDomains: ['official.example'],
   };
   latest: LatestRawItem | null = null;
-  failureOperation: 'findCommitted' | 'loadContext' | 'loadLatest' | 'commitEndpoint' | null = null;
+  readonly latestByUrl = new Map<string, LatestRawItem>();
+  readonly failLatestUrls = new Set<string>();
+  failureOperation: 'findCommitted' | 'loadContext' | 'loadLatest' | 'commitEndpoint' | 'commitFeed' | null = null;
+  failArticleCommitAt: number | null = null;
+  articleCommitAttempts = 0;
   resultExtra: string | null = null;
   readonly commits: CommitEndpointInput[] = [];
+  readonly feedCommits: CommitFeedInput[] = [];
+  readonly articleCommits: CommitArticleOutcomeInput[] = [];
   readonly loadedLatestUrls: string[] = [];
 
   constructor(private readonly events: string[]) {}
@@ -368,7 +639,10 @@ class InMemoryRepository implements SourceCollectionRepository {
     void sourceId;
     this.loadedLatestUrls.push(logicalUrl);
     this.failIfSelected('loadLatest');
-    return this.latest;
+    if (this.failLatestUrls.has(logicalUrl)) {
+      throw new Error('postgres validator lookup must never leak');
+    }
+    return this.latestByUrl.get(logicalUrl) ?? this.latest;
   }
 
   async commitEndpoint(input: CommitEndpointInput): Promise<CollectSourceResult> {
@@ -389,13 +663,30 @@ class InMemoryRepository implements SourceCollectionRepository {
   }
 
   async commitFeed(input: CommitFeedInput): Promise<CommitFeedResult> {
-    void input;
-    throw new Error('Task 9 only');
+    this.events.push('repository.commitFeed');
+    this.failIfSelected('commitFeed');
+    this.feedCommits.push(input);
+    return {
+      result: {
+        attemptId: input.attempt.id,
+        projectId: PROJECT_ID,
+        sourceId: SOURCE_ID,
+        outcome: input.attempt.outcome,
+        rawItemId: input.rawItem.id,
+        discoveredCount: input.discoveries.length,
+        bodyFetchCount: input.attempt.bodyFetchCount,
+      },
+      discoveryIds: input.discoveries.map(({ id }) => id),
+    };
   }
 
   async commitArticleOutcome(input: CommitArticleOutcomeInput): Promise<void> {
-    void input;
-    throw new Error('Task 9 only');
+    this.events.push('repository.commitArticleOutcome');
+    this.articleCommitAttempts += 1;
+    if (this.failArticleCommitAt === this.articleCommitAttempts) {
+      throw new Error('postgres article body must never leak');
+    }
+    this.articleCommits.push(input);
   }
 
   private failIfSelected(operation: InMemoryRepository['failureOperation']): void {
@@ -408,17 +699,32 @@ class InMemoryRepository implements SourceCollectionRepository {
 class InMemoryHttp implements SafeHttpClient {
   failure: { readonly code: FailureCode; readonly message: string } | null = null;
   response: SafeHttpResponse = httpResponse();
+  readonly scripts: Array<
+    | { readonly response: SafeHttpResponse }
+    | { readonly failure: { readonly code: FailureCode; readonly message: string } }
+  > = [];
   readonly requests: SafeHttpRequest[] = [];
+  activeRequests = 0;
+  maximumActiveRequests = 0;
 
   constructor(private readonly events: string[]) {}
 
   async get(input: SafeHttpRequest): Promise<SafeHttpResponse> {
     this.events.push('http.get');
     this.requests.push(input);
-    if (this.failure !== null) {
-      throw Object.assign(new Error(this.failure.message), { code: this.failure.code });
+    this.activeRequests += 1;
+    this.maximumActiveRequests = Math.max(this.maximumActiveRequests, this.activeRequests);
+    try {
+      await Promise.resolve();
+      const script = this.scripts.shift();
+      const failure = script !== undefined && 'failure' in script ? script.failure : this.failure;
+      if (failure !== null) {
+        throw Object.assign(new Error(failure.message), { code: failure.code });
+      }
+      return script !== undefined && 'response' in script ? script.response : this.response;
+    } finally {
+      this.activeRequests -= 1;
     }
-    return this.response;
   }
 }
 
@@ -441,30 +747,55 @@ function createFixture(options: { readonly times?: readonly string[] } = {}) {
   const hasher = new RecordingHasher(events);
   const times = [...(options.times ?? [COLLECTED_AT, COLLECTED_AT])];
   const ids = [ATTEMPT_ID, RAW_ITEM_ID];
+  let generatedId = 100;
   const clock: Clock = {
     now() {
       events.push('clock.now');
-      const timestamp = times.shift();
-      if (timestamp === undefined) throw new Error('test clock exhausted');
-      return new Date(timestamp);
+      return new Date(times.shift() ?? COLLECTED_AT);
     },
   };
   const idGenerator: IdGenerator = {
     generate() {
       events.push('ids.generate');
-      const id = ids.shift();
-      if (id === undefined) throw new Error('test IDs exhausted');
-      return id;
+      return ids.shift() ?? `10000000-0000-4000-8000-${String(generatedId++).padStart(12, '0')}`;
     },
   };
+  const feedParserInputs: string[] = [];
+  const realFeedParser = createFeedParser();
   const feedParser: FeedParser = {
-    parse() {
-      throw new Error('Task 9 only');
+    parse(xml) {
+      feedParserInputs.push(xml);
+      return realFeedParser.parse(xml);
     },
   };
   const dependencies = { repository, http, feedParser, hasher, clock, ids: idGenerator };
   const collect = createCollectSource(dependencies) as (job: unknown) => Promise<StrictResult>;
-  return { collect, repository, http, hasher, events };
+  return { collect, repository, http, hasher, events, feedParserInputs };
+}
+
+function feedWithArticlesFixture(count: number) {
+  const fixture = createFixture();
+  const items = Array.from(
+    { length: count },
+    (_, index) => `<item><guid>entry-${index + 1}</guid><link>https://official.example/${index + 1}</link></item>`,
+  );
+  const xml = `<rss version="2.0"><channel>${items.join('')}</channel></rss>`;
+  const bytes = new TextEncoder().encode(xml);
+  fixture.http.response = httpResponse({
+    mediaTypeHeader: 'application/rss+xml',
+    body: bytes,
+    decompressedBytes: bytes.byteLength,
+  });
+  fixture.http.scripts.push({ response: fixture.http.response });
+  for (let index = 0; index < count; index += 1) {
+    fixture.http.scripts.push({
+      response: httpResponse({
+        requestedUrl: `https://official.example/${index + 1}`,
+        finalUrl: `https://official.example/${index + 1}`,
+      }),
+    });
+  }
+  return fixture;
 }
 
 function httpResponse(overrides: Partial<SafeHttpResponse> = {}): SafeHttpResponse {

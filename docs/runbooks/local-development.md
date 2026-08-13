@@ -8,6 +8,8 @@
 
 Use only local development credentials. Never put seed phrases, private keys, mnemonics, wallet passwords, signing secrets, or production credentials in this repository or its environment files.
 
+The dormant source collector expects the environment-variable names `AIRDROP_COLLECTION_DATABASE_URL` and `AIRDROP_COLLECTION_USER_AGENT` in its future server-side adapter. Do not document, print, or commit their values. Provision a dedicated login separately with only membership sufficient to `SET ROLE collection_worker`; the migration intentionally creates `collection_worker` without login capability or a password. Never use a browser credential or service-role credential for collection.
+
 ## Install and configure
 
 From the repository root, install exactly what the lockfile records and create an untracked local environment file:
@@ -102,6 +104,15 @@ Use `pnpm verify:full` when both the repository and local database gates are nee
 ```bash
 pnpm verify:full
 ```
+
+Target source-collection tests with:
+
+```bash
+pnpm --filter @airdrop/worker test -- src/collection/tests/collect-source.test.ts
+pnpm --filter @airdrop/worker test -- src/collection/tests/create-collector.test.ts
+```
+
+`createSourceCollector()` does not start a queue, timer, or schedule. A future owning adapter must retain the returned object and call `await collector.close()` during shutdown so the small postgres.js pool closes cleanly.
 
 ## Shutdown
 
