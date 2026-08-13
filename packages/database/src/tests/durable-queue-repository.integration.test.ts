@@ -10,6 +10,7 @@ import type { ClaimedCollectionJob } from '@airdrop/contracts';
 const projectId = '82000000-0000-4000-8000-000000000010';
 const sourceId = '82000000-0000-4000-8000-000000000020';
 const reviewerId = '82000000-0000-4000-8000-000000000090';
+const seedSourceId = '90000000-0000-4000-8000-000000000020';
 const workerRole = 'durable_queue_repository_test_worker';
 const workerPassword = 'durable-queue-repository-test-only';
 const baseTime = new Date('2026-08-14T00:00:00.000Z');
@@ -19,6 +20,7 @@ const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
 const describeIntegration = integrationDatabaseUrl === undefined ? describe.skip : describe;
 
 describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', () => {
+  let seedSourceStatus: string | null = null;
   const owner = integrationDatabaseUrl === undefined
     ? null
     : postgres(integrationDatabaseUrl, { max: 1 });
@@ -36,6 +38,19 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
     if (owner === null) throw new Error('Database integration environment is unavailable.');
     await removeFixtures(owner);
     await dropWorkerRole(owner);
+    const seedRows = await owner<readonly { status: string }[]>`
+      select status::text
+      from public.sources
+      where id = ${seedSourceId}::uuid
+    `;
+    seedSourceStatus = seedRows[0]?.status ?? null;
+    if (seedSourceStatus !== null) {
+      await owner`
+        update public.sources
+        set status = 'suspended'
+        where id = ${seedSourceId}::uuid
+      `;
+    }
     await owner`
       create role durable_queue_repository_test_worker
       login noinherit nosuperuser nobypassrls nocreatedb nocreaterole noreplication
@@ -85,11 +100,21 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
     try {
       await removeFixtures(owner);
     } finally {
-      await Promise.all([first.close(), second.close()]);
       try {
-        await dropWorkerRole(owner);
+        if (seedSourceStatus !== null) {
+          await owner`
+            update public.sources
+            set status = ${seedSourceStatus}::public.source_status
+            where id = ${seedSourceId}::uuid
+          `;
+        }
       } finally {
-        await owner.end({ timeout: 5 });
+        await Promise.all([first.close(), second.close()]);
+        try {
+          await dropWorkerRole(owner);
+        } finally {
+          await owner.end({ timeout: 5 });
+        }
       }
     }
   });
@@ -180,14 +205,15 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
   });
 
   it('maps the server-only queue health snapshot', async () => {
+    const baseline = await requireRepository(first).health(dueTime);
     await enqueue(first);
 
     await expect(requireRepository(first).health(dueTime)).resolves.toMatchObject({
-      queuedCount: 1,
-      retryWaitCount: 0,
-      leasedCount: 0,
-      expiredLeaseCount: 0,
-      deadLetterCount: 0,
+      queuedCount: baseline.queuedCount + 1,
+      retryWaitCount: baseline.retryWaitCount,
+      leasedCount: baseline.leasedCount,
+      expiredLeaseCount: baseline.expiredLeaseCount,
+      deadLetterCount: baseline.deadLetterCount,
     });
     expect((await requireRepository(first).health(dueTime)).oldestRunnableAgeSeconds)
       .toBeGreaterThanOrEqual(0);
@@ -196,7 +222,7 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
     ).resolves.toBe(true);
   });
 
-  it('rolls back the job state when an invalid event transition aborts completion', async () => {
+  it('maps a generic PL/pgSQL event failure to persistence and rolls back completion', async () => {
     const database = requireOwner(owner);
     await enqueue(first);
     const claimed = await claimOne(first, 'worker-one', dueTime);
@@ -217,7 +243,7 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
           select 1 from public.queue_repository_rejected_jobs as rejected
           where rejected.job_id = new.job_id
         ) then
-          raise exception 'integration_forced_invalid_event_transition' using errcode = '23514';
+          raise exception 'integration_forced_invalid_event_transition' using errcode = 'P0001';
         end if;
         return new;
       end;

@@ -698,7 +698,7 @@ begin
   for update;
 
   if not found then
-    raise exception 'lease_fence_lost' using errcode = 'P0001';
+    raise exception 'lease_fence_lost' using errcode = 'AQL01';
   end if;
 
   return job_record;

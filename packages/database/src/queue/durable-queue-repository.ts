@@ -104,7 +104,7 @@ export function createDurableCollectionQueueRepositoryFromClient(
     try {
       return await client.transaction(work);
     } catch (error) {
-      if (options.fenceOperation === true && sqlState(error) === 'P0001') {
+      if (options.fenceOperation === true && sqlState(error) === 'AQL01') {
         throw new LeaseFenceError();
       }
       throw new DurableQueuePersistenceError();

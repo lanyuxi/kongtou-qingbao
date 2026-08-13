@@ -866,7 +866,7 @@ reset role;
 
 select results_eq(
   $$ select sqlstate, message from pg_temp.queue_role_observations where key = 'lease_fence_lost' $$,
-  $$ values ('P0001'::text, 'lease_fence_lost'::text) $$,
+  $$ values ('AQL01'::text, 'lease_fence_lost'::text) $$,
   'a stale owner cannot complete another worker lease'
 );
 

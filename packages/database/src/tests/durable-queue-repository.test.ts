@@ -251,18 +251,24 @@ describe('DurableCollectionQueueRepository', () => {
   });
 
   it('maps fence SQLSTATE without branching on the human-readable message', async () => {
-    const first = new RecordingClient([], Object.assign(new Error('totally changed wording'), { code: 'P0001' }));
-    const second = new RecordingClient([], Object.assign(new Error('lease_fence_lost'), { code: 'XX000' }));
+    const fenceFailure = new RecordingClient(
+      [],
+      Object.assign(new Error('totally changed wording'), { code: 'AQL01' }),
+    );
+    const genericPlpgsqlFailure = new RecordingClient(
+      [],
+      Object.assign(new Error('lease_fence_lost'), { code: 'P0001' }),
+    );
 
     await expect(
-      createDurableCollectionQueueRepositoryFromClient(first).succeed(
+      createDurableCollectionQueueRepositoryFromClient(fenceFailure).succeed(
         fence,
         'stored_new_content',
         now,
       ),
     ).rejects.toBeInstanceOf(LeaseFenceError);
     await expect(
-      createDurableCollectionQueueRepositoryFromClient(second).succeed(
+      createDurableCollectionQueueRepositoryFromClient(genericPlpgsqlFailure).succeed(
         fence,
         'stored_new_content',
         now,
