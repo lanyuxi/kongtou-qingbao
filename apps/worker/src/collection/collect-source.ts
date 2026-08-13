@@ -96,6 +96,12 @@ export function createCollectSource(
     try {
       const committed = await dependencies.repository.findCommitted(job.idempotencyKey);
       if (committed !== null) {
+        if (
+          committed.projectId !== job.payload.projectId ||
+          committed.sourceId !== job.payload.sourceId
+        ) {
+          throw new Error('committed_aggregate_mismatch');
+        }
         return collectSourceResultSchema.parse(committed);
       }
 

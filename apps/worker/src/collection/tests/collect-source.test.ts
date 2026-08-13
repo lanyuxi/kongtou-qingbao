@@ -104,6 +104,27 @@ describe('collect source', () => {
     expect(fixture.http.requests).toEqual([]);
   });
 
+  it.each([
+    { field: 'projectId', value: '10000000-0000-4000-8000-000000000090' },
+    { field: 'sourceId', value: '10000000-0000-4000-8000-000000000091' },
+  ] as const)('fails closed when a replay key belongs to another $field', async ({ field, value }) => {
+    const fixture = createFixture();
+    fixture.repository.priorResult = { ...priorResult(), [field]: value };
+
+    await expect(fixture.collect(validJob)).resolves.toEqual({
+      attemptId: ATTEMPT_ID,
+      projectId: PROJECT_ID,
+      sourceId: SOURCE_ID,
+      outcome: 'persistence_failed',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.events).toEqual(['repository.findCommitted', 'ids.generate']);
+    expect(fixture.http.requests).toEqual([]);
+    expect(fixture.repository.commits).toEqual([]);
+  });
+
   it('rejects inactive or unverified configuration before validators and HTTP', async () => {
     const fixture = createFixture();
     fixture.repository.context = null;

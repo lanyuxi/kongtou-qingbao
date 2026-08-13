@@ -166,6 +166,10 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
     );
 
     expect(replay).toEqual(first);
+    expect(await repository.findCommitted(endpointAttempt().idempotencyKey)).toMatchObject({
+      projectId,
+      sourceId,
+    });
     expect(reuse.rawItemId).toBe(rawItemId);
     expect(revalidated.rawItemId).toBe(rawItemId);
     expect(latest).toMatchObject({ id: rawItemId, etag: '"v2"' });
