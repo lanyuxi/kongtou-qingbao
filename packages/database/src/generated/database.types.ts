@@ -292,6 +292,154 @@ export type Database = {
           },
         ]
       }
+      durable_job_events: {
+        Row: {
+          detail: string | null
+          event_type: Database["public"]["Enums"]["durable_job_event_type"]
+          execution_attempt: number | null
+          id: string
+          job_id: string
+          job_state: Database["public"]["Enums"]["durable_job_state"]
+          job_version: number
+          lease_epoch: number | null
+          occurred_at: string
+          result_code: string | null
+          worker_id: string | null
+        }
+        Insert: {
+          detail?: string | null
+          event_type: Database["public"]["Enums"]["durable_job_event_type"]
+          execution_attempt?: number | null
+          id?: string
+          job_id: string
+          job_state: Database["public"]["Enums"]["durable_job_state"]
+          job_version: number
+          lease_epoch?: number | null
+          occurred_at: string
+          result_code?: string | null
+          worker_id?: string | null
+        }
+        Update: {
+          detail?: string | null
+          event_type?: Database["public"]["Enums"]["durable_job_event_type"]
+          execution_attempt?: number | null
+          id?: string
+          job_id?: string
+          job_state?: Database["public"]["Enums"]["durable_job_state"]
+          job_version?: number
+          lease_epoch?: number | null
+          occurred_at?: string
+          result_code?: string | null
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "durable_job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "durable_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      durable_jobs: {
+        Row: {
+          available_at: string
+          collection_rule_version: string
+          completed_at: string | null
+          contract_version: number
+          created_at: string
+          delivery_count: number
+          execution_attempt: number
+          id: string
+          idempotency_key: string
+          job_type: string
+          last_error_detail: string | null
+          last_result_code: string | null
+          lease_epoch: number
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          payload: Json
+          payload_hash: string
+          project_id: string
+          schedule_id: string
+          schedule_version: number
+          scheduled_for: string
+          source_id: string
+          state: Database["public"]["Enums"]["durable_job_state"]
+          trigger: Database["public"]["Enums"]["collection_job_trigger"]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          available_at: string
+          collection_rule_version?: string
+          completed_at?: string | null
+          contract_version?: number
+          created_at?: string
+          delivery_count?: number
+          execution_attempt?: number
+          id?: string
+          idempotency_key: string
+          job_type?: string
+          last_error_detail?: string | null
+          last_result_code?: string | null
+          lease_epoch?: number
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          payload: Json
+          payload_hash: string
+          project_id: string
+          schedule_id: string
+          schedule_version: number
+          scheduled_for: string
+          source_id: string
+          state?: Database["public"]["Enums"]["durable_job_state"]
+          trigger: Database["public"]["Enums"]["collection_job_trigger"]
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          available_at?: string
+          collection_rule_version?: string
+          completed_at?: string | null
+          contract_version?: number
+          created_at?: string
+          delivery_count?: number
+          execution_attempt?: number
+          id?: string
+          idempotency_key?: string
+          job_type?: string
+          last_error_detail?: string | null
+          last_result_code?: string | null
+          lease_epoch?: number
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          payload?: Json
+          payload_hash?: string
+          project_id?: string
+          schedule_id?: string
+          schedule_version?: number
+          scheduled_for?: string
+          source_id?: string
+          state?: Database["public"]["Enums"]["durable_job_state"]
+          trigger?: Database["public"]["Enums"]["collection_job_trigger"]
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "durable_jobs_schedule_identity_fkey"
+            columns: ["schedule_id", "project_id", "source_id"]
+            isOneToOne: false
+            referencedRelation: "source_collection_schedules"
+            referencedColumns: ["id", "project_id", "source_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -649,6 +797,178 @@ export type Database = {
           },
         ]
       }
+      source_collection_schedules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          enablement_origin: Database["public"]["Enums"]["source_schedule_origin"]
+          id: string
+          interval_seconds: number
+          last_enqueued_at: string | null
+          next_run_at: string
+          project_id: string
+          source_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          enablement_origin?: Database["public"]["Enums"]["source_schedule_origin"]
+          id?: string
+          interval_seconds?: number
+          last_enqueued_at?: string | null
+          next_run_at: string
+          project_id: string
+          source_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          enablement_origin?: Database["public"]["Enums"]["source_schedule_origin"]
+          id?: string
+          interval_seconds?: number
+          last_enqueued_at?: string | null
+          next_run_at?: string
+          project_id?: string
+          source_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_collection_schedules_project_source_fkey"
+            columns: ["project_id", "source_id"]
+            isOneToOne: true
+            referencedRelation: "project_sources"
+            referencedColumns: ["project_id", "source_id"]
+          },
+        ]
+      }
+      source_schedule_commands: {
+        Row: {
+          actor_id: string
+          command_type: Database["public"]["Enums"]["source_schedule_command_type"]
+          created_at: string
+          expected_version: number
+          id: string
+          idempotency_key: string
+          input_hash: string
+          job_id: string | null
+          result_enabled: boolean
+          result_interval_seconds: number
+          result_next_run_at: string
+          resulting_version: number
+          schedule_id: string
+        }
+        Insert: {
+          actor_id: string
+          command_type: Database["public"]["Enums"]["source_schedule_command_type"]
+          created_at?: string
+          expected_version: number
+          id?: string
+          idempotency_key: string
+          input_hash: string
+          job_id?: string | null
+          result_enabled: boolean
+          result_interval_seconds: number
+          result_next_run_at: string
+          resulting_version: number
+          schedule_id: string
+        }
+        Update: {
+          actor_id?: string
+          command_type?: Database["public"]["Enums"]["source_schedule_command_type"]
+          created_at?: string
+          expected_version?: number
+          id?: string
+          idempotency_key?: string
+          input_hash?: string
+          job_id?: string | null
+          result_enabled?: boolean
+          result_interval_seconds?: number
+          result_next_run_at?: string
+          resulting_version?: number
+          schedule_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_schedule_commands_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_schedule_commands_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "durable_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_schedule_commands_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "source_collection_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_schedule_events: {
+        Row: {
+          actor_id: string | null
+          command_id: string | null
+          event_type: Database["public"]["Enums"]["source_schedule_event_type"]
+          id: string
+          occurred_at: string
+          schedule_id: string
+          schedule_version: number
+        }
+        Insert: {
+          actor_id?: string | null
+          command_id?: string | null
+          event_type: Database["public"]["Enums"]["source_schedule_event_type"]
+          id?: string
+          occurred_at: string
+          schedule_id: string
+          schedule_version: number
+        }
+        Update: {
+          actor_id?: string | null
+          command_id?: string | null
+          event_type?: Database["public"]["Enums"]["source_schedule_event_type"]
+          id?: string
+          occurred_at?: string
+          schedule_id?: string
+          schedule_version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_schedule_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_schedule_events_command_id_fkey"
+            columns: ["command_id"]
+            isOneToOne: false
+            referencedRelation: "source_schedule_commands"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_schedule_events_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "source_collection_schedules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sources: {
         Row: {
           canonical_url: string
@@ -970,8 +1290,145 @@ export type Database = {
       }
     }
     Functions: {
+      assert_collection_job_fence: {
+        Args: {
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          worker_id: string
+        }
+        Returns: {
+          available_at: string
+          collection_rule_version: string
+          completed_at: string | null
+          contract_version: number
+          created_at: string
+          delivery_count: number
+          execution_attempt: number
+          id: string
+          idempotency_key: string
+          job_type: string
+          last_error_detail: string | null
+          last_result_code: string | null
+          lease_epoch: number
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          payload: Json
+          payload_hash: string
+          project_id: string
+          schedule_id: string
+          schedule_version: number
+          scheduled_for: string
+          source_id: string
+          state: Database["public"]["Enums"]["durable_job_state"]
+          trigger: Database["public"]["Enums"]["collection_job_trigger"]
+          updated_at: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "durable_jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cancel_collection_job: {
+        Args: {
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          result_code: string
+          worker_id: string
+        }
+        Returns: {
+          canceled_job_id: string
+        }[]
+      }
+      claim_collection_jobs: {
+        Args: { batch_limit: number; now_at: string; worker_id: string }
+        Returns: {
+          delivery_count: number
+          execution_attempt: number
+          job_id: string
+          lease_epoch: number
+          lease_expires_at: string
+          lease_owner: string
+          max_attempts: number
+          payload: Json
+        }[]
+      }
+      collection_queue_health: {
+        Args: { now_at: string }
+        Returns: {
+          dead_letter_count: number
+          expired_lease_count: number
+          leased_count: number
+          oldest_runnable_age_seconds: number
+          queued_count: number
+          retry_wait_count: number
+        }[]
+      }
+      collection_schedule_jitter_seconds: {
+        Args: {
+          interval_seconds: number
+          project_id: string
+          scheduled_for: string
+          source_id: string
+        }
+        Returns: number
+      }
+      complete_collection_job: {
+        Args: {
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          result_code: string
+          worker_id: string
+        }
+        Returns: {
+          completed_job_id: string
+        }[]
+      }
+      dead_letter_collection_job: {
+        Args: {
+          detail: string
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          result_code: string
+          worker_id: string
+        }
+        Returns: {
+          dead_lettered_job_id: string
+        }[]
+      }
+      execute_source_schedule_command: {
+        Args: {
+          p_actor_id: string
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_input_hash: string
+          p_now_at: string
+          p_schedule_id: string
+        }
+        Returns: {
+          command: Database["public"]["Enums"]["source_schedule_command_type"]
+          enabled: boolean
+          interval_seconds: number
+          job_id: string
+          next_run_at: string
+          replayed: boolean
+          schedule_id: string
+          schedule_version: number
+        }[]
+      }
       has_active_role: {
         Args: { requested_role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
+      is_source_collection_eligible: {
+        Args: { project_id: string; source_id: string }
         Returns: boolean
       }
       load_source_collection_context: {
@@ -981,6 +1438,40 @@ export type Database = {
           canonical_url: string
           project_id: string
           source_id: string
+        }[]
+      }
+      reconcile_due_source_schedules: {
+        Args: { batch_limit: number; now_at: string }
+        Returns: {
+          canceled_count: number
+          created_schedule_count: number
+          enqueued_count: number
+          lock_acquired: boolean
+        }[]
+      }
+      renew_collection_job_lease: {
+        Args: {
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          worker_id: string
+        }
+        Returns: {
+          lease_expires_at: string
+        }[]
+      }
+      retry_collection_job: {
+        Args: {
+          available_at: string
+          detail: string
+          job_id: string
+          lease_epoch: number
+          now_at: string
+          result_code: string
+          worker_id: string
+        }
+        Returns: {
+          retried_job_id: string
         }[]
       }
       update_user_task: {
@@ -1006,11 +1497,28 @@ export type Database = {
         }
       }
       valid_authority_domains: { Args: { domains: string[] }; Returns: boolean }
+      valid_collection_job_payload: {
+        Args: {
+          candidate: Json
+          normalized_project_id: string
+          normalized_rule_version: string
+          normalized_schedule_id: string
+          normalized_schedule_version: number
+          normalized_scheduled_for: string
+          normalized_source_id: string
+          normalized_trigger: Database["public"]["Enums"]["collection_job_trigger"]
+        }
+        Returns: boolean
+      }
       valid_collection_redirect_chain: {
         Args: { candidate: Json }
         Returns: boolean
       }
       valid_https_url: { Args: { candidate_url: string }; Returns: boolean }
+      valid_source_schedule_command_payload: {
+        Args: { candidate: Json }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:
@@ -1024,6 +1532,7 @@ export type Database = {
         | "rss_feed"
         | "atom_feed"
         | "feed_article_html"
+      collection_job_trigger: "scheduled" | "manual"
       collection_outcome:
         | "stored_new_content"
         | "not_modified"
@@ -1046,6 +1555,22 @@ export type Database = {
         | "body_fetch_budget_exhausted"
         | "fetched"
         | "fetch_failed"
+      durable_job_event_type:
+        | "enqueued"
+        | "claimed"
+        | "lease_renewed"
+        | "lease_expired"
+        | "retry_scheduled"
+        | "succeeded"
+        | "dead_lettered"
+        | "canceled"
+      durable_job_state:
+        | "queued"
+        | "leased"
+        | "retry_wait"
+        | "succeeded"
+        | "dead_letter"
+        | "canceled"
       participation_status:
         | "interested"
         | "researching"
@@ -1071,6 +1596,17 @@ export type Database = {
         | "verified"
         | "disputed"
         | "retracted"
+      source_schedule_command_type:
+        | "pause"
+        | "resume"
+        | "change_interval"
+        | "collect_now"
+      source_schedule_event_type:
+        | "auto_created"
+        | "paused"
+        | "resumed"
+        | "interval_changed"
+      source_schedule_origin: "automatic" | "manual"
       source_status: "active" | "degraded" | "suspended" | "retired"
       source_type:
         | "official_web"
@@ -1232,6 +1768,7 @@ export const Constants = {
         "atom_feed",
         "feed_article_html",
       ],
+      collection_job_trigger: ["scheduled", "manual"],
       collection_outcome: [
         "stored_new_content",
         "not_modified",
@@ -1255,6 +1792,24 @@ export const Constants = {
         "body_fetch_budget_exhausted",
         "fetched",
         "fetch_failed",
+      ],
+      durable_job_event_type: [
+        "enqueued",
+        "claimed",
+        "lease_renewed",
+        "lease_expired",
+        "retry_scheduled",
+        "succeeded",
+        "dead_lettered",
+        "canceled",
+      ],
+      durable_job_state: [
+        "queued",
+        "leased",
+        "retry_wait",
+        "succeeded",
+        "dead_letter",
+        "canceled",
       ],
       participation_status: [
         "interested",
@@ -1284,6 +1839,19 @@ export const Constants = {
         "disputed",
         "retracted",
       ],
+      source_schedule_command_type: [
+        "pause",
+        "resume",
+        "change_interval",
+        "collect_now",
+      ],
+      source_schedule_event_type: [
+        "auto_created",
+        "paused",
+        "resumed",
+        "interval_changed",
+      ],
+      source_schedule_origin: ["automatic", "manual"],
       source_status: ["active", "degraded", "suspended", "retired"],
       source_type: [
         "official_web",
