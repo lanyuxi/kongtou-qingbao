@@ -4,6 +4,7 @@ const requiredEnvironmentNames = [
   'AIRDROP_DATABASE_TEST_URL',
   'AIRDROP_ANON_SUPABASE_URL',
   'AIRDROP_ANON_SUPABASE_KEY',
+  'AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL',
 ];
 
 if (
@@ -12,7 +13,7 @@ if (
   )
 ) {
   console.error(
-    'Database repository integration requires AIRDROP_DATABASE_TEST_URL, AIRDROP_ANON_SUPABASE_URL, and AIRDROP_ANON_SUPABASE_KEY.',
+    'Database repository integration requires AIRDROP_DATABASE_TEST_URL, AIRDROP_ANON_SUPABASE_URL, AIRDROP_ANON_SUPABASE_KEY, and AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL.',
   );
   process.exitCode = 1;
 }

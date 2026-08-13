@@ -13,6 +13,10 @@
     "./collection-queue-worker": {
       "browser": "./src/queue/browser-denied.ts",
       "default": "./src/queue/worker-entry.ts"
+    },
+    "./schedule-admin": {
+      "browser": "./src/queue/admin-browser-denied.ts",
+      "default": "./src/queue/admin-entry.ts"
     }
   },
   "scripts": {
@@ -20,7 +24,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "node scripts/require-integration-env.mjs && vitest run src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts"
+    "test:integration": "node scripts/require-integration-env.mjs && vitest run src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts src/tests/schedule-command-repository.integration.test.ts"
   },
   "dependencies": {
     "@airdrop/contracts": "workspace:*",

@@ -1055,6 +1055,56 @@ select results_eq(
   'collect-now creates one manual job while preserving the recurring cursor'
 );
 
+insert into pg_temp.queue_command_inputs (key, payload, input_hash)
+select
+  'collect_now_microseconds',
+  command_payload,
+  pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(command_payload::text, 'UTF8'), 'sha256'),
+    'hex'
+  )
+from (
+  select pg_catalog.jsonb_build_object(
+    'version', 1,
+    'command', 'collect_now',
+    'expectedVersion', 8,
+    'intervalSeconds', null
+  ) as command_payload
+) as microsecond_command;
+
+set local role collection_schedule_admin;
+
+create temporary table collect_now_microseconds_result on commit drop as
+select * from public.execute_source_schedule_command(
+  '81000000-0000-4000-8000-000000000001',
+  (select value from pg_temp.queue_test_ids where key = 'schedule_one'),
+  (select payload from pg_temp.queue_command_inputs where key = 'collect_now_microseconds'),
+  'collect-now-microseconds-queue-schedule-1',
+  (select input_hash from pg_temp.queue_command_inputs where key = 'collect_now_microseconds'),
+  '2026-08-13 12:22:00.123456+00'
+);
+
+reset role;
+
+select results_eq(
+  $$ select schedule_version, next_run_at, job_id is not null from pg_temp.collect_now_microseconds_result $$,
+  $$ values (9::bigint, '2026-08-20 12:21:00+00'::timestamptz, true) $$,
+  'microsecond collect-now advances the schedule version while preserving the recurring cursor'
+);
+
+select results_eq(
+  $$
+    select
+      job.payload ->> 'scheduledFor',
+      job.scheduled_for,
+      (job.payload ->> 'scheduledFor')::timestamptz = job.scheduled_for
+    from public.durable_jobs as job
+    where job.id = (select job_id from pg_temp.collect_now_microseconds_result)
+  $$,
+  $$ values ('2026-08-13T12:22:00.123456Z'::text, '2026-08-13 12:22:00.123456+00'::timestamptz, true) $$,
+  'microsecond collect-now payload scheduledFor round-trips exactly to normalized scheduled_for'
+);
+
 insert into queue_test_ids (key, value)
 select 'manual_job', job_id from pg_temp.collect_now_result;
 

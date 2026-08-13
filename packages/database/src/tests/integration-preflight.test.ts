@@ -17,7 +17,7 @@ describe('database integration environment preflight', () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe(
-      'Database repository integration requires AIRDROP_DATABASE_TEST_URL, AIRDROP_ANON_SUPABASE_URL, and AIRDROP_ANON_SUPABASE_KEY.\n',
+      'Database repository integration requires AIRDROP_DATABASE_TEST_URL, AIRDROP_ANON_SUPABASE_URL, AIRDROP_ANON_SUPABASE_KEY, and AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL.\n',
     );
   });
 });

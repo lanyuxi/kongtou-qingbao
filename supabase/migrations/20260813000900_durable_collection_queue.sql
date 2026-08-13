@@ -514,7 +514,7 @@ begin
     next_version := schedule_record.version + 1;
     logical_text := pg_catalog.to_char(
       schedule_record.next_run_at at time zone 'UTC',
-      'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
     );
     payload_value := pg_catalog.jsonb_build_object(
       'projectId', schedule_record.project_id::text,
@@ -1153,7 +1153,7 @@ begin
     from canceled_jobs;
   elsif command_type = 'collect_now' then
     logical_text := pg_catalog.to_char(
-      p_now_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      p_now_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
     );
     payload_value := pg_catalog.jsonb_build_object(
       'projectId', schedule_record.project_id::text,
