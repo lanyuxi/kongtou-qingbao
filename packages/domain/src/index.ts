@@ -67,3 +67,31 @@ export type {
   FeedArticleDispositionInput,
   StableFeedEntryKeyInput,
 } from './collection/content-policy.js';
+export {
+  CollectionIntervalError,
+  DEFAULT_COLLECTION_INTERVAL_SECONDS,
+  MAX_COLLECTION_INTERVAL_SECONDS,
+  MIN_COLLECTION_INTERVAL_SECONDS,
+  assertCollectionInterval,
+  calculateNextRunAt,
+  deterministicJitterSeconds,
+  isAutomaticCollectionEligible,
+} from './queue/schedule-policy.js';
+export type {
+  EligibilityInput,
+  JitterInput,
+  NextRunInput,
+} from './queue/schedule-policy.js';
+export {
+  CollectionRetryPolicyError,
+  DEFAULT_MAX_COLLECTION_ATTEMPTS,
+  classifyCollectionOutcome,
+  collectorIdempotencyKey,
+  retryDelaySeconds,
+} from './queue/retry-policy.js';
+export type {
+  CollectionOutcomeClassification,
+  CollectionTerminalResultCode,
+  RetryDelayInput,
+  RetryPolicyErrorCode,
+} from './queue/retry-policy.js';
