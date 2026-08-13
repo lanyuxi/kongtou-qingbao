@@ -940,7 +940,9 @@ as $$
       select pg_catalog.array_agg(payload_key order by payload_key)
       from pg_catalog.jsonb_object_keys(candidate) as payload_keys(payload_key)
     ) = array['command', 'expectedVersion', 'intervalSeconds', 'version']::text[]
+    and pg_catalog.jsonb_typeof(candidate -> 'version') = 'number'
     and candidate ->> 'version' = '1'
+    and pg_catalog.jsonb_typeof(candidate -> 'expectedVersion') = 'number'
     and candidate ->> 'expectedVersion' ~ '^(0|[1-9][0-9]*)$'
     and candidate ->> 'command' in ('pause', 'resume', 'change_interval', 'collect_now')
     and (
@@ -1057,6 +1059,27 @@ begin
   if not found then
     raise exception 'schedule_not_found' using errcode = 'P0001';
   end if;
+
+  select * into receipt_record
+  from public.source_schedule_commands as receipt
+  where receipt.actor_id = p_actor_id
+    and receipt.schedule_id = p_schedule_id
+    and receipt.idempotency_key = p_idempotency_key;
+
+  if found then
+    if receipt_record.input_hash <> p_input_hash
+      or receipt_record.command_type <> command_type
+    then
+      raise exception 'idempotency_conflict' using errcode = 'P0001';
+    end if;
+
+    return query select receipt_record.schedule_id, receipt_record.command_type,
+      receipt_record.resulting_version, receipt_record.result_enabled,
+      receipt_record.result_interval_seconds, receipt_record.result_next_run_at,
+      receipt_record.job_id, true;
+    return;
+  end if;
+
   if schedule_record.version <> expected_version then
     raise exception 'schedule_version_conflict' using errcode = 'P0001';
   end if;

@@ -545,6 +545,41 @@ select ok(
   'strict payload validator rejects source content and every unknown key'
 );
 
+select results_eq(
+  $$
+    select fixture.case_name::text collate "C",
+      public.valid_source_schedule_command_payload(fixture.payload)
+    from (
+      values
+        ('numeric version and expected version'::text, '{"version":1,"command":"pause","expectedVersion":2,"intervalSeconds":null}'::jsonb),
+        ('string version', '{"version":"1","command":"pause","expectedVersion":2,"intervalSeconds":null}'::jsonb),
+        ('boolean version', '{"version":true,"command":"pause","expectedVersion":2,"intervalSeconds":null}'::jsonb),
+        ('null version', '{"version":null,"command":"pause","expectedVersion":2,"intervalSeconds":null}'::jsonb),
+        ('fractional version', '{"version":1.5,"command":"pause","expectedVersion":2,"intervalSeconds":null}'::jsonb),
+        ('string expected version', '{"version":1,"command":"pause","expectedVersion":"2","intervalSeconds":null}'::jsonb),
+        ('boolean expected version', '{"version":1,"command":"pause","expectedVersion":true,"intervalSeconds":null}'::jsonb),
+        ('null expected version', '{"version":1,"command":"pause","expectedVersion":null,"intervalSeconds":null}'::jsonb),
+        ('fractional expected version', '{"version":1,"command":"pause","expectedVersion":2.5,"intervalSeconds":null}'::jsonb)
+    ) as fixture(case_name, payload)
+    order by fixture.case_name
+  $$,
+  $$
+    select expected.case_name collate "C", expected.is_valid
+    from (values
+      ('boolean expected version'::text, false),
+      ('boolean version', false),
+      ('fractional expected version', false),
+      ('fractional version', false),
+      ('null expected version', false),
+      ('null version', false),
+      ('numeric version and expected version', true),
+      ('string expected version', false),
+      ('string version', false)
+    ) as expected(case_name, is_valid)
+  $$,
+  'schedule command versions require JSON integer numbers and reject coercible scalar types'
+);
+
 select throws_ok(
   $$ select * from public.reconcile_due_source_schedules('2026-08-13 12:00:00+00', 0) $$,
   '22023',
@@ -1082,6 +1117,45 @@ select throws_ok(
   '55000',
   'collection_queue_history_append_only',
   'job events are append-only even to the database owner'
+);
+
+select ok(
+  (
+    with function_definition as (
+      select pg_catalog.regexp_replace(
+        pg_catalog.pg_get_functiondef(
+          'public.execute_source_schedule_command(uuid,uuid,jsonb,text,text,timestamptz)'::regprocedure
+        ),
+        '[[:space:]]+',
+        ' ',
+        'g'
+      ) as source_text
+    ),
+    source_locations as (
+      select
+        pg_catalog.strpos(source_text, 'for update;') as lock_position,
+        pg_catalog.strpos(
+          pg_catalog.substr(
+            source_text,
+            pg_catalog.strpos(source_text, 'for update;') + 11
+          ),
+          'from public.source_schedule_commands as receipt'
+        ) as receipt_after_lock_position,
+        pg_catalog.strpos(
+          pg_catalog.substr(
+            source_text,
+            pg_catalog.strpos(source_text, 'for update;') + 11
+          ),
+          'if schedule_record.version <> expected_version'
+        ) as version_after_lock_position
+      from function_definition
+    )
+    select lock_position > 0
+      and receipt_after_lock_position > 0
+      and version_after_lock_position > receipt_after_lock_position
+    from source_locations
+  ),
+  'schedule command rechecks its receipt after the aggregate lock and before expected version validation'
 );
 
 \else
