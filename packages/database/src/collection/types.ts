@@ -103,10 +103,14 @@ export interface CommitFeedInput {
   readonly discoveries: readonly DiscoveredItemInput[];
 }
 
-export interface CommitFeedResult {
+export type CommitFeedResult = {
+  readonly inserted: false;
+  readonly result: CollectSourceResult;
+} | {
+  readonly inserted: true;
   readonly result: CollectSourceResult;
   readonly discoveryIds: readonly string[];
-}
+};
 
 export interface CommitArticleOutcomeInput {
   readonly attempt: CollectionAttemptInput;

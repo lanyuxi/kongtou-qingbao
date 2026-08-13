@@ -521,6 +521,47 @@ describe('collect source', () => {
     expect(fixture.repository.articleCommits).toEqual([]);
   });
 
+  it('does not fetch articles when a concurrent Feed collector wins the commit race', async () => {
+    const fixture = feedWithArticlesFixture(2);
+    fixture.repository.feedReplayResult = {
+      attemptId: '10000000-0000-4000-8000-000000000099',
+      projectId: PROJECT_ID,
+      sourceId: SOURCE_ID,
+      outcome: 'stored_new_content',
+      rawItemId: '10000000-0000-4000-8000-000000000098',
+      discoveredCount: 2,
+      bodyFetchCount: 2,
+    };
+
+    await expect(fixture.collect(validJob)).resolves.toEqual(fixture.repository.feedReplayResult);
+    expect(fixture.http.requests).toHaveLength(1);
+    expect(fixture.repository.articleCommits).toEqual([]);
+  });
+
+  it('associates winner article successors with the matching inserted discoveries', async () => {
+    const fixture = feedWithArticlesFixture(2);
+    fixture.repository.feedDiscoveryIds = [
+      '10000000-0000-4000-8000-000000000091',
+      '10000000-0000-4000-8000-000000000092',
+    ];
+
+    await fixture.collect(validJob);
+
+    expect(fixture.repository.articleCommits.map(({ discovery }) => ({
+      stableEntryKey: discovery.stableEntryKey,
+      supersedesDiscoveredItemId: discovery.supersedesDiscoveredItemId,
+    }))).toEqual([
+      {
+        stableEntryKey: 'id:entry-1',
+        supersedesDiscoveredItemId: '10000000-0000-4000-8000-000000000091',
+      },
+      {
+        stableEntryKey: 'id:entry-2',
+        supersedesDiscoveredItemId: '10000000-0000-4000-8000-000000000092',
+      },
+    ]);
+  });
+
   it('continues after an article persistence failure and preserves committed Feed counts', async () => {
     const fixture = feedWithArticlesFixture(3);
     fixture.repository.failArticleCommitAt = 1;
@@ -611,6 +652,8 @@ class InMemoryRepository implements SourceCollectionRepository {
   readonly feedCommits: CommitFeedInput[] = [];
   readonly articleCommits: CommitArticleOutcomeInput[] = [];
   readonly loadedLatestUrls: string[] = [];
+  feedReplayResult: CollectSourceResult | null = null;
+  feedDiscoveryIds: readonly string[] | null = null;
 
   constructor(private readonly events: string[]) {}
 
@@ -666,7 +709,14 @@ class InMemoryRepository implements SourceCollectionRepository {
     this.events.push('repository.commitFeed');
     this.failIfSelected('commitFeed');
     this.feedCommits.push(input);
+    if (this.feedReplayResult !== null) {
+      return {
+        inserted: false,
+        result: this.feedReplayResult,
+      };
+    }
     return {
+      inserted: true,
       result: {
         attemptId: input.attempt.id,
         projectId: PROJECT_ID,
@@ -676,7 +726,7 @@ class InMemoryRepository implements SourceCollectionRepository {
         discoveredCount: input.discoveries.length,
         bodyFetchCount: input.attempt.bodyFetchCount,
       },
-      discoveryIds: input.discoveries.map(({ id }) => id),
+      discoveryIds: this.feedDiscoveryIds ?? input.discoveries.map(({ id }) => id),
     };
   }
 

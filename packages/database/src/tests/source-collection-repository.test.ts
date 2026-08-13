@@ -181,7 +181,11 @@ describe('SourceCollectionRepository', () => {
 
     const committed = await repository.commitFeed(feedInput());
 
-    expect(committed).toEqual({ result: result({ discoveredCount: 1 }), discoveryIds: [discoveredItemId] });
+    expect(committed).toEqual({
+      inserted: true,
+      result: result({ discoveredCount: 1 }),
+      discoveryIds: [discoveredItemId],
+    });
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
       'lock idempotency collect:one',
@@ -192,16 +196,16 @@ describe('SourceCollectionRepository', () => {
     ]);
   });
 
-  it('returns the original discovery identifiers when replaying a committed feed', async () => {
+  it('marks a committed Feed replay without loading positional discovery identifiers', async () => {
     const prior = result({ discoveredCount: 1 });
-    const harness = createHarness({ committed: prior, discoveryIds: [discoveredItemId] });
+    const harness = createHarness({ committed: prior });
     const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
 
     await expect(repository.commitFeed(feedInput())).resolves.toEqual({
+      inserted: false,
       result: prior,
-      discoveryIds: [discoveredItemId],
     });
-    expect(harness.transactions.at(-1)).toContain(`load discovery ids ${rawItemId}`);
+    expect(harness.transactions.at(-1)).not.toContain(`load discovery ids ${rawItemId}`);
   });
 
   it.each(['endpoint', 'feed', 'article'] as const)(
@@ -455,7 +459,6 @@ function result(overrides: Partial<CollectSourceResult> = {}): CollectSourceResu
 function createHarness(options: {
   committed?: CollectSourceResult;
   reusedRawItemId?: string;
-  discoveryIds?: readonly string[];
 } = {}): {
   readonly run: CollectionTransactionRunner;
   readonly transactions: string[][];
@@ -475,7 +478,6 @@ function createHarnessTransaction(
   options: {
     committed?: CollectSourceResult;
     reusedRawItemId?: string;
-    discoveryIds?: readonly string[];
   } = {},
 ): CollectionTransaction {
   return {
@@ -483,7 +485,6 @@ function createHarnessTransaction(
     lockIdempotencyKey: async (key) => { events.push(`lock idempotency ${key}`); },
     loadContext: async () => null,
     findCommitted: async (key) => { events.push(`find committed ${key}`); return options.committed ?? null; },
-    loadDiscoveryIds: async (feedRawItemId) => { events.push(`load discovery ids ${feedRawItemId}`); return options.discoveryIds ?? []; },
     loadLatest: async () => null,
     insertRawItem: async (rawItem) => { events.push(`insert raw ${rawItem.id}`); return options.reusedRawItemId ?? rawItem.id; },
     insertAttempt: async (attempt, committedRawItemId) => { events.push(`insert attempt ${attempt.id}:${committedRawItemId ?? 'null'}`); },

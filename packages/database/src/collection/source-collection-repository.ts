@@ -21,7 +21,6 @@ export interface CollectionTransaction {
   lockIdempotencyKey(idempotencyKey: string): Promise<void>;
   loadContext(projectId: string, sourceId: string): Promise<SourceCollectionContext | null>;
   findCommitted(idempotencyKey: string): Promise<CollectSourceResult | null>;
-  loadDiscoveryIds(feedRawItemId: string): Promise<readonly string[]>;
   loadLatest(logicalUrl: string, projectId: string, sourceId: string): Promise<LatestRawItem | null>;
   insertRawItem(rawItem: RawItemInput): Promise<string>;
   insertAttempt(attempt: CollectionAttemptInput, rawItemId: string | null): Promise<void>;
@@ -88,8 +87,8 @@ export function createSourceCollectionRepositoryFromTransactions(
             throw new Error('committed_feed_raw_item_required');
           }
           return {
+            inserted: false,
             result: committed,
-            discoveryIds: await transaction.loadDiscoveryIds(committed.rawItemId),
           };
         }
         const rawItemId = await transaction.insertRawItem(input.rawItem);
@@ -100,6 +99,7 @@ export function createSourceCollectionRepositoryFromTransactions(
         }));
         await transaction.insertDiscoveries(discoveries);
         return {
+          inserted: true,
           result: buildResult(input.attempt, rawItemId),
           discoveryIds: discoveries.map(({ id }) => id),
         };
@@ -234,15 +234,6 @@ function createPostgresTransaction(sql: TransactionSql): CollectionTransaction {
         select * from public.collection_attempts where idempotency_key = ${idempotencyKey} limit 1
       `;
       return rows[0] === undefined ? null : resultFromRow(rows[0]);
-    },
-    loadDiscoveryIds: async (feedRawItemId) => {
-      const rows = await sql<readonly { id: string }[]>`
-        select id from public.discovered_items
-        where feed_raw_item_id = ${feedRawItemId}::uuid
-          and version = 1
-        order by created_at, id
-      `;
-      return rows.map(({ id }) => id);
     },
     loadLatest: async (logicalUrl, projectId, sourceId) => {
       const rows = await sql<

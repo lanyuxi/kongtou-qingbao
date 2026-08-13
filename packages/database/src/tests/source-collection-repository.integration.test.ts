@@ -184,7 +184,8 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
     const discovery = discoveryInput(feedRaw.id);
     const firstFeed = await repository.commitFeed({ attempt: feedAttempt, rawItem: feedRaw, discoveries: [discovery] });
     const replayedFeed = await repository.commitFeed({ attempt: feedAttempt, rawItem: feedRaw, discoveries: [discovery] });
-    expect(replayedFeed).toEqual(firstFeed);
+    expect(firstFeed).toMatchObject({ inserted: true, discoveryIds: [discoveryId] });
+    expect(replayedFeed).toEqual({ inserted: false, result: firstFeed.result });
 
     await repository.commitArticleOutcome({
       attempt: {

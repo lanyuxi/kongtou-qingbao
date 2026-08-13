@@ -301,6 +301,9 @@ export function createCollectSource(
           rawItem,
           discoveries: initialDiscoveries,
         });
+        if (!committedFeed.inserted) {
+          return collectSourceResultSchema.parse(committedFeed.result);
+        }
         for (const candidate of articleCandidates) {
           const discoveryId = committedFeed.discoveryIds[
             initialDiscoveries.findIndex(({ id }) => id === candidate.discovery.id)
