@@ -14,7 +14,7 @@ The slice does not add AI processing, Candidate or Evidence records, canonical i
 - An administrator can pause, resume, change the interval, or request one immediate collection without changing the recurring schedule.
 - The allowed recurring interval is 5 minutes through 7 days.
 - Worker startup promptly schedules eligible overdue sources. Deterministic jitter prevents a startup request burst.
-- A source is eligible only when its `sources.status` is `active` and its `project_sources` relationship is official and has both verification time and verifier provenance.
+- A source is eligible only when its project lifecycle and `sources.status` are both `active` and its `project_sources` relationship is official and has both verification time and verifier provenance.
 - `degraded`, `suspended`, and `retired` sources do not produce new automatic jobs. Eligibility restoration resumes an enabled schedule but never overrides an administrator's manual pause.
 - Disabling or invalidating a relationship preserves schedules, jobs, attempts, events, Raw Items, and collection history.
 
@@ -194,6 +194,7 @@ Eligibility is computed from current canonical catalog state and schedule state;
 ```text
 eligible =
   schedule.enabled
+  and project.lifecycle = active
   and source.status = active
   and project_source.is_official
   and project_source.verified_at is not null
@@ -202,9 +203,11 @@ eligible =
 
 The scheduler performs a 30-second scan tick. One transaction obtains a transaction-scoped advisory lock, reconciles at most 100 eligible relationships missing schedules, and enqueues at most 100 due schedules. Every inserted job and the associated schedule advancement commit together.
 
-Automatic schedule creation sets the first logical run near the current time plus deterministic jitter. Jitter is derived from stable project/source identity and the logical window, never from process-local randomness. It is bounded to prevent more than a small fraction of the configured interval from being delayed.
+Automatic schedule creation sets the first logical `next_run_at` to the current scheduler time, so the same startup scan immediately creates its first durable job. Jitter is applied to that job's `available_at`, not to whether it is durably enqueued. It is derived from stable project/source identity and the logical window, never from process-local randomness, and is bounded to prevent more than a small fraction of the configured interval from being delayed.
 
-An overdue source creates only one catch-up job per scan. Missed historical windows are coalesced instead of producing a request storm. After enqueue, `next_run_at` is calculated from the current scheduler time plus the configured interval and deterministic jitter. The job records the consumed logical `scheduled_for` value so repeated scanning produces the same unique identity.
+The deterministic algorithm is FNV-1a 32-bit over the UTF-8 bytes of `projectId|sourceId|scheduledFor`, using unsigned 32-bit multiplication. The jitter bound is `min(300, floor(intervalSeconds / 10))`; the offset is `hash mod (bound + 1)` seconds. TypeScript and SQL use the same conformance vectors.
+
+An overdue source creates only one catch-up job per scan. Missed historical windows are coalesced instead of producing a request storm. After enqueue, `next_run_at` is exactly the current scheduler time plus the configured interval; the job's `available_at` is current scheduler time plus deterministic jitter. The job records the consumed logical `scheduled_for` value so repeated scanning produces the same unique identity.
 
 If a source becomes ineligible, no new automatic job is created. Queued or retry-wait jobs are canceled during reconciliation. A leased job is not rewritten by the scheduler; immediately before DNS/HTTP, the consumer reloads eligibility. An ineligible task terminates as `canceled` with `source_ineligible` and performs no network request. Previously stored collection records remain unchanged.
 
@@ -245,19 +248,23 @@ Route Handlers live under `/api/v1/admin/source-collection-schedules`. They auth
 
 The server service has execute permission only on narrow schedule-command functions. Browser principals and browser administrators receive no direct schedule, command, job, event, or health-row DML. The command function independently verifies that the supplied actor has an active admin grant so a Route Handler bug cannot convert an ordinary user into an operational administrator.
 
-`pause` disables the schedule and atomically cancels its queued/retry-wait jobs. `resume` enables it and calculates a prompt jittered next run. `change_interval` validates 300 through 604800 seconds and recalculates the next run from command time. `collect_now` creates one manual job and leaves the recurring cursor unchanged.
+`pause` disables the schedule and atomically cancels its queued/retry-wait jobs. `resume` enables it and sets the next logical run to command time so the following scheduler scan durably enqueues it with job-availability jitter. `change_interval` validates 300 through 604800 seconds and recalculates the next run from command time. `collect_now` requires current collection eligibility, creates one manual job, advances the aggregate version, and leaves the recurring cursor unchanged.
 
 ## 10. Database Roles and Trust Boundaries
 
 The migration creates a `collection_queue_worker` `NOLOGIN` role with no password. Deployment provisions a separate login that may `SET ROLE collection_queue_worker`. Its privileges are limited to the queue/schedule functions and required server-only health read.
+
+The migration also creates a `collection_schedule_admin` `NOLOGIN` role with no password. A separate server-only BFF login may `SET ROLE collection_schedule_admin`; that role may execute only the schedule-command function. The function independently verifies the authenticated actor's active `admin` grant. The role receives no direct schedule/job table DML and no canonical-intelligence DML.
 
 The existing `collection_worker` continues to own only source-collection persistence. It gains no schedule or durable-job mutation privilege. The queue runtime and Collector therefore use separate server-only connection configuration:
 
 - `AIRDROP_QUEUE_DATABASE_URL`
 - `AIRDROP_COLLECTION_DATABASE_URL`
 - `AIRDROP_COLLECTION_USER_AGENT`
+- `AIRDROP_QUEUE_WORKER_ID`
+- `AIRDROP_QUEUE_ADMIN_DATABASE_URL` (web BFF only)
 
-Values are never logged, committed, sent to browsers, stored in jobs, or returned in errors. A deployment may use one login only if it has explicitly provisioned membership in both narrow roles; the application still keeps the two pools and role boundaries separate.
+Values are never logged, committed, sent to browsers, stored in jobs, or returned in errors. A deployment may use one login for the two Worker pools only if it has explicitly provisioned membership in both narrow Worker roles; the application still keeps the pools and role boundaries separate. The BFF schedule-admin login remains separate from Worker logins.
 
 `anon`, `authenticated`, browser admins, and `service_role` receive no table DML that bypasses the approved functions. The queue role cannot write projects, sources, project-source verification, signals, scores, future Evidence, or other canonical intelligence.
 
@@ -334,4 +341,3 @@ AI Run and Candidate records
   -> Promotion Service, audit, and transactional outbox
   -> deterministic scoring and user-facing intelligence pages
 ```
-
