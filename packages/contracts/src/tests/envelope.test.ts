@@ -55,4 +55,24 @@ describe('job envelopes', () => {
     expect(schema.safeParse({ ...base, occurredAt: 'not-a-timestamp' }).success).toBe(false);
     expect(schema.safeParse({ ...base, version: 2 }).success).toBe(false);
   });
+
+  it('preserves surrounding idempotency-key whitespace while bounding the raw value', () => {
+    const surroundedKey = ' collect:project:1 ';
+    const base = {
+      jobId,
+      type: 'collect.project',
+      version: 1,
+      idempotencyKey: 'collect:project:1',
+      correlationId: requestId,
+      occurredAt,
+      payload: { projectId: 'project-1' }
+    };
+
+    expect(schema.parse({ ...base, idempotencyKey: surroundedKey }).idempotencyKey).toBe(
+      surroundedKey,
+    );
+    expect(schema.safeParse({ ...base, idempotencyKey: ` ${'a'.repeat(255)}` }).success).toBe(
+      false,
+    );
+  });
 });

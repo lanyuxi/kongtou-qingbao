@@ -19,7 +19,7 @@ export const createJobEnvelopeSchema = <TType extends string, TPayload extends z
       jobId: z.string().uuid(),
       type: z.literal(type),
       version: z.literal(1),
-      idempotencyKey: z.string().trim().min(1).max(255),
+      idempotencyKey: z.string().min(1).max(255).refine((value) => value.trim().length >= 1),
       correlationId: z.string().uuid(),
       occurredAt: z.string().datetime({ offset: true }),
       payload: payloadSchema
