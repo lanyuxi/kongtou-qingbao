@@ -1,5 +1,15 @@
 export { createBrowserSupabaseClient, type BrowserSupabaseClientOptions } from './client.js';
-export type { Database } from './generated/database.types.js';
+export type { Database, Json } from './generated/database.types.js';
+export {
+  createExtractionRepository,
+  ExtractionPersistenceError,
+  type ExtractionCandidateInput,
+  type ExtractionCandidateRow,
+  type ExtractionRepository,
+  type PendingCandidateRecord,
+  type PendingExtractionInput,
+  type RecordExtractionRunInput,
+} from './ai/extraction-repository.js';
 export {
   createProjectRepository,
   OpportunityListQueryError,

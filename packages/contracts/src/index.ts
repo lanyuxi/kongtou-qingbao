@@ -1,6 +1,19 @@
 export { apiErrorSchema, createApiSuccessSchema } from './api/envelope.js';
 export type { ApiError, ApiSuccess } from './api/envelope.js';
 export {
+  extractionCandidatePayloadSchema,
+  extractionClaimTypeSchema,
+  extractionRunOutputSchema,
+  extractionRunStatusSchema,
+  extractionStageConstants,
+} from './ai/extraction.js';
+export type {
+  ExtractionCandidatePayload,
+  ExtractionClaimType,
+  ExtractionRunOutput,
+  ExtractionRunStatus,
+} from './ai/extraction.js';
+export {
   collectSourceJobSchema,
   collectSourcePayloadSchema,
   collectSourceResultSchema,

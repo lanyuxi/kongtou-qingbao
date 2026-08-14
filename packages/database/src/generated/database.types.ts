@@ -7,33 +7,62 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      ai_runs: {
+        Row: {
+          created_at: string
+          error_detail: string | null
+          id: string
+          input_hash: string
+          input_id: string
+          input_kind: string
+          latency_ms: number | null
+          model_id: string
+          output: Json | null
+          pipeline_version: string
+          prompt_version: string
+          schema_version: string
+          stage: string
+          status: string
+          usage: Json | null
+        }
+        Insert: {
+          created_at?: string
+          error_detail?: string | null
+          id?: string
+          input_hash: string
+          input_id: string
+          input_kind: string
+          latency_ms?: number | null
+          model_id: string
+          output?: Json | null
+          pipeline_version: string
+          prompt_version: string
+          schema_version: string
+          stage: string
+          status: string
+          usage?: Json | null
+        }
+        Update: {
+          created_at?: string
+          error_detail?: string | null
+          id?: string
+          input_hash?: string
+          input_id?: string
+          input_kind?: string
+          latency_ms?: number | null
+          model_id?: string
+          output?: Json | null
+          pipeline_version?: string
+          prompt_version?: string
+          schema_version?: string
+          stage?: string
+          status?: string
+          usage?: Json | null
+        }
+        Relationships: []
+      }
       collection_attempts: {
         Row: {
           body_fetch_count: number
@@ -440,6 +469,108 @@ export type Database = {
           },
         ]
       }
+      extraction_candidates: {
+        Row: {
+          ai_run_id: string
+          created_at: string
+          decided_at: string | null
+          discovered_item_id: string
+          id: string
+          payload: Json
+          payload_sha256: string
+          project_id: string
+          raw_item_id: string | null
+          signal_id: string | null
+          source_id: string
+          status: string
+        }
+        Insert: {
+          ai_run_id: string
+          created_at?: string
+          decided_at?: string | null
+          discovered_item_id: string
+          id?: string
+          payload: Json
+          payload_sha256: string
+          project_id: string
+          raw_item_id?: string | null
+          signal_id?: string | null
+          source_id: string
+          status?: string
+        }
+        Update: {
+          ai_run_id?: string
+          created_at?: string
+          decided_at?: string | null
+          discovered_item_id?: string
+          id?: string
+          payload?: Json
+          payload_sha256?: string
+          project_id?: string
+          raw_item_id?: string | null
+          signal_id?: string | null
+          source_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_candidates_ai_run_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_discovered_item_fkey"
+            columns: ["discovered_item_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_raw_item_fkey"
+            columns: ["raw_item_id"]
+            isOneToOne: false
+            referencedRelation: "raw_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -635,6 +766,45 @@ export type Database = {
           version?: number
         }
         Relationships: []
+      }
+      promotion_events: {
+        Row: {
+          actor: string
+          candidate_id: string
+          created_at: string
+          id: string
+          signal_id: string
+        }
+        Insert: {
+          actor: string
+          candidate_id: string
+          created_at?: string
+          id?: string
+          signal_id: string
+        }
+        Update: {
+          actor?: string
+          candidate_id?: string
+          created_at?: string
+          id?: string
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_events_candidate_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_events_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       raw_items: {
         Row: {
@@ -1444,6 +1614,10 @@ export type Database = {
           source_id: string
         }[]
       }
+      promote_extraction_candidate: {
+        Args: { p_actor: string; p_candidate_id: string }
+        Returns: string
+      }
       reconcile_due_source_schedules: {
         Args: { batch_limit: number; now_at: string }
         Returns: {
@@ -1754,9 +1928,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
