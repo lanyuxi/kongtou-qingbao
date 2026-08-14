@@ -42,6 +42,15 @@ describe('collection job processor', () => {
     expect(fixture.repository.successes).toEqual([{ fence: fence(), resultCode: 'stored_new_content', now: NOW }]);
   });
 
+  it('cancels the pending renewal wait when a fast collector completes', async () => {
+    const fixture = createFixture();
+
+    await fixture.processor.process(claimedJob(), new AbortController().signal);
+
+    expect(fixture.timer.pendingCount).toBe(0);
+    expect(fixture.timer.cancelledCount).toBe(1);
+  });
+
   it('retries retryable results at their deterministic delay', async () => {
     const fixture = createFixture();
     fixture.collector.result = result('timeout');
@@ -86,10 +95,10 @@ describe('collection job processor', () => {
     const pending = deferred<CollectSourceResult>();
     fixture.collector.pending = pending;
     const processing = fixture.processor.process(claimedJob(), new AbortController().signal);
-    await Promise.resolve();
+    await flushMicrotasks();
 
     fixture.timer.releaseOne();
-    await Promise.resolve();
+    await waitFor(() => fixture.repository.renewals.length === 1);
     pending.resolve(result('not_modified'));
     await processing;
 
@@ -103,10 +112,10 @@ describe('collection job processor', () => {
     fixture.collector.pending = pending;
     fixture.repository.renewError = new Error('stale lease');
     const processing = fixture.processor.process(claimedJob(), new AbortController().signal);
-    await Promise.resolve();
+    await flushMicrotasks();
 
     fixture.timer.releaseOne();
-    await Promise.resolve();
+    await waitFor(() => fixture.repository.renewals.length === 1);
     pending.resolve(result('stored_new_content'));
     await processing;
 
@@ -116,15 +125,53 @@ describe('collection job processor', () => {
     expect(fixture.logger.records).toContainEqual({ event: 'collection_job_lease_lost', code: 'lease_fence_lost' });
   });
 
+  it('contains a renewal wait rejection and leaves the job without a terminal mutation', async () => {
+    const fixture = createFixture();
+    const pending = deferred<CollectSourceResult>();
+    fixture.collector.pending = pending;
+    const processing = fixture.processor.process(claimedJob(), new AbortController().signal);
+    await flushMicrotasks();
+
+    fixture.timer.rejectOne(new Error('timer failed'));
+    await flushMicrotasks();
+    pending.resolve(result('stored_new_content'));
+    await expect(processing).resolves.toBeUndefined();
+
+    expect(fixture.repository.successes).toEqual([]);
+    expect(fixture.repository.retries).toEqual([]);
+    expect(fixture.repository.deadLetters).toEqual([]);
+    expect(fixture.logger.records).toContainEqual({ event: 'collection_job_lease_lost', code: 'lease_fence_lost' });
+  });
+
+  it('contains an in-flight renewal rejection before terminal confirmation', async () => {
+    const fixture = createFixture();
+    const pendingCollection = deferred<CollectSourceResult>();
+    const pendingRenewal = deferred<Date>();
+    fixture.collector.pending = pendingCollection;
+    fixture.repository.pendingRenewal = pendingRenewal;
+    const processing = fixture.processor.process(claimedJob(), new AbortController().signal);
+    await flushMicrotasks();
+
+    fixture.timer.releaseOne();
+    await waitFor(() => fixture.repository.renewals.length === 1);
+    pendingCollection.resolve(result('stored_new_content'));
+    pendingRenewal.reject(new Error('renewal failed'));
+    await expect(processing).resolves.toBeUndefined();
+
+    expect(fixture.repository.successes).toEqual([]);
+    expect(fixture.repository.retries).toEqual([]);
+    expect(fixture.repository.deadLetters).toEqual([]);
+  });
+
   it('stops lease renewal when collection rejects', async () => {
     const fixture = createFixture();
     fixture.collector.error = new Error('collector failed');
 
     await expect(fixture.processor.process(claimedJob(), new AbortController().signal)).rejects.toThrow('collector failed');
-    fixture.timer.releaseOne();
-    await Promise.resolve();
 
     expect(fixture.repository.renewals).toEqual([]);
+    expect(fixture.timer.pendingCount).toBe(0);
+    expect(fixture.timer.cancelledCount).toBe(1);
   });
 
   it('logs only structured outcome metadata', async () => {
@@ -147,13 +194,14 @@ describe('collection job processor', () => {
 class FakeRepository implements Pick<DurableCollectionQueueRepository, 'isEligible' | 'renew' | 'succeed' | 'retry' | 'deadLetter' | 'cancel'> {
   eligible = true;
   renewError: Error | null = null;
+  pendingRenewal: Deferred<Date> | null = null;
   readonly renewals: Array<{ fence: LeaseFence; now: Date }> = [];
   readonly successes: Array<{ fence: LeaseFence; resultCode: string; now: Date }> = [];
   readonly retries: Array<{ fence: LeaseFence; result: QueueFailure; availableAt: Date; now: Date }> = [];
   readonly deadLetters: Array<{ fence: LeaseFence; result: QueueFailure; now: Date }> = [];
   readonly cancellations: Array<{ fence: LeaseFence; resultCode: 'source_ineligible'; now: Date }> = [];
   async isEligible(): Promise<boolean> { return this.eligible; }
-  async renew(leaseFence: LeaseFence, now: Date): Promise<Date> { this.renewals.push({ fence: leaseFence, now }); if (this.renewError) throw this.renewError; return new Date(NOW.getTime() + 120_000); }
+  async renew(leaseFence: LeaseFence, now: Date): Promise<Date> { this.renewals.push({ fence: leaseFence, now }); if (this.renewError) throw this.renewError; return this.pendingRenewal === null ? new Date(NOW.getTime() + 120_000) : this.pendingRenewal.promise; }
   async succeed(leaseFence: LeaseFence, resultCode: string, now: Date): Promise<void> { this.successes.push({ fence: leaseFence, resultCode, now }); }
   async retry(leaseFence: LeaseFence, result: QueueFailure, availableAt: Date, now: Date): Promise<void> { this.retries.push({ fence: leaseFence, result, availableAt, now }); }
   async deadLetter(leaseFence: LeaseFence, result: QueueFailure, now: Date): Promise<void> { this.deadLetters.push({ fence: leaseFence, result, now }); }
@@ -170,9 +218,25 @@ class FakeCollector implements SourceCollectorPort {
 
 class FakeTimer implements ProcessorTimer {
   readonly delays: number[] = [];
-  private readonly pending: Array<() => void> = [];
-  sleep(milliseconds: number): Promise<void> { this.delays.push(milliseconds); return new Promise((resolve) => this.pending.push(resolve)); }
-  releaseOne(): void { this.pending.shift()?.(); }
+  private readonly pending: Array<Deferred<void>> = [];
+  private cancelled = 0;
+  get pendingCount(): number { return this.pending.length; }
+  get cancelledCount(): number { return this.cancelled; }
+  sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
+    this.delays.push(milliseconds);
+    const wait = deferred<void>();
+    const cancel = () => {
+      const index = this.pending.indexOf(wait);
+      if (index >= 0) this.pending.splice(index, 1);
+      this.cancelled += 1;
+      wait.resolve();
+    };
+    signal.addEventListener('abort', cancel, { once: true });
+    this.pending.push(wait);
+    return wait.promise.finally(() => signal.removeEventListener('abort', cancel));
+  }
+  releaseOne(): void { this.pending.shift()?.resolve(); }
+  rejectOne(error: Error): void { this.pending.shift()?.reject(error); }
 }
 
 class FakeLogger implements QueueLogger {
@@ -194,5 +258,10 @@ function claimedJob(input: Partial<ClaimedCollectionJob> = {}): ClaimedCollectio
 }
 function fence(): LeaseFence { return { jobId: JOB_ID, workerId: 'worker-a', leaseEpoch: 1 }; }
 function result(outcome: CollectSourceResult['outcome']): CollectSourceResult { return { attemptId: '10000000-0000-4000-8000-000000000006', projectId: PROJECT_ID, sourceId: SOURCE_ID, outcome, rawItemId: null, discoveredCount: 0, bodyFetchCount: 0 }; }
-interface Deferred<T> { readonly promise: Promise<T>; resolve(value: T): void; }
-function deferred<T>(): Deferred<T> { let resolve!: (value: T) => void; const promise = new Promise<T>((done) => { resolve = done; }); return { promise, resolve }; }
+interface Deferred<T> { readonly promise: Promise<T>; resolve(value: T): void; reject(error: Error): void; }
+function deferred<T>(): Deferred<T> { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; }
+async function flushMicrotasks(): Promise<void> { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); }
+async function waitFor(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 10 && !condition(); attempt += 1) await flushMicrotasks();
+  expect(condition()).toBe(true);
+}

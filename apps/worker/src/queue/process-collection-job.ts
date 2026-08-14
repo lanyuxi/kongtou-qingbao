@@ -27,11 +27,11 @@ export function createCollectionJobProcessor(deps: ProcessorDependencies): Colle
           toCollectorJob(job, deps.ids.generate(), deps.clock.now()),
         );
       } catch (error) {
-        lease.stop();
+        await lease.stop();
         await lease.waitForRenewal();
         throw error;
       }
-      lease.stop();
+      await lease.stop();
       await lease.waitForRenewal();
       if (lease.lost() || signal.aborted) return;
       await settle(deps, fence, job, result.outcome);
@@ -92,29 +92,38 @@ function renewLeaseWhileCollecting(
   deps: ProcessorDependencies,
   fence: LeaseFence,
   signal: AbortSignal,
-): { stop(): void; lost(): boolean; waitForRenewal(): Promise<void> } {
-  let stopped = false;
+): { stop(): Promise<void>; lost(): boolean; waitForRenewal(): Promise<void> } {
+  const renewalAbort = new AbortController();
   let leaseLost = false;
-  let activeRenewal: Promise<Date> | null = null;
-  void (async (): Promise<void> => {
-    while (!stopped && !signal.aborted) {
-      await deps.timer.sleep(LEASE_RENEWAL_INTERVAL_MS);
-      if (stopped || signal.aborted) return;
-      try {
-        activeRenewal = deps.repository.renew(fence, deps.clock.now());
-        await activeRenewal;
-      } catch {
-        leaseLost = true;
-        deps.logger.error({ event: 'collection_job_lease_lost', code: 'lease_fence_lost' });
-        return;
-      } finally {
-        activeRenewal = null;
+  const stop = async (): Promise<void> => {
+    renewalAbort.abort();
+    await task;
+  };
+  signal.addEventListener('abort', stop, { once: true });
+  const task = (async (): Promise<void> => {
+    try {
+      while (!renewalAbort.signal.aborted) {
+        await deps.timer.sleep(LEASE_RENEWAL_INTERVAL_MS, renewalAbort.signal);
+        if (renewalAbort.signal.aborted) return;
+        try {
+          await deps.repository.renew(fence, deps.clock.now());
+        } catch {
+          leaseLost = true;
+          deps.logger.error({ event: 'collection_job_lease_lost', code: 'lease_fence_lost' });
+          return;
+        }
       }
+    } catch {
+      if (renewalAbort.signal.aborted) return;
+      leaseLost = true;
+      deps.logger.error({ event: 'collection_job_lease_lost', code: 'lease_fence_lost' });
+    } finally {
+      signal.removeEventListener('abort', stop);
     }
   })();
   return {
-    stop: () => { stopped = true; },
+    stop,
     lost: () => leaseLost,
-    waitForRenewal: async () => { await activeRenewal; },
+    waitForRenewal: async () => task,
   };
 }

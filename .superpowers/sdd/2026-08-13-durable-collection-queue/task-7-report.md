@@ -45,3 +45,15 @@ All passed; full worker test result: 8 files, 112 tests.
 - Terminal queue operations occur only after collection and renewal are checked; an in-flight renewal is awaited after collection before terminal confirmation. A collector rejection stops renewal and propagates, preserving at-least-once redelivery without terminal mutation.
 - Collector exceptions currently propagate without a terminal queue mutation, preserving at-least-once redelivery rather than guessing an ungrounded outcome.
 - The runtime is Node 24.19.0 while package engines request `>=22 <23`; every pnpm command emits that warning. It did not cause a test/typecheck/lint failure.
+
+## Fix round 1 — clean lease-renewal shutdown
+
+### RED
+
+The focused processor test command exposed four failures: fast collection completion and collector rejection both left a pending renewal wait; a timer wait rejection produced an unhandled rejection and allowed terminal success; an in-flight renewal rejection could race terminal confirmation. The final race was traced to the outer catch treating every rejection after abort as benign, including a renewal that had already started before stop.
+
+### GREEN
+
+`ProcessorTimer.sleep` now accepts an `AbortSignal`. A per-job renewal `AbortController` wakes/cancels the injected timer; `stop()` awaits the owned renewal task. Timer failures are contained and latch lease loss. In-flight renewals have a dedicated inner catch, so their failure latches lease loss even when stop has aborted future waits. The processor awaits stop before reading the latch or issuing a terminal queue mutation.
+
+Focused Worker processor tests passed twice: 8 files / 115 tests. Worker typecheck and lint passed. Fresh root verification follows this report update.

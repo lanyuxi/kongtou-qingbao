@@ -14,7 +14,7 @@ export interface SchedulerTimer {
 }
 
 export interface ProcessorTimer {
-  sleep(milliseconds: number): Promise<void>;
+  sleep(milliseconds: number, signal: AbortSignal): Promise<void>;
 }
 
 export interface QueueLogger {
