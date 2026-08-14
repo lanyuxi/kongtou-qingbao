@@ -1274,6 +1274,7 @@ export type Database = {
           latest_published_signal_at: string | null
           lifecycle: Database["public"]["Enums"]["project_lifecycle"] | null
           name: string | null
+          official_website_url: string | null
           opportunity_score: number | null
           primary_chain: string | null
           project_id: string | null
@@ -1283,6 +1284,9 @@ export type Database = {
           risk_score: number | null
           score_calculated_at: string | null
           score_confidence: number | null
+          score_explanation: string | null
+          score_input_version: string | null
+          score_model_version: string | null
           slug: string | null
           summary: string | null
         }

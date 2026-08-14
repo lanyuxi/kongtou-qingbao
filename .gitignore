@@ -9,3 +9,6 @@ coverage/
 .env.*.local
 !.env.example
 supabase/.temp/
+
+# WorkBuddy session data
+.workbuddy/

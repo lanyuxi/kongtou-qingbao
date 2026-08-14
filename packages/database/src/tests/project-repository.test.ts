@@ -119,6 +119,163 @@ describe('ProjectRepository.listOpportunities', () => {
   });
 });
 
+const projectDetailRow = {
+  project_id: '20000000-0000-4000-8000-000000000001',
+  slug: 'demo-project',
+  name: 'Demo Project',
+  summary: 'A demo project.',
+  lifecycle: 'active',
+  primary_chain: 'Ethereum',
+  official_website_url: 'https://demo.example.dev',
+  project_updated_at: '2026-08-10T00:00:00.000Z',
+  opportunity_score: 84,
+  risk_score: 22,
+  score_confidence: 80,
+  recommendation: 'act_now',
+  score_model_version: 'seed-fixture-v1',
+  score_input_version: 'seed-2026-08-14',
+  score_explanation: 'Fixture sample score.',
+  score_calculated_at: '2026-08-13T00:00:00.000Z',
+} as const;
+
+const signalRows: readonly {
+  signal_type: string;
+  title: string;
+  summary: string;
+  verification: 'verified';
+  confidence: number;
+  occurred_at: string;
+  published_at: string;
+}[] = [
+  {
+    signal_type: 'points_program',
+    title: 'Points program extended',
+    summary: 'Official blog confirms extension.',
+    verification: 'verified',
+    confidence: 90,
+    occurred_at: '2026-08-13T00:00:00.000Z',
+    published_at: '2026-08-13T00:00:00.000Z',
+  },
+];
+
+describe('ProjectRepository.getProjectBySlug', () => {
+  it('maps a project row with its latest score', async () => {
+    const client = createProjectLookupClient(projectDetailRow);
+
+    const result = await createProjectRepository(client).getProjectBySlug('demo-project');
+
+    expect(result).toEqual({
+      projectId: '20000000-0000-4000-8000-000000000001',
+      slug: 'demo-project',
+      name: 'Demo Project',
+      summary: 'A demo project.',
+      lifecycle: 'active',
+      primaryChain: 'Ethereum',
+      officialWebsiteUrl: 'https://demo.example.dev',
+      updatedAt: '2026-08-10T00:00:00.000Z',
+      latestScore: {
+        modelVersion: 'seed-fixture-v1',
+        inputVersion: 'seed-2026-08-14',
+        opportunityScore: 84,
+        riskScore: 22,
+        confidence: 80,
+        recommendation: 'act_now',
+        explanation: 'Fixture sample score.',
+        calculatedAt: '2026-08-13T00:00:00.000Z',
+      },
+    });
+  });
+
+  it('returns null when no project matches', async () => {
+    const client = createProjectLookupClient(null);
+
+    const result = await createProjectRepository(client).getProjectBySlug('demo-project');
+
+    expect(result).toBeNull();
+  });
+
+  it('reports a project without a score as scoreless', async () => {
+    const unscored = { ...projectDetailRow, opportunity_score: null, score_calculated_at: null };
+    const client = createProjectLookupClient(unscored);
+
+    const result = await createProjectRepository(client).getProjectBySlug('demo-project');
+
+    expect(result?.latestScore).toBeNull();
+  });
+
+  it('rejects a malformed slug', async () => {
+    await expect(
+      createProjectRepository(createProjectLookupClient(projectDetailRow)).getProjectBySlug('Bad Slug!'),
+    ).rejects.toThrow(RangeError);
+  });
+});
+
+describe('ProjectRepository.listProjectSignals', () => {
+  it('returns published signals newest first', async () => {
+    const client = createSignalClient(signalRows);
+
+    const result = await createProjectRepository(client).listProjectSignals(
+      '20000000-0000-4000-8000-000000000001',
+      10,
+    );
+
+    expect(result).toEqual([
+      {
+        signalType: 'points_program',
+        title: 'Points program extended',
+        summary: 'Official blog confirms extension.',
+        verification: 'verified',
+        confidence: 90,
+        occurredAt: '2026-08-13T00:00:00.000Z',
+        publishedAt: '2026-08-13T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('rejects a malformed project identifier or limit', async () => {
+    const repository = createProjectRepository(createSignalClient(signalRows));
+    await expect(repository.listProjectSignals('not-a-uuid', 10)).rejects.toThrow(RangeError);
+    await expect(
+      repository.listProjectSignals('20000000-0000-4000-8000-000000000001', 0),
+    ).rejects.toThrow(RangeError);
+  });
+});
+
+function createProjectLookupClient(
+  fixtureRow: typeof projectDetailRow | { readonly opportunity_score: null } | null,
+): SupabaseClient<Database> {
+  const query = {
+    select: () => query,
+    eq: () => query,
+    maybeSingle: () =>
+      Promise.resolve({
+        data: fixtureRow === null ? null : structuredClone(fixtureRow),
+        error: null,
+      }),
+  };
+  return { from: () => query } as unknown as SupabaseClient<Database>;
+}
+
+function createSignalClient(
+  fixtureRows: readonly (typeof signalRows)[number][],
+): SupabaseClient<Database> {
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: () => query,
+    range: () => query,
+    then: <TResult1 = { data: readonly (typeof signalRows)[number][]; error: null }>(
+      onfulfilled?:
+        | ((value: {
+            data: readonly (typeof signalRows)[number][];
+            error: null;
+          }) => TResult1 | PromiseLike<TResult1>)
+        | null,
+    ) => Promise.resolve({ data: fixtureRows, error: null }).then(onfulfilled),
+  };
+  return { from: () => query } as unknown as SupabaseClient<Database>;
+}
+
 function createSupabaseClient(
   fixtureRows: readonly OpportunityListRow[],
 ): SupabaseClient<Database> & {
