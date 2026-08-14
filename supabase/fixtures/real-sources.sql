@@ -37,3 +37,28 @@ select
 from projects project
 where project.slug = 'ethereum'
 on conflict (project_id, source_id) do nothing;
+
+-- Airdrop aggregator RSS: third-party (non-official) monitoring source for the
+-- Ethereum project so the extraction stage sees real airdrop-related content.
+insert into sources (id, source_type, name, canonical_url, status, reputation_score)
+values (
+  '90000000-0000-4000-8000-000000000031',
+  'news',
+  'Airdrops.io (RSS)',
+  'https://airdrops.io/feed/',
+  'active',
+  60.00
+)
+on conflict (id) do nothing;
+
+insert into project_sources (
+  project_id, source_id, authority_domains, is_official
+)
+select
+  project.id,
+  '90000000-0000-4000-8000-000000000031',
+  array['airdrops.io'],
+  false
+from projects project
+where project.slug = 'ethereum'
+on conflict (project_id, source_id) do nothing;

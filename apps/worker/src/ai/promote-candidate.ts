@@ -51,3 +51,10 @@ export async function main(argv: readonly string[]): Promise<void> {
     await sql.end({ timeout: 5 });
   }
 }
+
+void main(process.argv.slice(2)).catch((error: unknown) => {
+  process.stderr.write(
+    `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+  );
+  process.exitCode = 1;
+});

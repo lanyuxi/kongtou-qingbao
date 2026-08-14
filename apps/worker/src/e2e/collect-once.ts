@@ -35,3 +35,13 @@ export async function main(projectId: string, sourceId: string): Promise<void> {
     await collector.close();
   }
 }
+
+const argv = process.argv.slice(2);
+if (argv.length === 2 && argv.every((value) => /^[0-9a-f-]{36}$/i.test(value))) {
+  void main(argv[0]!, argv[1]!).catch((error: unknown) => {
+    process.stderr.write(
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+    );
+    process.exitCode = 1;
+  });
+}
