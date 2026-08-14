@@ -9,11 +9,11 @@ const pageSize = 20;
 const batchLimit = 100;
 
 const tabs = [
-  { key: 'all', label: 'All' },
-  { key: 'act_now', label: 'Act now' },
-  { key: 'watch', label: 'Watch' },
-  { key: 'research', label: 'Research' },
-  { key: 'avoid', label: 'Avoid' },
+  { key: 'all', label: '全部' },
+  { key: 'act_now', label: '立即行动' },
+  { key: 'watch', label: '观察' },
+  { key: 'research', label: '调研' },
+  { key: 'avoid', label: '规避' },
 ] as const;
 
 type TabKey = (typeof tabs)[number]['key'];
@@ -57,10 +57,9 @@ export default async function OpportunitiesPage({
   return (
     <main>
       <div className="page-header">
-        <h1 className="page-title">Opportunities</h1>
+        <h1 className="page-title">机会列表</h1>
         <p className="page-subtitle">
-          Opportunity score, risk, and confidence are independent dimensions — read them
-          separately before deciding.
+          机会分、风险、置信度是三个独立维度——决策前请分别阅读，不要合并成一个总分。
         </p>
       </div>
 
@@ -78,19 +77,17 @@ export default async function OpportunitiesPage({
 
       <section className="card">
         {visible.length === 0 ? (
-          <div className="empty-state">
-            No opportunities in this view. Try another filter or wait for pipeline data.
-          </div>
+          <div className="empty-state">当前视图暂无机会。请尝试其他筛选，或等待管线数据产出。</div>
         ) : (
           <table className="data-table">
             <thead>
               <tr>
-                <th>Project</th>
-                <th className="num-col">Score</th>
-                <th>Risk</th>
-                <th className="num-col">Confidence</th>
-                <th>Recommendation</th>
-                <th className="num-col">Last signal</th>
+                <th>项目</th>
+                <th className="num-col">机会分</th>
+                <th>风险</th>
+                <th className="num-col">置信度</th>
+                <th>建议</th>
+                <th className="num-col">最新信号</th>
               </tr>
             </thead>
             <tbody>
@@ -103,15 +100,15 @@ export default async function OpportunitiesPage({
         {nextParams !== null && (
           <div className="load-more">
             <Link className="button" href={`/opportunities${nextParams}`}>
-              Load more
+              加载更多
             </Link>
           </div>
         )}
       </section>
 
       <p className="fixture-note">
-        Blocked projects are hidden by default and fixture scores ({' '}
-        <code>seed-fixture-v1</code>) demonstrate the layout until the scoring pipeline ships.
+        被封锁的项目默认隐藏；样例评分（<code>seed-fixture-v1</code>
+        ）仅用于演示界面布局，评分管线上线后将被替换。
       </p>
     </main>
   );

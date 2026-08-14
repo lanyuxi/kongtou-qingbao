@@ -5,6 +5,7 @@ import {
   RecommendationBadge,
   SignalTimeline,
   formatTimestamp,
+  lifecycleLabel,
 } from '../../../components/opportunity-elements.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
@@ -42,7 +43,7 @@ export default async function ProjectDetailPage({
           {score !== null && <RecommendationBadge recommendation={score.recommendation} />}
         </div>
         <p className="page-subtitle">
-          {project.primaryChain ?? 'Unknown chain'} · updated {formatTimestamp(project.updatedAt)}
+          {project.primaryChain ?? '未知公链'} · 更新于 {formatTimestamp(project.updatedAt)}
           {project.officialWebsiteUrl === null ? null : (
             <>
               {' · '}
@@ -52,7 +53,7 @@ export default async function ProjectDetailPage({
                 rel="noreferrer noopener"
                 style={{ color: 'var(--accent-ink)' }}
               >
-                official site ↗
+                官方网站 ↗
               </a>
             </>
           )}
@@ -61,9 +62,7 @@ export default async function ProjectDetailPage({
 
       {score === null ? (
         <section className="card">
-          <div className="empty-state">
-            This project has no published score yet, so it stays out of the opportunity list.
-          </div>
+          <div className="empty-state">该项目尚无已发布评分，因此不会出现在机会列表中。</div>
         </section>
       ) : (
         <>
@@ -72,51 +71,51 @@ export default async function ProjectDetailPage({
               <div className="metric-value" style={{ color: 'var(--good)' }}>
                 {score.opportunityScore.toFixed(0)}
               </div>
-              <div className="metric-label">Opportunity score</div>
-              <div className="metric-note">Higher is more worth your time</div>
+              <div className="metric-label">机会分</div>
+              <div className="metric-note">分数越高，越值得投入时间</div>
             </div>
             <div className="metric-card">
               <div className="metric-value" style={{ color: 'var(--bad)' }}>
                 {score.riskScore.toFixed(0)}
               </div>
-              <div className="metric-label">Risk score</div>
-              <div className="metric-note">Independent of opportunity</div>
+              <div className="metric-label">风险分</div>
+              <div className="metric-note">与机会分相互独立</div>
             </div>
             <div className="metric-card">
               <div className="metric-value" style={{ color: 'var(--info)' }}>
                 {score.confidence.toFixed(0)}%
               </div>
-              <div className="metric-label">Confidence</div>
-              <div className="metric-note">How well-evidenced the scores are</div>
+              <div className="metric-label">置信度</div>
+              <div className="metric-note">评分结论背后的证据支撑强度</div>
             </div>
           </div>
 
           <div className="detail-grid">
             <div>
               <section className="card detail-section">
-                <h2 className="detail-section-title">Why this rating</h2>
+                <h2 className="detail-section-title">评分依据</h2>
                 <div className="explanation-box">{score.explanation}</div>
               </section>
 
               <section className="card detail-section">
-                <h2 className="detail-section-title">Published signals</h2>
+                <h2 className="detail-section-title">已发布信号</h2>
                 <SignalTimeline signals={signals} />
               </section>
             </div>
 
             <aside>
               <section className="card">
-                <h2 className="detail-section-title">Facts</h2>
+                <h2 className="detail-section-title">基本信息</h2>
                 <dl className="kv">
-                  <dt>Summary</dt>
-                  <dd>{project.summary ?? 'No summary available.'}</dd>
-                  <dt>Lifecycle</dt>
-                  <dd style={{ textTransform: 'capitalize' }}>{project.lifecycle}</dd>
-                  <dt>Primary chain</dt>
-                  <dd>{project.primaryChain ?? 'Unknown'}</dd>
-                  <dt>Score calculated</dt>
+                  <dt>简介</dt>
+                  <dd>{project.summary ?? '暂无简介。'}</dd>
+                  <dt>生命周期</dt>
+                  <dd>{lifecycleLabel(project.lifecycle)}</dd>
+                  <dt>主要公链</dt>
+                  <dd>{project.primaryChain ?? '未知'}</dd>
+                  <dt>评分时间</dt>
                   <dd>{formatTimestamp(score.calculatedAt)}</dd>
-                  <dt>Model version</dt>
+                  <dt>模型版本</dt>
                   <dd>
                     <code>{score.modelVersion}</code>
                   </dd>
@@ -128,9 +127,8 @@ export default async function ProjectDetailPage({
       )}
 
       <p className="fixture-note">
-        This MVP renders hand-authored fixture data (model version <code>seed-fixture-v1</code>).
-        Verified tutorials, evidence links, and pipeline-generated scores arrive with the
-        intelligence stages.
+        当前 MVP 展示手工构造的样例数据（模型版本 <code>seed-fixture-v1</code>
+        ）。已验证的教程、证据链接与管线评分将随情报阶段陆续上线。
       </p>
     </main>
   );

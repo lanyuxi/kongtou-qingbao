@@ -10,12 +10,12 @@ interface NavItem {
 }
 
 const primaryNav: readonly NavItem[] = [
-  { label: 'Overview', href: '/' },
-  { label: 'Opportunities', href: '/opportunities' },
-  { label: 'Projects', href: null },
-  { label: 'Intelligence', href: null },
-  { label: 'Tasks', href: null },
-  { label: 'Watchlist', href: null },
+  { label: '总览', href: '/' },
+  { label: '机会列表', href: '/opportunities' },
+  { label: '项目库', href: null },
+  { label: '情报', href: null },
+  { label: '任务', href: null },
+  { label: '关注列表', href: null },
 ];
 
 export function AppShell({ children }: { readonly children: ReactNode }) {
@@ -26,15 +26,15 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
       <aside className="sidebar">
         <div className="sidebar-logo">
           <span className="sidebar-logo-mark">AI</span>
-          <span className="sidebar-logo-name">Airdrop Intelligence</span>
+          <span className="sidebar-logo-name">空投情报站</span>
         </div>
-        <div className="sidebar-section-label">Workspace</div>
+        <div className="sidebar-section-label">工作台</div>
         <nav className="sidebar-nav">
           {primaryNav.map((item) =>
             item.href === null ? (
               <span key={item.label} className="sidebar-link disabled">
                 {item.label}
-                <span className="sidebar-soon">soon</span>
+                <span className="sidebar-soon">即将上线</span>
               </span>
             ) : (
               <Link
@@ -47,15 +47,15 @@ export function AppShell({ children }: { readonly children: ReactNode }) {
             ),
           )}
         </nav>
-        <div className="sidebar-footer">Evidence-oriented intelligence · MVP</div>
+        <div className="sidebar-footer">证据导向情报 · MVP</div>
       </aside>
       <div className="main">
         <header className="topbar">
-          <div className="topbar-search">Search projects, chains, tokens…</div>
+          <div className="topbar-search">搜索项目、公链、代币…</div>
           <div className="topbar-status">
             <span>
               <span className="topbar-dot" />
-              Synced via remote
+              已连接远程数据源
             </span>
           </div>
         </header>

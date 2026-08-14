@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import type { OpportunityListItem, ProjectSignal } from '@airdrop/database';
+import type { OpportunityListItem, ProjectLifecycle, ProjectSignal } from '@airdrop/database';
 
 export function OpportunityScoreNumber({ score }: { readonly score: number }) {
   return <span className="num">{score.toFixed(0)}</span>;
@@ -26,11 +26,11 @@ export function recommendationBadgeClass(
 }
 
 const recommendationLabels: Record<OpportunityListItem['recommendation'], string> = {
-  act_now: 'Act now',
-  watch: 'Watch',
-  research: 'Research',
-  avoid: 'Avoid',
-  blocked: 'Blocked',
+  act_now: '立即行动',
+  watch: '观察',
+  research: '调研',
+  avoid: '规避',
+  blocked: '已封锁',
 };
 
 export function RecommendationBadge({
@@ -56,9 +56,9 @@ function riskLevel(riskScore: number): 'low' | 'medium' | 'high' {
 }
 
 const riskLabels: Record<'low' | 'medium' | 'high', string> = {
-  low: 'Low',
-  medium: 'Med',
-  high: 'High',
+  low: '低',
+  medium: '中',
+  high: '高',
 };
 
 export function RiskIndicator({ riskScore }: { readonly riskScore: number }) {
@@ -74,11 +74,23 @@ export function RiskIndicator({ riskScore }: { readonly riskScore: number }) {
   );
 }
 
+const lifecycleLabels: Record<ProjectLifecycle, string> = {
+  active: '进行中',
+  rumored: '传闻中',
+  paused: '已暂停',
+  ended: '已结束',
+  archived: '已归档',
+};
+
+export function lifecycleLabel(lifecycle: ProjectLifecycle): string {
+  return lifecycleLabels[lifecycle];
+}
+
 export function LifecycleBadge({ lifecycle }: { readonly lifecycle: 'active' | 'rumored' }) {
   return lifecycle === 'active' ? (
-    <span className="badge good">Active</span>
+    <span className="badge good">进行中</span>
   ) : (
-    <span className="badge neutral">Rumored</span>
+    <span className="badge neutral">传闻中</span>
   );
 }
 
@@ -100,8 +112,8 @@ export function OpportunityRow({ item }: { readonly item: OpportunityListItem })
         <Link className="project-cell" href={`/projects/${item.slug}`}>
           <span className="project-cell-name">{item.name}</span>
           <span className="project-cell-meta">
-            {item.primaryChain ?? 'Unknown chain'}
-            {item.lifecycle === 'rumored' ? ' · rumored' : ''}
+            {item.primaryChain ?? '未知公链'}
+            {item.lifecycle === 'rumored' ? ' · 传闻' : ''}
           </span>
         </Link>
       </td>
@@ -127,20 +139,35 @@ export function OpportunityRow({ item }: { readonly item: OpportunityListItem })
 }
 
 const verificationLabels: Record<ProjectSignal['verification'], string> = {
-  verified: 'Verified',
-  corroborated: 'Corroborated',
-  unverified: 'Unverified',
-  disputed: 'Disputed',
-  retracted: 'Retracted',
+  verified: '已验证',
+  corroborated: '已佐证',
+  unverified: '未验证',
+  disputed: '有争议',
+  retracted: '已撤回',
 };
+
+const signalTypeLabels: Record<string, string> = {
+  points_program: '积分计划',
+  season_launch: '赛季开启',
+  quest_campaign: '任务活动',
+  cap_increase: '额度上调',
+  testnet_task: '测试网任务',
+  docs_hint: '文档线索',
+  engagement_campaign: '互动活动',
+  criteria_review: '标准调整',
+  founder_interview: '创始人访谈',
+  incident_followup: '事件跟进',
+  marketing_pattern: '营销话术',
+  phishing_report: '钓鱼举报',
+};
+
+function signalTypeLabel(signalType: string): string {
+  return signalTypeLabels[signalType] ?? signalType.replaceAll('_', ' ');
+}
 
 export function SignalTimeline({ signals }: { readonly signals: readonly ProjectSignal[] }) {
   if (signals.length === 0) {
-    return (
-      <div className="empty-state">
-        No published signals are visible for this project yet.
-      </div>
-    );
+    return <div className="empty-state">该项目暂无可见的已发布信号。</div>;
   }
   return (
     <div className="timeline">
@@ -149,8 +176,8 @@ export function SignalTimeline({ signals }: { readonly signals: readonly Project
           <span className="timeline-marker" />
           <div className="timeline-body">
             <div className="timeline-meta">
-              {formatTimestamp(signal.publishedAt)} · {signal.signalType.replaceAll('_', ' ')} ·{' '}
-              {verificationLabels[signal.verification]} · confidence{' '}
+              {formatTimestamp(signal.publishedAt)} · {signalTypeLabel(signal.signalType)} ·{' '}
+              {verificationLabels[signal.verification]} · 置信度{' '}
               {signal.confidence.toFixed(0)}%
             </div>
             <div className="timeline-title">{signal.title}</div>

@@ -6,13 +6,13 @@ import { AppShell } from '../components/app-shell.js';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Airdrop Intelligence OS',
-  description: 'Evidence-oriented public participation intelligence.'
+  title: '空投情报站',
+  description: '证据导向的公开参与机会情报平台。',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body>
         <AppShell>{children}</AppShell>
       </body>
