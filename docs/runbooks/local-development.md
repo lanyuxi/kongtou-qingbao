@@ -8,7 +8,7 @@
 
 Use only local development credentials. Never put seed phrases, private keys, mnemonics, wallet passwords, signing secrets, or production credentials in this repository or its environment files.
 
-The dormant source collector expects the environment-variable names `AIRDROP_COLLECTION_DATABASE_URL` and `AIRDROP_COLLECTION_USER_AGENT` in its future server-side adapter. Do not document, print, or commit their values. Provision a dedicated login separately with only membership sufficient to `SET ROLE collection_worker`; the migration intentionally creates `collection_worker` without login capability or a password. Never use a browser credential or service-role credential for collection.
+The automatic collection queue expects the server-only environment-variable names `AIRDROP_QUEUE_ADMIN_DATABASE_URL`, `AIRDROP_QUEUE_DATABASE_URL`, `AIRDROP_COLLECTION_DATABASE_URL`, `AIRDROP_COLLECTION_USER_AGENT`, and `AIRDROP_QUEUE_WORKER_ID` in the worker environment. Do not document, print, or commit their values. Provision a dedicated login separately for each boundary: membership sufficient to `SET ROLE collection_queue_worker` for queue operations, `SET ROLE collection_worker` for collection persistence, and `SET ROLE collection_schedule_admin` for schedule administration. The migrations intentionally create those roles without login capability or passwords. Never use a browser credential or service-role credential for the queue or collection.
 
 ## Install and configure
 
@@ -79,7 +79,7 @@ pnpm db:types
 git diff --exit-code packages/database/src/generated/database.types.ts
 ```
 
-Run the PostgREST repository integration test only against the local PostgreSQL + Kong + PostgREST topology. It requires these three environment-variable names together: `AIRDROP_DATABASE_TEST_URL`, `AIRDROP_ANON_SUPABASE_URL`, and `AIRDROP_ANON_SUPABASE_KEY`. After `pnpm db:start`, the following local-only command derives them in shell variables and never prints their values:
+Run the PostgREST repository integration test only against the local PostgreSQL + Kong + PostgREST topology. It requires these four environment-variable names together: `AIRDROP_DATABASE_TEST_URL`, `AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL`, `AIRDROP_ANON_SUPABASE_URL`, and `AIRDROP_ANON_SUPABASE_KEY`. After `pnpm db:start`, the following local-only command derives them in shell variables and never prints their values:
 
 ```bash
 set -euo pipefail
@@ -90,6 +90,7 @@ anon_key="$(docker exec "$kong_container" sh -c "grep -o 'sb_publishable_[A-Za-z
 encoded_database_password="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$database_password")"
 
 AIRDROP_DATABASE_TEST_URL="postgresql://postgres:${encoded_database_password}@127.0.0.1:54322/postgres" \
+  AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL="postgresql://postgres:${encoded_database_password}@127.0.0.1:54322/postgres" \
   AIRDROP_ANON_SUPABASE_URL='http://127.0.0.1:54321' \
   AIRDROP_ANON_SUPABASE_KEY="$anon_key" \
   pnpm --filter @airdrop/database test:integration
@@ -99,7 +100,7 @@ unset database_password anon_key encoded_database_password
 
 The command fails instead of skipping when any required integration variable is absent. Do not print, commit, or reuse these local values outside the local stack.
 
-Use `pnpm verify:full` when both the repository and local database gates are needed:
+Use `pnpm verify:full` when both the repository and local database gates are needed. It resets only the local disposable Supabase database; it must never run against shared, staging, or production data:
 
 ```bash
 pnpm verify:full
@@ -112,11 +113,26 @@ pnpm --filter @airdrop/worker test -- src/collection/tests/collect-source.test.t
 pnpm --filter @airdrop/worker test -- src/collection/tests/create-collector.test.ts
 ```
 
-`createSourceCollector()` does not start a queue, timer, or schedule. A future owning adapter must retain the returned object and call `await collector.close()` during shutdown so the small postgres.js pool closes cleanly.
+Target the automatic collection queue with:
+
+```bash
+pnpm --filter @airdrop/worker test -- src/queue/run-scheduler.test.ts src/queue/run-consumer.test.ts
+pnpm --filter @airdrop/worker test -- src/queue/process-collection-job.test.ts src/queue/create-queue-runtime.test.ts
+pnpm --filter @airdrop/database test:integration
+```
+
+The end-to-end queue acceptance test requires `AIRDROP_DATABASE_TEST_URL` pointing at the freshly reset local database and runs the scheduler, consumer, queue repository, collector repository, and collector against a fake HTTP adapter:
+
+```bash
+pnpm exec supabase db reset
+pnpm --filter @airdrop/worker test -- src/queue/tests/automatic-collection.e2e.test.ts
+```
+
+`createSourceCollector()` exposes only `collect` and `close`; the queue runtime owns both and closes the collector pool during shutdown.
 
 ## Shutdown
 
-Stop the web and worker processes with `Ctrl-C`, then stop the local Supabase stack:
+Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
 
 ```bash
 pnpm db:stop

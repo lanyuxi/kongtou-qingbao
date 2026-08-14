@@ -17,7 +17,7 @@ pnpm verify
 
 The seed intentionally contains only fixed UUIDs, `.example.invalid` URLs, and fictional project/source/signal/score records. It contains no real people, wallets, contracts, credentials, or production domains.
 
-Phase 2 adds a dormant, queue-ready collector for exact configured official HTML and RSS/Atom sources. It is not scheduled or activated by the worker entry point. Server-side deployment will supply `AIRDROP_COLLECTION_DATABASE_URL` and `AIRDROP_COLLECTION_USER_AGENT` without committing or logging their values and must explicitly close the returned collector pool on shutdown.
+Phase 2 adds bounded, evidence-preserving collection for exact configured official HTML and RSS/Atom sources, activated through a durable PostgreSQL queue in `apps/worker`: a 30-second scheduler reconciles eligible official relationships into 30-minute default schedules, and a single consumer claims fenced jobs with 120-second leases, bounded retries, and dead-letter handling. Server-side deployment supplies the five server-only environment-variable names documented in the runbook (`AIRDROP_QUEUE_ADMIN_DATABASE_URL`, `AIRDROP_QUEUE_DATABASE_URL`, `AIRDROP_COLLECTION_DATABASE_URL`, `AIRDROP_COLLECTION_USER_AGENT`, `AIRDROP_QUEUE_WORKER_ID`) without committing or logging their values. Automatic collection stores untrusted Raw Items; it never publishes verified airdrop claims or bypasses the future Evidence, review, and Promotion pipeline.
 
 ## Architecture
 

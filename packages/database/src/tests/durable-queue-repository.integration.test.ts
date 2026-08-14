@@ -160,6 +160,26 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
     expect([firstClaims.length, secondClaims.length].sort()).toEqual([0, 1]);
   });
 
+  it('skips jobs whose rows are locked by another session instead of blocking', async () => {
+    await enqueue(first);
+    const database = requireOwner(owner);
+
+    await database.begin(async (holder) => {
+      await holder`
+        select id from public.durable_jobs
+        where project_id = ${projectId}::uuid
+        for update
+      `;
+      await expect(
+        withCompletionBound(requireRepository(first).claim('worker-bound', dueTime, 1), 1_500),
+      ).resolves.toHaveLength(0);
+    });
+
+    await expect(
+      requireRepository(first).claim('worker-final', dueTime, 1),
+    ).resolves.toHaveLength(1);
+  });
+
   it('recovers an expired lease without consuming another execution attempt', async () => {
     await enqueue(first);
     const original = await claimOne(first, 'worker-one', dueTime);
@@ -201,6 +221,22 @@ describeIntegration('DurableCollectionQueueRepository PostgreSQL integration', (
     ).rejects.toBeInstanceOf(LeaseFenceError);
     await expect(
       requireRepository(second).succeed(fenceOf(current), 'stored_new_content', recoveredAt),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects a stale fence after the same worker reclaims an expired lease', async () => {
+    await enqueue(first);
+    const original = await claimOne(first, 'worker-one', dueTime);
+    const reclaimedAt = new Date(dueTime.getTime() + 121_000);
+    const reclaimed = await claimOne(first, 'worker-one', reclaimedAt);
+
+    expect(reclaimed.jobId).toBe(original.jobId);
+    expect(reclaimed.leaseEpoch).toBeGreaterThan(original.leaseEpoch);
+    await expect(
+      requireRepository(first).succeed(fenceOf(original), 'stored_new_content', reclaimedAt),
+    ).rejects.toBeInstanceOf(LeaseFenceError);
+    await expect(
+      requireRepository(first).succeed(fenceOf(reclaimed), 'stored_new_content', reclaimedAt),
     ).resolves.toBeUndefined();
   });
 
@@ -315,6 +351,20 @@ function withDatabaseCredentials(databaseUrl: string, username: string, password
   parsed.username = username;
   parsed.password = password;
   return parsed.href;
+}
+
+function withCompletionBound<T>(operation: Promise<T>, milliseconds: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const bound = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`operation blocked for more than ${milliseconds}ms behind a lock`)),
+      milliseconds,
+    );
+  });
+  return Promise.race([operation, bound]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+    operation.catch(() => undefined);
+  });
 }
 
 async function dropWorkerRole(sql: postgres.Sql): Promise<void> {
