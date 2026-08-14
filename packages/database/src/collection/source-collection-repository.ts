@@ -61,7 +61,10 @@ export function createSourceCollectionRepositoryFromTransactions(
         await transaction.setCollectionWorkerRole();
         return work(transaction);
       });
-    } catch {
+    } catch (cause) {
+      if (process.env.AIRDROP_COLLECTION_DEBUG === '1') {
+        console.error('collection_persistence_error', cause);
+      }
       throw new SourceCollectionPersistenceError('persistence_failed');
     }
   };
