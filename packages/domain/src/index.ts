@@ -95,3 +95,22 @@ export type {
   RetryDelayInput,
   RetryPolicyErrorCode,
 } from './queue/retry-policy.js';
+export {
+  SCORING_MODEL_VERSION,
+  ScoringModelError,
+  computeProjectScore,
+  computeScoreInputVersion,
+  scoringPipelineVersion,
+  scoringSchemaVersion,
+  scoringThresholds,
+  scoringWeights,
+} from './scoring/score-model.js';
+export type {
+  ProjectScoreResult,
+  ScoreFactor,
+  ScoringAxis,
+  ScoringInput,
+  ScoringModelErrorCode,
+  ScoringProvenance,
+  ScoringSignalInput,
+} from './scoring/score-model.js';

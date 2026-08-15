@@ -51,6 +51,11 @@ export type SignalLifecycle = z.infer<typeof signalLifecycleSchema>;
 export const riskLevelSchema = z.enum(['low', 'medium', 'high', 'critical']);
 export type RiskLevel = z.infer<typeof riskLevelSchema>;
 
+// Derived cross-layer enum (not a database enum): where a promoted signal's
+// source sits relative to the project's official relationships.
+export const scoringProvenanceSchema = z.enum(['official', 'third_party', 'unknown']);
+export type ScoringProvenance = z.infer<typeof scoringProvenanceSchema>;
+
 export const recommendationSchema = z.enum(['act_now', 'watch', 'research', 'avoid', 'blocked']);
 export type Recommendation = z.infer<typeof recommendationSchema>;
 

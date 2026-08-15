@@ -127,8 +127,9 @@ export default async function ProjectDetailPage({
       )}
 
       <p className="fixture-note">
-        当前 MVP 展示手工构造的样例数据（模型版本 <code>seed-fixture-v1</code>
-        ）。已验证的教程、证据链接与管线评分将随情报阶段陆续上线。
+        演示项目的评分仍为手工样例数据（模型版本 <code>seed-fixture-v1</code>
+        ）；真实来源项目由确定性评分管线计算（模型版本 <code>score-model-v1</code>
+        ）。已验证的教程与证据链接将随后续阶段上线。
       </p>
     </main>
   );
