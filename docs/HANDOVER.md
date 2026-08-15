@@ -9,7 +9,7 @@
 
 ## 1. 项目定位（一段话版）
 
-Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前三个（情报采集 → AI 抽取 → 页面展示）已端到端打通；评分、教程、任务管理、通知、安全风控尚未开始。
+Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前四个（情报采集 → AI 抽取 → 确定性评分 → 页面展示）已端到端打通，且采集之外的两个 AI 阶段（抽取、评分）已由 worker 内的编排循环自动驱动（人工 Promotion 门禁保留）；教程、任务管理、通知、安全风控尚未开始。
 
 核心铁律（详见 AGENTS.md）：永不接触私钥/助记词；永不自动签名；机会分、风险分、置信度三者独立不得合成单一总分；AI 输出只是候选数据，写入正式事实必须走 Promotion Service 并留审计；冲突证据保持可见，不静默覆盖。
 
@@ -29,26 +29,25 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | Phase 3 管线 | `ai_runs` / `extraction_candidates` / `promotion_events` 三表 + `promote_extraction_candidate` security-definer 函数；contracts zod schema（additionalProperties: false）；extraction repository；DeepSeek（OpenAI 兼容）model client；抽取运行器（幂等、一次 schema-repair、evidenceQuote 空白归一化 grounding）+ 8 个 mock 单测 | `08c8992` |
 | 真实数据源 | Ethereum 项目 + EF 博客 RSS（official+verified）fixtures；一次性采集入口 `collect-once.ts`；首次真实采集入库（21 raw_items / 120 discovered / 20 正文） | `0e097c1` |
 | **端到端打通** | DeepSeek 真实抽取 130 输入全部处理（EF 博客 120 条正确判零候选；airdrops.io 真实 feed 10 条 → **6 个 grounded 候选 → 6 个 promoted signals**，含审计事件，`/projects/ethereum` 页面可见）；三个 CLI 补自执行入口；`ai_stage_worker` 读权限 RLS 迁移；`dev_fixture_admin` 开发注入角色 | `e0cd5e5`（当前 HEAD） |
-| **Phase 4 评分管线**（2026-08-15，未提交） | `packages/domain/src/scoring/score-model.ts` 确定性评分（机会/风险/置信度三轴独立 + 因子分解 + recommendation 决策表，11 个单测）；迁移 `20260815000100_scoring_factors`（score_factors + score_signal_links 两表，ai_stage_worker 写权限）与 `20260815000200_score_factors_axis_unique`（唯一约束修正为按轴）；`scoring-repository.ts`（事务写入 + on-conflict 回查）；`score-projects.ts` runner + `run-scoring.ts` CLI；真实库跑通 **12 个项目评分**（Ethereum 67.30/60.00/35% watch），重跑 12/12 幂等；Ethereum 自动进入 `opportunity_list`（第 6 位）；详情页 fixture 提示同步更新 | 待提交 |
+| **Phase 4 评分管线** | `packages/domain/src/scoring/score-model.ts` 确定性评分（机会/风险/置信度三轴独立 + 因子分解 + recommendation 决策表，11 个单测）；迁移 `20260815000100_scoring_factors`（score_factors + score_signal_links 两表，ai_stage_worker 写权限）与 `20260815000200_score_factors_axis_unique`（唯一约束修正为按轴）；`scoring-repository.ts`（事务写入 + on-conflict 回查）；`score-projects.ts` runner + `run-scoring.ts` CLI；真实库跑通 **12 个项目评分**（Ethereum 67.30/60.00/35% watch），重跑 12/12 幂等；Ethereum 自动进入 `opportunity_list`（第 6 位）；详情页 fixture 提示同步更新 | `1e9b675` |
+| **Phase 5 常态化编排**（2026-08-15） | worker 进程内新增 AI 阶段编排循环（不动已硬化的采集 durable queue）：`packages/domain/src/orchestration/backoff.ts`（指数退避纯函数，7 单测）；`listPendingInputs` 毒物防护对齐——排除**一切**已有 run 的输入（schema 唯一键使失败重试必然重复 `on conflict do nothing`，故语义改为每输入至多一次尝试，失败输入成为事实 dead-letter，待 review 流接手）；`apps/worker/src/orchestration/`（ports + ai-stage-orchestrator 双定时循环 + create-ai-stage-runtime 组合根，13 个单测）；`index.ts` opt-in 集成——设 `AIRDROP_AI_STAGE_DATABASE_URL` + `AI_MODEL_API_KEY` 即启用（tick 可用 `AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS` / `AIRDROP_ORCHESTRATION_SCORING_TICK_MS` 覆盖），缺席则单行 `ai_stage_orchestration_disabled` 日志后纯采集模式；远程库补建 `collection_queue_worker_login` 登录角色；真实库端到端验证：注入 discovered_item → extraction tick 自动拾取并真实调用 DeepSeek 产出候选 → 人工 promote → scoring tick 自动检测 input_version 变化重算（novanet 83.2/20/31 → 74.8/40/27，三轴独立语义正确），页面正确渲染 | `b846185` |
 
-当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders）。测试通过 488（contracts 38 / domain 203 / database 80 / web 17 / worker 150）；另有 database 20 个集成测试与 worker 2 个 e2e 需远程库环境变量，默认 skip。本次新增 domain 11 + worker 4 = 15 个评分测试。
+当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders）。测试通过 508（contracts 38 / domain 210 / database 80 / web 17 / worker 163）；另有 database 20 个集成测试与 worker 2 个 e2e 需远程库环境变量，默认 skip。Phase 5 新增 domain 7 + worker 13 = 20 个编排测试。
 
 ### ⚠️ 半成品 / 已知缺口
 
 | 项 | 状态 | 说明 |
 |----|------|------|
-| `collection_schedule_admin_login` 角色 | **不存在** | 早期经 ssh 传 `DO $$` 块静默失败遗留。`apps/web/.env.local` 里的 `AIRDROP_QUEUE_ADMIN_DATABASE_URL` 指向它，**目前不可用**。需要时用平铺语句重建：`create role collection_schedule_admin_login with login password '...' in role collection_schedule_admin;` |
-| Ethereum 的评分 | **seed 占位** | `project_scores` 行 model_version=`seed-fixture-v1`，explanation 已注明「占位待管线评分模型上线后替换」。详情页在 score 为 null 时整个信号区不渲染，所以才插了占位行 |
+| `collection_schedule_admin_login` 角色 | **不存在** | 早期经 ssh 传 `DO $$` 块静默失败遗留。`apps/web/.env.local` 里的 `AIRDROP_QUEUE_ADMIN_DATABASE_URL` 指向它，**目前不可用**。需要时用平铺语句重建：`create role collection_schedule_admin_login with login password '...' in role collection_schedule_admin;`（注意：`collection_queue_worker_login` 已于 Phase 5 补建，模式可参考 §6.2） |
 | airdrops.io 数据接入方式 | **开发注入，非正式通道** | 采集器 INSERT 策略深度校验「official+verified」，第三方源被正确拒绝（产品设计）。当前用 `dev_fixture_admin`（bypassrls，仅 raw_items/discovered_items 两表 insert/select）+ `seed-nonofficial-feed.ts` 注入真实 feed。**正式的多源接入（含第三方源的审核接收流）尚未设计实现** |
-| 抽取调度 | **手动 CLI** | `run-extract.ts` 是一次性入口，未接入 durable queue，无定时。采集→抽取→评分的编排不存在 |
 | worktree | `.worktrees/phase-2-source-collection` | Phase 2 时代的 worktree，其提交已全部在主分支历史中，确认后可清理 |
 
 ### ❌ 未开始（按建议优先级）
 
 1. ~~**评分管线**~~ ✅ **2026-08-15 完成**：score-model-v1 确定性评分 + 因子分解 + recommendation 决策表；Ethereum 及 11 个 demo 项目全部评分，Ethereum 自动进入 `opportunity_list`。见 `docs/superpowers/specs/2026-08-15-score-pipeline-design.md`
 2. ~~**机会列表纳入真实项目**~~ ✅ **2026-08-15 完成**：Ethereum 评分后由读模型视图自动纳入（第 6 位）
-3. **schema_invalid / 反复 grounding 失败的 review 流**：目前只有 success/empty 路径，失败输入没有 dead-letter 审核界面
-4. **采集→抽取→评分的常态化编排**：评分目前仍是手动 CLI（`run-scoring.ts`），未接入 durable queue 或 cron；三阶段尚无统一编排
+3. **schema_invalid / 反复 grounding 失败的 review 流**：目前只有 success/empty 路径，失败输入没有 dead-letter 审核界面。Phase 5 的毒物防护已把「失败输入不再重试」落进 `listPendingInputs`（每输入至多一次尝试），这些输入静静躺在库里等 review 流接手
+4. ~~**采集→抽取→评分的常态化编排**~~ ✅ **2026-08-15 完成（Phase 5）**：worker 进程内 AI 阶段编排循环（抽取 60s / 评分 300s 默认 tick，指数退避，错误隔离，opt-in 环境变量）。采集队列未动；人工 Promotion 门禁按产品设计保留。见 `docs/superpowers/specs/2026-08-15-orchestration-design.md`
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
 7. 通知系统（alerts、偏好）
@@ -74,6 +73,9 @@ apps/
     src/queue/              #   durable queue：scheduler、consumer、lease 围栏
     src/ai/                 #   ⭐ Phase 3：model-client、extract-discovered、
     src/ai/                 #      run-extract.ts / promote-candidate.ts（CLI）
+    src/scoring/            #   ⭐ Phase 4：score-projects runner、run-scoring CLI
+    src/orchestration/      #   ⭐ Phase 5：AI 阶段编排循环（抽取/评分双 tick、
+    src/orchestration/      #      退避、错误隔离、opt-in 组合根）
     src/e2e/                #   collect-once.ts、seed-nonofficial-feed.ts（开发注入）
 packages/
   contracts/                # 唯一契约源：API/AI 输出/任务 payload zod schema
@@ -156,13 +158,22 @@ ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200 \
 | `AI_MODEL_API_KEY` | DeepSeek Key（`sk-` 开头，本地-only） |
 | `AIRDROP_COLLECTION_USER_AGENT` | 出站 UA |
 | `AIRDROP_QUEUE_WORKER_ID` | 队列 worker 标识 |
+| `AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS` | 可选：抽取 tick 间隔（默认 60000） |
+| `AIRDROP_ORCHESTRATION_SCORING_TICK_MS` | 可选：评分 tick 间隔（默认 300000） |
+
+> ⭐ **Phase 5 编排 opt-in**：worker 启动时若同时存在 `AIRDROP_AI_STAGE_DATABASE_URL` 与 `AI_MODEL_API_KEY`，则自动运行 AI 阶段编排循环（抽取/评分定时 tick）；任一缺席即纯采集模式（日志 `ai_stage_orchestration_disabled`）。promotion（候选→signal）按产品设计保持人工 CLI。
 
 ### 常用命令
 
 ```bash
 pnpm dev                # web + worker 并行开发（web 在 localhost:3000）
-pnpm verify             # lint + typecheck + test(155) + build + placeholders
+                        # ⭐ 若 .env.local 同时含 AIRDROP_AI_STAGE_DATABASE_URL 与
+                        #    AI_MODEL_API_KEY，worker 自动运行抽取/评分编排循环
+pnpm verify             # lint + typecheck + test(508) + build + placeholders
 env -u NODE_OPTIONS pnpm verify   # ⚠️ 必须这样跑（见 §6 坑 1）
+
+# 手动评分（一次性，幂等：input_version 哈希）
+AIRDROP_AI_STAGE_DATABASE_URL=... npx tsx apps/worker/src/scoring/run-scoring.ts
 
 # AI 抽取（一次性，幂等：input_kind+input_id+input_hash+pipeline_version）
 AIRDROP_AI_STAGE_DATABASE_URL=... AI_MODEL_API_KEY=... AI_EXTRACT_MAX_INPUTS=50 \
@@ -232,17 +243,17 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 8. 建议的接手顺序
 
-1. **跑通现状**：起隧道 → `pnpm dev` → 打开 `/`、`/opportunities`、`/projects/ethereum` → 跑 `env -u NODE_OPTIONS pnpm verify` 确认 155 测试全绿
+1. **跑通现状**：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 打开 `/`、`/opportunities`、`/projects/ethereum`、`/projects/novanet` → 跑 `env -u NODE_OPTIONS pnpm verify` 确认 508 测试全绿
 2. **读文档**：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程）→ `docs/architecture/`（决策）→ 本手册 §6（坑）
-3. **第一个任务：评分管线**。路径：signals（已有 6 条真实数据 + demo 信号）→ 确定性、版本化的因子计算 → `project_scores` + `score_factors` + score-evidence 关联 → 替换 Ethereum 的 `seed-fixture-v1` 占位行 → 机会列表自动纳入。AI 只参与解释文案起草
+3. **第一个任务建议（三选一，见 §2 未开始清单）**：(a) 失败抽取的 review / dead-letter 审核界面——毒物防护已把失败输入 park 住，等界面接手；(b) 教程生成 tutorials（价值链「执行」环，依赖已就绪的自动信号流）；(c) 详情页 score_factors 展示 + anon 读策略（把 Phase 4 的因子数据变成用户可见）。若上生产，还需部署 worker（带 AI env）并配置采集调度常态化
 4. 之后按 §2「未开始」清单顺序推进
 
 ---
 
 ## 9. 其他
 
-- Git 分支：`codex/phase-0-1-foundation`（HEAD `e0cd5e5`，包含全部历史）；`codex/phase-2-source-collection` 及其 worktree 可在确认后清理
+- Git 分支：`codex/phase-0-1-foundation`（HEAD `1e9b675` = Phase 4；Phase 5 编排为其后一次提交）；`codex/phase-2-source-collection` 及其 worktree 可在确认后清理
 - dev server 可能仍在 localhost:3000 运行（前一会话启动）
 - 历史决策细节（为什么这样做）：`docs/superpowers/specs/` 与 `docs/superpowers/plans/` 下的设计文档
 - DeepSeek 计费注意：130 次真实抽取消耗约 62 万 prompt tokens（每输入截取 12K 字符上限）；批量跑前评估成本
-- 交接时的数据库快照：14 迁移已应用；13 项目（12 demo + Ethereum）；raw_items 31+；discovered_items 130；ai_runs 130；extraction_candidates 6（全部 promoted）；signals = demo 信号 + 6 真实信号
+- 交接时的数据库快照：16 迁移已应用；14 项目（12 demo + Ethereum + novanet 等实为 13 项目含 novanet + Ethereum）；raw_items 23；discovered_items 131；ai_runs 131（130 Phase 3 + 1 Phase 5 编排验证）；extraction_candidates 7（全 promoted）；signals 20（demo + 6 Ethereum 真实 + 1 novanet 编排验证）；project_scores 26 行（12 项目含历史版本行）；score_factors 117；score_signal_links 已建。novanet 的 `airdrop_season_announcement` 信号及其评分（74.8/40/27 watch）是 Phase 5 端到端验证产物，内容为合成测试数据

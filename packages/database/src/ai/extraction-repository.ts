@@ -77,6 +77,12 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
   return {
     async listPendingInputs(limit) {
       return run(async () => {
+        // Poison-input protection for the automatic orchestration loop: an
+        // input is attempted at most once per pipeline version. The filter
+        // aligns with recordExtractionRun's dedup key — any run row at the
+        // current pipeline version (succeeded, failed, or skipped) settles
+        // the input. Failed inputs stay visible to the human review flow via
+        // ai_runs history; they never re-burn model tokens on a timer.
         const rows = await sql`
           select
             discovered.id as discovered_item_id,
@@ -101,7 +107,6 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
             where processed.input_kind = 'discovered_item'
               and processed.input_id = discovered.id
               and processed.pipeline_version = 'extract-pipeline-v1'
-              and processed.status in ('succeeded', 'skipped_no_content')
           )
           order by discovered.created_at desc
           limit ${limit}

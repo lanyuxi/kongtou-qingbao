@@ -1,6 +1,12 @@
 import { pathToFileURL } from 'node:url';
 
 import { createQueueRuntime } from './queue/index.js';
+import {
+  createAiStageRuntime,
+  DEFAULT_EXTRACT_TICK_MS,
+  DEFAULT_SCORING_TICK_MS,
+  type AiStageRuntimeOptions,
+} from './orchestration/create-ai-stage-runtime.js';
 import { createWorkerHealth, transitionWorkerHealth, type WorkerHealth } from './health.js';
 
 const DEFAULT_SHUTDOWN_BOUND_MS = 30_000;
@@ -10,6 +16,18 @@ const QUEUE_DATABASE_URL = 'AIRDROP_QUEUE_DATABASE_URL';
 const COLLECTION_DATABASE_URL = 'AIRDROP_COLLECTION_DATABASE_URL';
 const COLLECTION_USER_AGENT = 'AIRDROP_COLLECTION_USER_AGENT';
 const QUEUE_WORKER_ID = 'AIRDROP_QUEUE_WORKER_ID';
+
+const AI_STAGE_DATABASE_URL = 'AIRDROP_AI_STAGE_DATABASE_URL';
+const AI_MODEL_API_KEY = 'AI_MODEL_API_KEY';
+const AI_MODEL_BASE_URL = 'AI_MODEL_BASE_URL';
+const AI_MODEL_ID = 'AI_MODEL_ID';
+const AI_EXTRACT_MAX_INPUTS = 'AI_EXTRACT_MAX_INPUTS';
+const AI_SCORE_MAX_PROJECTS = 'AI_SCORE_MAX_PROJECTS';
+const ORCHESTRATION_EXTRACT_TICK_MS = 'AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS';
+const ORCHESTRATION_SCORING_TICK_MS = 'AIRDROP_ORCHESTRATION_SCORING_TICK_MS';
+
+const DEFAULT_MODEL_BASE_URL = 'https://api.deepseek.com/v1';
+const DEFAULT_MODEL_ID = 'deepseek-chat';
 
 export interface WorkerEnvironment {
   readonly queueDatabaseUrl: string;
@@ -58,6 +76,57 @@ export function parseWorkerEnvironment(environment: NodeJS.ProcessEnv): WorkerEn
   }
 
   return { queueDatabaseUrl, collectionDatabaseUrl, collectionUserAgent, workerId };
+}
+
+/**
+ * AI stage orchestration is opt-in: it starts only when the stage database URL
+ * and the model API key are both present. Absent configuration leaves the
+ * worker collection-only and is never an error. Malformed optional values
+ * (batch sizes, tick intervals) are rejected loudly.
+ */
+export function parseAiStageOptions(
+  environment: NodeJS.ProcessEnv,
+): AiStageRuntimeOptions | null {
+  const databaseUrl = environment[AI_STAGE_DATABASE_URL];
+  const modelApiKey = environment[AI_MODEL_API_KEY];
+
+  if (databaseUrl === undefined || databaseUrl.length === 0) return null;
+  if (modelApiKey === undefined || modelApiKey.length === 0) return null;
+
+  return {
+    databaseUrl,
+    modelApiKey,
+    modelBaseUrl: environment[AI_MODEL_BASE_URL] ?? DEFAULT_MODEL_BASE_URL,
+    modelId: environment[AI_MODEL_ID] ?? DEFAULT_MODEL_ID,
+    maxInputs: parseBoundedInteger(environment[AI_EXTRACT_MAX_INPUTS], 5, 1, 50),
+    maxProjects: parseBoundedInteger(environment[AI_SCORE_MAX_PROJECTS], 25, 1, 100),
+    extractTickMs: parseBoundedInteger(
+      environment[ORCHESTRATION_EXTRACT_TICK_MS],
+      DEFAULT_EXTRACT_TICK_MS,
+      5_000,
+      Number.MAX_SAFE_INTEGER,
+    ),
+    scoringTickMs: parseBoundedInteger(
+      environment[ORCHESTRATION_SCORING_TICK_MS],
+      DEFAULT_SCORING_TICK_MS,
+      5_000,
+      Number.MAX_SAFE_INTEGER,
+    ),
+  };
+}
+
+function parseBoundedInteger(
+  raw: string | undefined,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  if (raw === undefined || raw.length === 0) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new WorkerConfigurationError();
+  }
+  return parsed;
 }
 
 export async function runWorker(
@@ -117,7 +186,29 @@ if (isDirectExecution()) {
 async function main(): Promise<void> {
   try {
     const environment = parseWorkerEnvironment(process.env);
-    const runtime = createQueueRuntime(environment);
+    const queueRuntime = createQueueRuntime(environment);
+    const aiStageOptions = parseAiStageOptions(process.env);
+    const aiStageRuntime = aiStageOptions === null
+      ? null
+      : createAiStageRuntime(aiStageOptions);
+
+    if (aiStageRuntime === null) {
+      process.stderr.write(
+        `${JSON.stringify({ event: 'ai_stage_orchestration_disabled', code: 'configuration_absent' })}\n`,
+      );
+    }
+
+    const runtime: WorkerRuntimePort = {
+      async start() {
+        await queueRuntime.start();
+        await aiStageRuntime?.start();
+      },
+      async stop() {
+        await aiStageRuntime?.stop();
+        await queueRuntime.stop();
+      },
+    };
+
     await runWorker(runtime, {
       emit: (health) => { process.stdout.write(`${JSON.stringify(health)}\n`); },
       onSignal: (handler) => {

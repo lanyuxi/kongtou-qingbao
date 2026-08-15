@@ -124,7 +124,7 @@ function isAcceptableToken(value: string, maxLength: number): boolean {
   );
 }
 
-function createNodeProcessorTimer(): ProcessorTimer {
+export function createNodeProcessorTimer(): ProcessorTimer {
   return {
     sleep(milliseconds: number, signal: AbortSignal): Promise<void> {
       return new Promise((resolve) => {
@@ -144,7 +144,7 @@ function createNodeProcessorTimer(): ProcessorTimer {
   };
 }
 
-function createStderrQueueLogger(): QueueLogger {
+export function createStderrQueueLogger(): QueueLogger {
   const write = (record: Record<string, unknown>): void => {
     process.stderr.write(`${JSON.stringify(record)}\n`);
   };

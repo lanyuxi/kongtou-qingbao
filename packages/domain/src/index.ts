@@ -114,3 +114,9 @@ export type {
   ScoringProvenance,
   ScoringSignalInput,
 } from './scoring/score-model.js';
+export {
+  ORCHESTRATION_BACKOFF_CAP_MS,
+  OrchestrationPolicyError,
+  backoffDelayMs,
+} from './orchestration/backoff.js';
+export type { OrchestrationPolicyErrorCode } from './orchestration/backoff.js';
