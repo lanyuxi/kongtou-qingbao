@@ -102,6 +102,42 @@ using (
 comment on policy signals_select_authenticated on public.signals is
   'Authenticated browser users may read Evidence-gated published signals whose parent project is active.';
 
+drop policy if exists project_scores_select_anon on public.project_scores;
+create policy project_scores_select_anon
+on public.project_scores
+for select
+to anon
+using (
+  exists (
+    select 1
+    from public.projects as project
+    where project.id = project_scores.project_id
+      and project.lifecycle in ('active', 'rumored')
+  )
+  and public.score_has_complete_evidence(id)
+);
+
+comment on policy project_scores_select_anon on public.project_scores is
+  'Anonymous users may read Evidence-complete score columns for active or rumored projects.';
+
+drop policy if exists project_scores_select_authenticated on public.project_scores;
+create policy project_scores_select_authenticated
+on public.project_scores
+for select
+to authenticated
+using (
+  exists (
+    select 1
+    from public.projects as project
+    where project.id = project_scores.project_id
+      and project.lifecycle in ('active', 'rumored')
+  )
+  and public.score_has_complete_evidence(id)
+);
+
+comment on policy project_scores_select_authenticated on public.project_scores is
+  'Authenticated browser users may read Evidence-complete score columns for active or rumored projects.';
+
 create or replace view public.project_current_state
 with (security_invoker = true, security_barrier = true)
 as

@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(79);
+select plan(80);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -550,6 +550,13 @@ values
   ('20000000-0000-4000-8000-000000000008', '30000000-0000-4000-8000-000000000008'),
   ('20000000-0000-4000-8000-000000000009', '30000000-0000-4000-8000-000000000009');
 
+select is(
+  (select count(*)::integer from public.project_scores
+   where id = '20000000-0000-4000-8000-000000000010'),
+  1,
+  'the zero-link score remains stored for owner-side history checks'
+);
+
 insert into public.watchlists (id, user_id, name, is_default)
 values ('40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000003', 'Victim List', true);
 insert into public.watchlist_projects (watchlist_id, project_id)
@@ -605,23 +612,23 @@ select results_eq(
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
-  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('20000000-0000-4000-8000-000000000010'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
-  'anonymous users can read safe score columns only for active and rumored projects'
+  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
+  'anonymous users can read only Evidence-complete scores for active and rumored projects'
 );
 select is(
   (select count(*)::integer from public.project_scores where model_version is not null),
-  8,
-  'anonymous model-version reads retain active-or-rumored project RLS'
+  7,
+  'anonymous model-version reads require complete Evidence and public project lifecycle'
 );
 select is(
   (select count(*)::integer from public.project_scores where input_version is not null),
-  8,
-  'anonymous input-version reads retain active-or-rumored project RLS'
+  7,
+  'anonymous input-version reads require complete Evidence and public project lifecycle'
 );
 select is(
   (select count(*)::integer from public.project_scores where explanation is not null),
-  8,
-  'anonymous explanation reads retain active-or-rumored project RLS'
+  7,
+  'anonymous explanation reads require complete Evidence and public project lifecycle'
 );
 select throws_like(
   $$delete from public.project_current_state$$,
@@ -646,8 +653,8 @@ select set_config(
 
 select is(
   (select count(*)::integer from public.project_scores where model_version is not null),
-  8,
-  'an authenticated model-version read retains active-or-rumored project RLS'
+  7,
+  'an authenticated model-version read requires complete Evidence and public project lifecycle'
 );
 
 select is((select count(*)::integer from public.watchlists), 0, 'an authenticated user cannot broadly read private watchlists');

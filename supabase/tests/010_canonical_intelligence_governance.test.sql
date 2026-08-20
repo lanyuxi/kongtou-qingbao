@@ -365,6 +365,44 @@ select ok(
   'browser roles receive no direct Evidence SELECT while using read helpers'
 );
 
+select results_eq(
+  $$
+    select policy.polname::text collate "C",
+      pg_catalog.pg_get_userbyid(policy.polroles[1])::text collate "C",
+      pg_catalog.regexp_replace(
+        pg_catalog.pg_get_expr(policy.polqual, policy.polrelid),
+        '[[:space:]]+', ' ', 'g'
+      )::text collate "C",
+      pg_catalog.obj_description(policy.oid, 'pg_policy')::text collate "C"
+    from pg_catalog.pg_policy as policy
+    where policy.polrelid = 'public.project_scores'::regclass
+      and policy.polname in (
+        'project_scores_select_anon', 'project_scores_select_authenticated'
+      )
+    order by policy.polname
+  $$,
+  $$
+    select expected.policy_name collate "C", expected.role_name collate "C",
+      expected.using_expression collate "C", expected.policy_comment collate "C"
+    from (values
+      (
+        'project_scores_select_anon'::text,
+        'anon'::text,
+        '((EXISTS ( SELECT 1 FROM projects project WHERE ((project.id = project_scores.project_id) AND (project.lifecycle = ANY (ARRAY[''active''::project_lifecycle, ''rumored''::project_lifecycle]))))) AND score_has_complete_evidence(id))'::text,
+        'Anonymous users may read Evidence-complete score columns for active or rumored projects.'::text
+      ),
+      (
+        'project_scores_select_authenticated',
+        'authenticated',
+        '((EXISTS ( SELECT 1 FROM projects project WHERE ((project.id = project_scores.project_id) AND (project.lifecycle = ANY (ARRAY[''active''::project_lifecycle, ''rumored''::project_lifecycle]))))) AND score_has_complete_evidence(id))',
+        'Authenticated browser users may read Evidence-complete score columns for active or rumored projects.'
+      )
+    ) as expected(policy_name, role_name, using_expression, policy_comment)
+    order by expected.policy_name
+  $$,
+  'browser score policies preserve lifecycle visibility and require complete Evidence'
+);
+
 select ok(
   procedure_info.prosecdef
     and pg_catalog.pg_get_userbyid(procedure_info.proowner) = 'postgres'
@@ -1228,16 +1266,63 @@ insert into public.raw_items (
   id, project_id, source_id, logical_url, final_url, content_kind, media_type,
   raw_text, sha256, collected_at
 )
-values (
-  '11000000-0000-4000-8000-000000000030',
-  '11000000-0000-4000-8000-000000000010',
-  '10000000-0000-4000-8000-000000000020',
-  'https://governance.example/evidence-gate',
-  'https://governance.example/evidence-gate',
-  'feed_article_html', 'text/html',
-  'A deterministic evidence gate fixture quote appears in this article.',
-  repeat('1', 64), '2026-08-20 01:01:00+00'
-);
+values
+  (
+    '11000000-0000-4000-8000-000000000030',
+    '11000000-0000-4000-8000-000000000010',
+    '10000000-0000-4000-8000-000000000020',
+    'https://governance.example/evidence-gate',
+    'https://governance.example/evidence-gate',
+    'feed_article_html', 'text/html',
+    'A deterministic evidence gate fixture quote appears in this article.',
+    repeat('1', 64), '2026-08-20 01:01:00+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000031',
+    '11000000-0000-4000-8000-000000000010',
+    '10000000-0000-4000-8000-000000000021',
+    'https://mismatch.example/evidence-gate-feed',
+    'https://mismatch.example/evidence-gate-feed',
+    'rss_feed', 'application/rss+xml',
+    '<rss>A mismatched discovered-item source fixture.</rss>',
+    repeat('2', 64), '2026-08-20 01:01:10+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000032',
+    '11000000-0000-4000-8000-000000000010',
+    '10000000-0000-4000-8000-000000000020',
+    'https://governance.example/evidence-gate-other-raw',
+    'https://governance.example/evidence-gate-other-raw',
+    'feed_article_html', 'text/html',
+    'A raw item that is not the discovered item feed raw item.',
+    repeat('3', 64), '2026-08-20 01:01:20+00'
+  );
+
+insert into public.discovered_items (
+  id, project_id, source_id, feed_raw_item_id, stable_entry_key, version,
+  entry_url, summary, is_authority_domain, disposition, created_at
+)
+values
+  (
+    '11000000-0000-4000-8000-000000000040',
+    '11000000-0000-4000-8000-000000000010',
+    '10000000-0000-4000-8000-000000000021',
+    '11000000-0000-4000-8000-000000000031',
+    'evidence-gate-mismatched-source', 1,
+    'https://mismatch.example/evidence-gate-entry',
+    'A discovered item whose source does not match its linked Evidence.',
+    false, 'eligible', '2026-08-20 01:01:30+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000041',
+    '11000000-0000-4000-8000-000000000010',
+    '10000000-0000-4000-8000-000000000020',
+    '11000000-0000-4000-8000-000000000030',
+    'evidence-gate-wrong-feed-raw', 1,
+    'https://governance.example/evidence-gate-entry',
+    'A discovered summary whose Evidence points at a different Raw Item.',
+    true, 'eligible', '2026-08-20 01:01:40+00'
+  );
 
 insert into public.signals (
   id, project_id, signal_type, title, summary, verification, lifecycle,
@@ -1255,28 +1340,83 @@ values
     'unverified', 'published', 60, '2026-08-20 01:04:00+00', '2026-08-20 01:04:00+00'),
   ('11000000-0000-4000-8000-000000000083', '11000000-0000-4000-8000-000000000012',
     'zero_score_links', 'Zero score links signal', 'This signal proves zero-link scores remain private.',
-    'unverified', 'published', 65, '2026-08-20 01:05:00+00', '2026-08-20 01:05:00+00');
+    'unverified', 'published', 65, '2026-08-20 01:05:00+00', '2026-08-20 01:05:00+00'),
+  ('11000000-0000-4000-8000-000000000084', '11000000-0000-4000-8000-000000000010',
+    'raw_source_mismatch', 'Raw source mismatch', 'Evidence source differs from its Raw Item source.',
+    'unverified', 'published', 60, '2026-08-20 01:05:10+00', '2026-08-20 01:05:10+00'),
+  ('11000000-0000-4000-8000-000000000085', '11000000-0000-4000-8000-000000000010',
+    'discovered_source_mismatch', 'Discovered source mismatch', 'Evidence source differs from its Discovered Item source.',
+    'unverified', 'published', 60, '2026-08-20 01:05:20+00', '2026-08-20 01:05:20+00'),
+  ('11000000-0000-4000-8000-000000000086', '11000000-0000-4000-8000-000000000010',
+    'discovered_feed_mismatch', 'Discovered feed Raw Item mismatch', 'Evidence Raw Item differs from the Discovered Item feed Raw Item.',
+    'unverified', 'published', 60, '2026-08-20 01:05:30+00', '2026-08-20 01:05:30+00');
 
 insert into public.evidence (
-  id, source_id, raw_item_id, source_field, quote_text,
+  id, source_id, raw_item_id, discovered_item_id, source_field, quote_text,
   normalized_quote_sha256, verified_at, created_at
 )
-values (
-  '11000000-0000-4000-8000-000000000070',
-  '10000000-0000-4000-8000-000000000020',
-  '11000000-0000-4000-8000-000000000030',
-  'article_raw_text',
-  'deterministic evidence gate fixture quote',
-  public.evidence_quote_sha256_v1('deterministic evidence gate fixture quote'),
-  '2026-08-20 01:06:00+00', '2026-08-20 01:06:00+00'
-);
+values
+  (
+    '11000000-0000-4000-8000-000000000070',
+    '10000000-0000-4000-8000-000000000020',
+    '11000000-0000-4000-8000-000000000030', null,
+    'article_raw_text',
+    'deterministic evidence gate fixture quote',
+    public.evidence_quote_sha256_v1('deterministic evidence gate fixture quote'),
+    '2026-08-20 01:06:00+00', '2026-08-20 01:06:00+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000071',
+    '10000000-0000-4000-8000-000000000021',
+    '11000000-0000-4000-8000-000000000030', null,
+    'article_raw_text',
+    'Evidence source differs from the Raw Item source',
+    public.evidence_quote_sha256_v1('Evidence source differs from the Raw Item source'),
+    '2026-08-20 01:06:10+00', '2026-08-20 01:06:10+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000072',
+    '10000000-0000-4000-8000-000000000020',
+    '11000000-0000-4000-8000-000000000030',
+    '11000000-0000-4000-8000-000000000040',
+    'article_raw_text',
+    'Evidence source differs from the Discovered Item source',
+    public.evidence_quote_sha256_v1('Evidence source differs from the Discovered Item source'),
+    '2026-08-20 01:06:20+00', '2026-08-20 01:06:20+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000073',
+    '10000000-0000-4000-8000-000000000020',
+    '11000000-0000-4000-8000-000000000032',
+    '11000000-0000-4000-8000-000000000041',
+    'discovered_summary',
+    'Evidence points at the wrong feed Raw Item',
+    public.evidence_quote_sha256_v1('Evidence points at the wrong feed Raw Item'),
+    '2026-08-20 01:06:30+00', '2026-08-20 01:06:30+00'
+  );
 
 insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
-values (
-  '11000000-0000-4000-8000-000000000080',
-  '11000000-0000-4000-8000-000000000070',
-  '2026-08-20 01:06:00+00'
-);
+values
+  (
+    '11000000-0000-4000-8000-000000000080',
+    '11000000-0000-4000-8000-000000000070',
+    '2026-08-20 01:06:00+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000084',
+    '11000000-0000-4000-8000-000000000071',
+    '2026-08-20 01:06:10+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000085',
+    '11000000-0000-4000-8000-000000000072',
+    '2026-08-20 01:06:20+00'
+  ),
+  (
+    '11000000-0000-4000-8000-000000000086',
+    '11000000-0000-4000-8000-000000000073',
+    '2026-08-20 01:06:30+00'
+  );
 
 insert into public.project_scores (
   id, project_id, model_version, input_version, opportunity_score, risk_score,
@@ -1297,14 +1437,76 @@ values
     'Score linked only to an unevidenced signal.', '2026-08-20 01:13:00+00', '2026-08-20 01:13:00+00'),
   ('11000000-0000-4000-8000-000000000094', '11000000-0000-4000-8000-000000000012',
     'evidence-gate-v1', 'zero-link-only', 90, 25, 75, 'watch',
-    'Score with no signal links.', '2026-08-20 01:14:00+00', '2026-08-20 01:14:00+00');
+    'Score with no signal links.', '2026-08-20 01:14:00+00', '2026-08-20 01:14:00+00'),
+  ('11000000-0000-4000-8000-000000000095', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'raw-source-mismatch', 89, 26, 74, 'watch',
+    'Score linked to a Raw Item source mismatch.', '2026-08-20 01:15:00+00', '2026-08-20 01:15:00+00'),
+  ('11000000-0000-4000-8000-000000000096', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'discovered-source-mismatch', 88, 27, 73, 'watch',
+    'Score linked to a Discovered Item source mismatch.', '2026-08-20 01:16:00+00', '2026-08-20 01:16:00+00'),
+  ('11000000-0000-4000-8000-000000000097', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'discovered-feed-mismatch', 87, 28, 72, 'watch',
+    'Score linked to a Discovered Item feed Raw Item mismatch.', '2026-08-20 01:17:00+00', '2026-08-20 01:17:00+00');
 
 insert into public.score_signal_links (project_score_id, signal_id)
 values
   ('11000000-0000-4000-8000-000000000090', '11000000-0000-4000-8000-000000000080'),
   ('11000000-0000-4000-8000-000000000091', '11000000-0000-4000-8000-000000000080'),
   ('11000000-0000-4000-8000-000000000091', '11000000-0000-4000-8000-000000000081'),
-  ('11000000-0000-4000-8000-000000000093', '11000000-0000-4000-8000-000000000082');
+  ('11000000-0000-4000-8000-000000000093', '11000000-0000-4000-8000-000000000082'),
+  ('11000000-0000-4000-8000-000000000095', '11000000-0000-4000-8000-000000000084'),
+  ('11000000-0000-4000-8000-000000000096', '11000000-0000-4000-8000-000000000085'),
+  ('11000000-0000-4000-8000-000000000097', '11000000-0000-4000-8000-000000000086');
+
+select is(public.signal_has_valid_evidence(null::uuid), false, 'NULL signal IDs have no valid Evidence');
+select is(
+  public.signal_has_valid_evidence('11000000-0000-4000-8000-000000000999'),
+  false,
+  'unknown signal IDs have no valid Evidence'
+);
+
+select results_eq(
+  $$
+    select signal_id, public.signal_has_valid_evidence(signal_id)
+    from (values
+      ('11000000-0000-4000-8000-000000000084'::uuid),
+      ('11000000-0000-4000-8000-000000000085'::uuid),
+      ('11000000-0000-4000-8000-000000000086'::uuid)
+    ) as invalid_signal(signal_id)
+    order by signal_id
+  $$,
+  $$ values
+    ('11000000-0000-4000-8000-000000000084'::uuid, false),
+    ('11000000-0000-4000-8000-000000000085'::uuid, false),
+    ('11000000-0000-4000-8000-000000000086'::uuid, false)
+  $$,
+  'Raw Item, Discovered Item, and feed Raw Item identity mismatches invalidate Evidence'
+);
+
+select is(public.score_has_complete_evidence(null::uuid), false, 'NULL score IDs have no complete Evidence');
+select is(
+  public.score_has_complete_evidence('11000000-0000-4000-8000-000000000999'),
+  false,
+  'unknown score IDs have no complete Evidence'
+);
+
+select results_eq(
+  $$
+    select score_id, public.score_has_complete_evidence(score_id)
+    from (values
+      ('11000000-0000-4000-8000-000000000095'::uuid),
+      ('11000000-0000-4000-8000-000000000096'::uuid),
+      ('11000000-0000-4000-8000-000000000097'::uuid)
+    ) as invalid_score(score_id)
+    order by score_id
+  $$,
+  $$ values
+    ('11000000-0000-4000-8000-000000000095'::uuid, false),
+    ('11000000-0000-4000-8000-000000000096'::uuid, false),
+    ('11000000-0000-4000-8000-000000000097'::uuid, false)
+  $$,
+  'scores linked to structurally invalid provenance are Evidence-incomplete'
+);
 
 set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -1320,6 +1522,30 @@ select results_eq(
   $$,
   $$ values ('11000000-0000-4000-8000-000000000080'::uuid) $$,
   'anonymous users see the evidenced signal but not the unevidenced signal'
+);
+
+select is_empty(
+  $$
+    select id from public.signals
+    where id in (
+      '11000000-0000-4000-8000-000000000084',
+      '11000000-0000-4000-8000-000000000085',
+      '11000000-0000-4000-8000-000000000086'
+    )
+  $$,
+  'anonymous users cannot read signals with structurally invalid provenance'
+);
+
+select results_eq(
+  $$
+    select id from public.project_scores
+    where id between
+      '11000000-0000-4000-8000-000000000090'
+      and '11000000-0000-4000-8000-000000000097'
+    order by id
+  $$,
+  $$ values ('11000000-0000-4000-8000-000000000090'::uuid) $$,
+  'anonymous users cannot bypass read models to read incomplete or zero-link scores'
 );
 
 select results_eq(
@@ -1347,6 +1573,37 @@ select results_eq(
   'opportunities exclude never-evidenced and zero-link-score projects without deleting history'
 );
 
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-4000-8000-000000000092","role":"authenticated"}',
+  true
+);
+
+select is_empty(
+  $$
+    select id from public.signals
+    where id in (
+      '11000000-0000-4000-8000-000000000084',
+      '11000000-0000-4000-8000-000000000085',
+      '11000000-0000-4000-8000-000000000086'
+    )
+  $$,
+  'authenticated users cannot read signals with structurally invalid provenance'
+);
+
+select results_eq(
+  $$
+    select id from public.project_scores
+    where id between
+      '11000000-0000-4000-8000-000000000090'
+      and '11000000-0000-4000-8000-000000000097'
+    order by id
+  $$,
+  $$ values ('11000000-0000-4000-8000-000000000090'::uuid) $$,
+  'authenticated users cannot bypass read models to read incomplete or zero-link scores'
+);
+
 reset role;
 select set_config('request.jwt.claims', '{}', true);
 
@@ -1360,12 +1617,15 @@ select results_eq(
       (select count(*) from public.project_scores where id in (
         '11000000-0000-4000-8000-000000000092',
         '11000000-0000-4000-8000-000000000093',
-        '11000000-0000-4000-8000-000000000094'
+        '11000000-0000-4000-8000-000000000094',
+        '11000000-0000-4000-8000-000000000095',
+        '11000000-0000-4000-8000-000000000096',
+        '11000000-0000-4000-8000-000000000097'
       ))::bigint,
       (select count(*) from public.score_signal_links
        where project_score_id = '11000000-0000-4000-8000-000000000093')::bigint
   $$,
-  $$ values (2::bigint, 3::bigint, 1::bigint) $$,
+  $$ values (2::bigint, 6::bigint, 1::bigint) $$,
   'visibility gates preserve never-linked signals, incomplete scores, zero-link scores, and their history'
 );
 

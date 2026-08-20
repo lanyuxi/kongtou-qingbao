@@ -5,7 +5,7 @@
 | 1. Add strict governance contracts | COMPLETED | See log | See log | `feat(contracts): add intelligence governance contracts` |
 | 2. Add deterministic Evidence grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
 | 3. Add governance schema and protected Promotion command | COMPLETED — FIX ROUND 2 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary`; `test(db): align pgTAP with current schema` |
-| 4. Gate public reads and scoring inputs on Evidence | COMPLETED | See log | See log | `feat(db): gate public intelligence on evidence` |
+| 4. Gate public reads and scoring inputs on Evidence | COMPLETED — FIX ROUND 1 | See log | See log | `feat(db): gate public intelligence on evidence`; `fix(db): close public score evidence bypass` |
 | 5. Add the server-only Promotion repository | READY | — | — | — |
 | 6. Replace the legacy Promotion CLI with governed review commands | READY | — | — | — |
 | 7. Reconcile historical Evidence and update fixtures | READY | — | — | — |
@@ -74,3 +74,19 @@ Fix round 2 reconciled the stale pgTAP expectations with the later committed mig
 | Package checks | Database lint, typecheck, unit tests, and repository-wide `pnpm verify` | Static checks, unit tests, builds, and placeholder scan pass | Database lint/typecheck passed; database unit run passed 80 with 22 environment-gated skips; repository `pnpm verify` passed. Local runtime was Node 24.19 and emitted the known Node 22 engine warning. |
 
 The append-only ruling is enforced by separate linked and never-linked fixtures. No Evidence or score link is removed or mutated to simulate revocation; Phase 6A has no revocation data model, so post-link revocation remains outside this task.
+
+## Evidence-gated public reads and scoring fix round 1
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| Review verification | Inspect the Task 4 migration, binding design, plan acceptance, and direct score grants/policies | Confirm whether browser roles can bypass gated views | Confirmed: `project_current_state` and `opportunity_list` were gated, but both browser `project_scores` SELECT policies checked only active/rumored lifecycle and exposed incomplete/zero-link rows directly. |
+| Clean RED | Isolated focused pgTAP file 010 after an exact safety-checked reset | New policy-contract and direct browser assertions fail for the missing score predicate | 141 assertions ran; exactly 3 failed: exact score-policy contract, anonymous direct score bypass, and authenticated direct score bypass. |
+| Focused GREEN | Isolated focused pgTAP file 010 after the minimal forward-migration policy replacement | Exact policy contract, direct anon/auth denial, and provenance mismatch matrix pass | 141/141 passed. |
+| Sensitivity: provenance identities | Temporarily weaken the isolated helper's Raw Item source, Discovered Item source, and discovered-summary feed Raw Item predicates | Structurally insertable mismatches become visible and turn the suite RED | Failed 8/141: invalid signal helpers became true, linked scores became complete, anon/auth direct signal and score reads leaked, and the read models selected the invalid newest score. The isolated reset restored the exact migration; focused GREEN returned 141/141. |
+| Legacy fixture RED | Full isolated pgTAP after the production fix | Reveal stale direct-score expectations without masking them | 004 failed 6/89 and 006 failed 5/79; all other files passed. The controller authorized fixture-only reconciliation: 004 links one positive score and retains a separate zero-link negative; 006 removes only its zero-link row from browser expectations while preserving owner history. |
+| Affected GREEN | Isolated pgTAP files 004 and 006 | Reconciled score visibility assertions pass | 2 files, 170/170 passed. |
+| Full database GREEN | Full isolated `supabase test db` | Every pgTAP file passes | 10 files, 928/928 passed. |
+| Repository integration GREEN | Full serialized `@airdrop/database test:integration` with isolated DB/API variables | All repository integrations run with zero skip | The controller ran 5 files and 22/22 tests passed with exit 0. |
+| Package checks | Database lint, typecheck, and unit tests | Static and unit checks pass | Lint and typecheck passed; unit run passed 80 tests with 22 environment-gated integration tests skipped in that unit-only command. Node 24.19 emitted the known Node 22 engine warning. |
+
+Fix round 1 replaces exactly the two browser score SELECT policies in the existing forward Task 4 migration. Active/rumored lifecycle checks remain intact and `score_has_complete_evidence(id)` is added. Separate invalid fixtures cover Evidence-source/Raw Item mismatch, Evidence-source/Discovered Item mismatch, and `discovered_summary` feed Raw Item mismatch without deleting or mutating history.

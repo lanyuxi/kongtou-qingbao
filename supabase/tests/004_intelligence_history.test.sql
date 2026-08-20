@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(89);
+select plan(90);
 
 select has_table('public', 'signals', 'signals table exists');
 select has_table('public', 'project_scores', 'project_scores table exists');
@@ -738,6 +738,13 @@ select lives_ok(
   $$,
   'a new score input version appends independent zero and one-hundred boundaries'
 );
+
+insert into public.score_signal_links (project_score_id, signal_id)
+values (
+  'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+  'cccccccc-cccc-4ccc-8ccc-ccccccccccc1'
+);
+
 insert into public.project_scores (
   id,
   project_id,
@@ -1059,13 +1066,19 @@ select is(
 );
 select results_eq(
   $$select id from public.project_scores where model_version is not null order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'anonymous model-version reads remain limited by project score RLS'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'anonymous model-version reads require complete Evidence and public project lifecycle'
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'anonymous users can read only safe score columns for active or rumored projects'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'anonymous users can read only Evidence-complete scores for active or rumored projects'
+);
+select is(
+  (select count(*)::integer from public.project_scores
+   where id = 'dddddddd-dddd-4ddd-8ddd-ddddddddddd2'),
+  0,
+  'anonymous users cannot read a preserved zero-link score'
 );
 select throws_like(
   $$
@@ -1108,18 +1121,18 @@ select results_eq(
 );
 select results_eq(
   $$select id from public.project_scores where explanation is not null order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'an ordinary user explanation reads remain limited by project score RLS'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'an ordinary user explanation reads require complete Evidence and public project lifecycle'
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'an ordinary user can read only safe score columns for active or rumored projects'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'an ordinary user can read only Evidence-complete scores for active or rumored projects'
 );
 select results_eq(
   $$select id from public.project_scores where input_version is not null order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'an ordinary user input-version reads remain limited by project score RLS'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'an ordinary user input-version reads require complete Evidence and public project lifecycle'
 );
 select throws_like(
   $$
@@ -1217,8 +1230,8 @@ select results_eq(
 );
 select results_eq(
   $$select id from public.project_scores where explanation is not null order by id$$,
-  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
-  'a browser admin explanation reads remain limited by project score RLS'
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
+  'a browser admin explanation reads require complete Evidence and public project lifecycle'
 );
 select throws_like(
   $$
