@@ -5,7 +5,7 @@
 | 1. Add strict governance contracts | COMPLETED | See log | See log | `feat(contracts): add intelligence governance contracts` |
 | 2. Add deterministic Evidence grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
 | 3. Add governance schema and protected Promotion command | COMPLETED — FIX ROUND 2 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary`; `test(db): align pgTAP with current schema` |
-| 4. Gate public reads and scoring inputs on Evidence | READY | — | — | — |
+| 4. Gate public reads and scoring inputs on Evidence | COMPLETED | See log | See log | `feat(db): gate public intelligence on evidence` |
 | 5. Add the server-only Promotion repository | READY | — | — | — |
 | 6. Replace the legacy Promotion CLI with governed review commands | READY | — | — | — |
 | 7. Reconcile historical Evidence and update fixtures | READY | — | — | — |
@@ -57,3 +57,20 @@ Cross-workspace typing regression: added `@types/node` as a domain devDependency
 | Repository verification | Bundled-runtime `env -u NODE_OPTIONS pnpm verify` | Lint, typecheck, unit tests, build, and placeholders pass | All workspace lint passed. Typecheck then stopped in the pre-existing Task 2 file `packages/domain/src/intelligence/evidence-grounding.ts:1` because its `@ts-expect-error` is unused when compiled through `apps/worker`; no Task 3 file caused the failure. |
 
 Fix round 2 reconciled the stale pgTAP expectations with the later committed migration contract without changing database behavior. The complete database gate is now GREEN.
+
+## Evidence-gated public reads and scoring execution log
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| RED | Isolated focused pgTAP file 010 before the Task 4 migration | Missing helpers and public/read-model gates fail | 130 assertions ran; 8 failed at helper existence/config/grants and the three Evidence visibility assertions. |
+| RED | Focused `scoring-repository.integration.test.ts` through the isolated 16432 tunnel | Unevidenced signal remains in scoring input before repository gating | Failed 1/1; the returned project included both evidenced and unevidenced signals. |
+| Focused GREEN | Isolated `supabase test db supabase/tests/010_canonical_intelligence_governance.test.sql` | Evidence helper, RLS, read-model, and history assertions pass | 130/130 passed. |
+| Baseline reconciliation RED | Full isolated `supabase test db` immediately after the new migration | Legacy positive fixtures reveal missing Evidence/score links | 004 failed 4/88, 006 failed 5/78, and 007 failed 1/5; every other file passed. The affected fixtures were repaired without changing production behavior and explicit unevidenced/zero-link negatives were retained. |
+| Full database GREEN | Full isolated `supabase test db` after fixture repair and again after sensitivity restoration | Every pgTAP file passes | 10 files, 915 tests, 915 passed. |
+| Repository GREEN | Full serialized `@airdrop/database test:integration` with isolated DB/API variables | All repository integrations run with zero skip | 5 files, 22 tests, 22 passed. File serialization prevents shared-database reconciliation races; scoring fixtures use the unique 840 namespace. |
+| Sensitivity: scoring project scan | Temporarily remove the project-scan Evidence predicate and run focused scoring integration | Unevidenced-only project turns the suite RED | Failed 1/1 because the 840...011 project entered the scoring input list; predicate restored. |
+| Sensitivity: scoring signal rows | Temporarily remove the signal-row Evidence predicate and run focused scoring integration | Unevidenced signal turns the suite RED | Failed 1/1 because the mixed fixture returned the 840...081 signal; predicate restored. |
+| Sensitivity: database helper | Temporarily redefine the isolated `signal_has_valid_evidence` helper as constant true and run focused file 010 | Public/read-model assertions turn RED | Failed 3/130 at anon signal visibility, incomplete-score selection, and invalid opportunity visibility; isolated database reset restored the migration. |
+| Package checks | Database lint, typecheck, unit tests, and repository-wide `pnpm verify` | Static checks, unit tests, builds, and placeholder scan pass | Database lint/typecheck passed; database unit run passed 80 with 22 environment-gated skips; repository `pnpm verify` passed. Local runtime was Node 24.19 and emitted the known Node 22 engine warning. |
+
+The append-only ruling is enforced by separate linked and never-linked fixtures. No Evidence or score link is removed or mutated to simulate revocation; Phase 6A has no revocation data model, so post-link revocation remains outside this task.

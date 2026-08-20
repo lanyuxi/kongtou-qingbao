@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(78);
+select plan(79);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -470,6 +470,26 @@ values
   ('10000000-0000-4000-8000-000000000009', 'equal-score-later-id', 'Equal Score Later ID', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'),
   ('10000000-0000-4000-8000-000000000008', 'equal-score-earlier-id', 'Equal Score Earlier ID', null, 'active', null, '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00');
 
+insert into public.sources (
+  id, source_type, name, canonical_url, status, created_at, updated_at
+)
+values (
+  '31000000-0000-4000-8000-000000000020', 'official_web',
+  'Read Model Evidence Fixture', 'https://read-model-evidence.example.invalid/',
+  'active', '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'
+);
+
+insert into public.raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at
+)
+values
+  ('31000000-0000-4000-8000-000000000031', '10000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000020', 'https://read-model-evidence.example.invalid/1', 'https://read-model-evidence.example.invalid/1', 'feed_article_html', 'text/html', 'Read model Evidence quote for project one.', repeat('1', 64), '2026-08-09 01:01:00+00'),
+  ('31000000-0000-4000-8000-000000000032', '10000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000020', 'https://read-model-evidence.example.invalid/2', 'https://read-model-evidence.example.invalid/2', 'feed_article_html', 'text/html', 'Read model Evidence quote for project two.', repeat('2', 64), '2026-08-09 01:01:00+00'),
+  ('31000000-0000-4000-8000-000000000037', '10000000-0000-4000-8000-000000000007', '31000000-0000-4000-8000-000000000020', 'https://read-model-evidence.example.invalid/7', 'https://read-model-evidence.example.invalid/7', 'feed_article_html', 'text/html', 'Read model Evidence quote for project seven.', repeat('7', 64), '2026-08-09 01:01:00+00'),
+  ('31000000-0000-4000-8000-000000000038', '10000000-0000-4000-8000-000000000008', '31000000-0000-4000-8000-000000000020', 'https://read-model-evidence.example.invalid/8', 'https://read-model-evidence.example.invalid/8', 'feed_article_html', 'text/html', 'Read model Evidence quote for project eight.', repeat('8', 64), '2026-08-09 01:01:00+00'),
+  ('31000000-0000-4000-8000-000000000039', '10000000-0000-4000-8000-000000000009', '31000000-0000-4000-8000-000000000020', 'https://read-model-evidence.example.invalid/9', 'https://read-model-evidence.example.invalid/9', 'feed_article_html', 'text/html', 'Read model Evidence quote for project nine.', repeat('9', 64), '2026-08-09 01:01:00+00');
+
 insert into public.project_scores (
   id, project_id, model_version, input_version, opportunity_score, risk_score,
   confidence, recommendation, explanation, calculated_at, created_at
@@ -484,7 +504,8 @@ values
   ('2fffffff-ffff-4fff-8fff-ffffffffffff', '10000000-0000-4000-8000-000000000007', 'model-v1', 'older-large-id', 15, 50, 60, 'research', 'Older score has the larger UUID.', '2026-08-09 02:00:00+00', '2026-08-09 02:00:00+00'),
   ('20000000-0000-4000-8000-000000000007', '10000000-0000-4000-8000-000000000007', 'model-v1', 'newer-small-id', 75, 30, 80, 'watch', 'Newer score has the smaller UUID.', '2026-08-09 02:01:00+00', '2026-08-09 02:01:00+00'),
   ('20000000-0000-4000-8000-000000000009', '10000000-0000-4000-8000-000000000009', 'model-v1', 'equal-later-id', 70, 20, 80, 'watch', 'Equal opportunity later project ID.', '2026-08-09 02:30:00+00', '2026-08-09 02:30:00+00'),
-  ('20000000-0000-4000-8000-000000000008', '10000000-0000-4000-8000-000000000008', 'model-v1', 'equal-earlier-id', 70, 20, 80, 'watch', 'Equal opportunity earlier project ID.', '2026-08-09 02:30:00+00', '2026-08-09 02:30:00+00');
+  ('20000000-0000-4000-8000-000000000008', '10000000-0000-4000-8000-000000000008', 'model-v1', 'equal-earlier-id', 70, 20, 80, 'watch', 'Equal opportunity earlier project ID.', '2026-08-09 02:30:00+00', '2026-08-09 02:30:00+00'),
+  ('20000000-0000-4000-8000-000000000010', '10000000-0000-4000-8000-000000000006', 'model-v1', 'zero-signal-links', 99, 1, 99, 'act_now', 'Zero-link score remains outside public read models.', '2026-08-09 02:40:00+00', '2026-08-09 02:40:00+00');
 
 insert into public.signals (
   id, project_id, signal_type, title, summary, lifecycle, confidence, published_at, created_at
@@ -493,7 +514,41 @@ values
   ('30000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001', 'first', 'First publication', 'Earlier public signal.', 'published', 80, '2026-08-09 03:00:00+00', '2026-08-09 03:00:00+00'),
   ('30000000-0000-4000-8000-000000000002', '10000000-0000-4000-8000-000000000001', 'latest', 'Latest publication', 'Latest public signal.', 'published', 80, '2026-08-09 03:10:00+00', '2026-08-09 03:10:00+00'),
   ('30000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000001', 'private', 'Unpublished candidate', 'Must not affect public time.', 'detected', 80, null, '2026-08-09 03:20:00+00'),
-  ('30000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000002', 'rumored', 'Rumored publication', 'Existing signal policy keeps this hidden.', 'published', 80, '2026-08-09 03:30:00+00', '2026-08-09 03:30:00+00');
+  ('30000000-0000-4000-8000-000000000004', '10000000-0000-4000-8000-000000000002', 'rumored', 'Rumored publication', 'Existing signal policy keeps this hidden.', 'published', 80, '2026-08-09 03:30:00+00', '2026-08-09 03:30:00+00'),
+  ('30000000-0000-4000-8000-000000000005', '10000000-0000-4000-8000-000000000001', 'unevidenced', 'Unevidenced publication', 'Must not replace the latest evidenced public time.', 'published', 80, '2026-08-09 03:15:00+00', '2026-08-09 03:15:00+00'),
+  ('30000000-0000-4000-8000-000000000007', '10000000-0000-4000-8000-000000000007', 'scoring-input', 'Project seven Evidence', 'Evidence-complete scoring input.', 'published', 80, '2026-08-09 03:00:00+00', '2026-08-09 03:00:00+00'),
+  ('30000000-0000-4000-8000-000000000008', '10000000-0000-4000-8000-000000000008', 'scoring-input', 'Project eight Evidence', 'Evidence-complete scoring input.', 'published', 80, '2026-08-09 03:00:00+00', '2026-08-09 03:00:00+00'),
+  ('30000000-0000-4000-8000-000000000009', '10000000-0000-4000-8000-000000000009', 'scoring-input', 'Project nine Evidence', 'Evidence-complete scoring input.', 'published', 80, '2026-08-09 03:00:00+00', '2026-08-09 03:00:00+00');
+
+insert into public.evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+values
+  ('31000000-0000-4000-8000-000000000071', '31000000-0000-4000-8000-000000000020', '31000000-0000-4000-8000-000000000031', 'article_raw_text', 'Read model Evidence quote for project one.', public.evidence_quote_sha256_v1('Read model Evidence quote for project one.'), '2026-08-09 03:40:00+00', '2026-08-09 03:40:00+00'),
+  ('31000000-0000-4000-8000-000000000072', '31000000-0000-4000-8000-000000000020', '31000000-0000-4000-8000-000000000032', 'article_raw_text', 'Read model Evidence quote for project two.', public.evidence_quote_sha256_v1('Read model Evidence quote for project two.'), '2026-08-09 03:40:00+00', '2026-08-09 03:40:00+00'),
+  ('31000000-0000-4000-8000-000000000077', '31000000-0000-4000-8000-000000000020', '31000000-0000-4000-8000-000000000037', 'article_raw_text', 'Read model Evidence quote for project seven.', public.evidence_quote_sha256_v1('Read model Evidence quote for project seven.'), '2026-08-09 03:40:00+00', '2026-08-09 03:40:00+00'),
+  ('31000000-0000-4000-8000-000000000078', '31000000-0000-4000-8000-000000000020', '31000000-0000-4000-8000-000000000038', 'article_raw_text', 'Read model Evidence quote for project eight.', public.evidence_quote_sha256_v1('Read model Evidence quote for project eight.'), '2026-08-09 03:40:00+00', '2026-08-09 03:40:00+00'),
+  ('31000000-0000-4000-8000-000000000079', '31000000-0000-4000-8000-000000000020', '31000000-0000-4000-8000-000000000039', 'article_raw_text', 'Read model Evidence quote for project nine.', public.evidence_quote_sha256_v1('Read model Evidence quote for project nine.'), '2026-08-09 03:40:00+00', '2026-08-09 03:40:00+00');
+
+insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+values
+  ('30000000-0000-4000-8000-000000000001', '31000000-0000-4000-8000-000000000071', '2026-08-09 03:40:00+00'),
+  ('30000000-0000-4000-8000-000000000002', '31000000-0000-4000-8000-000000000071', '2026-08-09 03:40:00+00'),
+  ('30000000-0000-4000-8000-000000000004', '31000000-0000-4000-8000-000000000072', '2026-08-09 03:40:00+00'),
+  ('30000000-0000-4000-8000-000000000007', '31000000-0000-4000-8000-000000000077', '2026-08-09 03:40:00+00'),
+  ('30000000-0000-4000-8000-000000000008', '31000000-0000-4000-8000-000000000078', '2026-08-09 03:40:00+00'),
+  ('30000000-0000-4000-8000-000000000009', '31000000-0000-4000-8000-000000000079', '2026-08-09 03:40:00+00');
+
+insert into public.score_signal_links (project_score_id, signal_id)
+values
+  ('20000000-0000-4000-8000-000000000001', '30000000-0000-4000-8000-000000000002'),
+  ('20000000-0000-4000-8000-000000000002', '30000000-0000-4000-8000-000000000002'),
+  ('20000000-0000-4000-8000-000000000003', '30000000-0000-4000-8000-000000000004'),
+  ('2fffffff-ffff-4fff-8fff-ffffffffffff', '30000000-0000-4000-8000-000000000007'),
+  ('20000000-0000-4000-8000-000000000007', '30000000-0000-4000-8000-000000000007'),
+  ('20000000-0000-4000-8000-000000000008', '30000000-0000-4000-8000-000000000008'),
+  ('20000000-0000-4000-8000-000000000009', '30000000-0000-4000-8000-000000000009');
 
 insert into public.watchlists (id, user_id, name, is_default)
 values ('40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000003', 'Victim List', true);
@@ -538,23 +593,34 @@ select results_eq(
   'opportunities are scored active or rumored projects in deterministic score and project order'
 );
 select results_eq(
+  $$
+    select
+      (select count(*)::integer from public.signals
+       where id = '30000000-0000-4000-8000-000000000005'),
+      (select opportunity_score from public.project_current_state
+       where project_id = '10000000-0000-4000-8000-000000000006')
+  $$,
+  $$ values (0, null::numeric) $$,
+  'read models hide an unevidenced signal and a zero-link score without deleting either fixture'
+);
+select results_eq(
   $$select id from public.project_scores order by id$$,
-  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
+  $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('20000000-0000-4000-8000-000000000010'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
   'anonymous users can read safe score columns only for active and rumored projects'
 );
 select is(
   (select count(*)::integer from public.project_scores where model_version is not null),
-  7,
+  8,
   'anonymous model-version reads retain active-or-rumored project RLS'
 );
 select is(
   (select count(*)::integer from public.project_scores where input_version is not null),
-  7,
+  8,
   'anonymous input-version reads retain active-or-rumored project RLS'
 );
 select is(
   (select count(*)::integer from public.project_scores where explanation is not null),
-  7,
+  8,
   'anonymous explanation reads retain active-or-rumored project RLS'
 );
 select throws_like(
@@ -580,7 +646,7 @@ select set_config(
 
 select is(
   (select count(*)::integer from public.project_scores where model_version is not null),
-  7,
+  8,
   'an authenticated model-version read retains active-or-rumored project RLS'
 );
 

@@ -1,6 +1,45 @@
 begin;
 
-select plan(5);
+select plan(6);
+
+insert into public.raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at
+)
+values
+  ('90000000-0000-4000-8000-000000000050', '90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000020', 'https://fixture-active.example.invalid/evidence', 'https://fixture-active.example.invalid/evidence', 'feed_article_html', 'text/html', 'Seed Evidence quote for the active fixture.', repeat('5', 64), '2026-08-09 10:00:00+00'),
+  ('90000000-0000-4000-8000-000000000051', '90000000-0000-4000-8000-000000000011', '90000000-0000-4000-8000-000000000021', 'https://fixture-research.example.invalid/evidence', 'https://fixture-research.example.invalid/evidence', 'feed_article_html', 'text/html', 'Seed Evidence quote for the rumored fixture.', repeat('6', 64), '2026-08-09 10:00:00+00');
+
+insert into public.evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+values
+  ('90000000-0000-4000-8000-000000000060', '90000000-0000-4000-8000-000000000020', '90000000-0000-4000-8000-000000000050', 'article_raw_text', 'Seed Evidence quote for the active fixture.', public.evidence_quote_sha256_v1('Seed Evidence quote for the active fixture.'), '2026-08-09 10:00:00+00', '2026-08-09 10:00:00+00'),
+  ('90000000-0000-4000-8000-000000000061', '90000000-0000-4000-8000-000000000021', '90000000-0000-4000-8000-000000000051', 'article_raw_text', 'Seed Evidence quote for the rumored fixture.', public.evidence_quote_sha256_v1('Seed Evidence quote for the rumored fixture.'), '2026-08-09 10:00:00+00', '2026-08-09 10:00:00+00');
+
+insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+values
+  ('90000000-0000-4000-8000-000000000030', '90000000-0000-4000-8000-000000000060', '2026-08-09 10:00:00+00'),
+  ('90000000-0000-4000-8000-000000000031', '90000000-0000-4000-8000-000000000061', '2026-08-09 10:00:00+00');
+
+insert into public.score_signal_links (project_score_id, signal_id)
+values
+  ('90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000030'),
+  ('90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000030'),
+  ('90000000-0000-4000-8000-000000000042', '90000000-0000-4000-8000-000000000031');
+
+insert into public.project_scores (
+  id, project_id, model_version, input_version, opportunity_score, risk_score,
+  confidence, recommendation, explanation, calculated_at, created_at
+)
+values (
+  '90000000-0000-4000-8000-000000000043',
+  '90000000-0000-4000-8000-000000000010',
+  'fixture-model-v1', 'zero-signal-links', 99, 1, 99, 'act_now',
+  'This newer zero-link fixture must remain outside public read models.',
+  '2026-08-09 15:00:00+00', '2026-08-09 15:00:00+00'
+);
 
 select results_eq(
   $$
@@ -130,6 +169,18 @@ select results_eq(
       ('90000000-0000-4000-8000-000000000011'::uuid, 'fixture-rumored'::text, 'Fixture Rumored'::text, 'Fictional rumored opportunity fixture.'::text, 'rumored'::public.project_lifecycle, 'Fixture Chain'::text, 61.00::numeric, 45.00::numeric, 60.00::numeric, 'research'::public.recommendation, '2026-08-09 14:00:00+00'::timestamptz, '2026-08-09 12:00:00+00'::timestamptz)
   $$,
   'opportunity_list exposes only scored active and rumored fixtures in deterministic latest-score order'
+);
+
+select results_eq(
+  $$
+    select
+      (select count(*)::integer from public.project_scores
+       where id = '90000000-0000-4000-8000-000000000043'),
+      (select opportunity_score from public.opportunity_list
+       where project_id = '90000000-0000-4000-8000-000000000010')
+  $$,
+  $$ values (1, 82.00::numeric) $$,
+  'seed smoke preserves a newer zero-link score while keeping it outside the public opportunity state'
 );
 
 select * from finish();

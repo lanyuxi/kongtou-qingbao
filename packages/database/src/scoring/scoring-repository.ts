@@ -78,6 +78,7 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
           join public.projects as project on project.id = signal.project_id
           where signal.lifecycle = 'published'
             and project.lifecycle in ('active', 'rumored')
+            and public.signal_has_valid_evidence(signal.id)
           group by signal.project_id, project.lifecycle
           order by min(signal.created_at) asc, signal.project_id asc
           limit ${limit}
@@ -107,6 +108,7 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
             and relation.source_id = candidate.source_id
           where signal.project_id = any(${projectIds})
             and signal.lifecycle = 'published'
+            and public.signal_has_valid_evidence(signal.id)
           order by signal.project_id asc, signal.published_at desc nulls last, signal.id asc
         `;
 

@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(88);
+select plan(89);
 
 select has_table('public', 'signals', 'signals table exists');
 select has_table('public', 'project_scores', 'project_scores table exists');
@@ -283,6 +283,31 @@ values
     '2026-08-09 01:00:00+00'
   );
 
+insert into public.sources (
+  id, source_type, name, canonical_url, status, created_at, updated_at
+)
+values (
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee0',
+  'official_web', 'Intelligence Evidence Fixture',
+  'https://intelligence-evidence.example.invalid/', 'active',
+  '2026-08-09 01:00:00+00', '2026-08-09 01:00:00+00'
+);
+
+insert into public.raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at
+)
+values (
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee0',
+  'https://intelligence-evidence.example.invalid/article',
+  'https://intelligence-evidence.example.invalid/article',
+  'feed_article_html', 'text/html',
+  'Published active signal Evidence fixture quote.',
+  repeat('e', 64), '2026-08-09 01:01:00+00'
+);
+
 select lives_ok(
   $$
     insert into public.signals (
@@ -543,6 +568,20 @@ values
     '2026-08-09 03:50:00+00',
     null,
     '2026-08-09 03:50:00+00'
+  ),
+  (
+    'cccccccc-cccc-4ccc-8ccc-ccccccccccc7',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+    'unevidenced-publication',
+    'Unevidenced published signal',
+    'An otherwise-public signal remains hidden without Evidence.',
+    'unverified',
+    'published',
+    60,
+    '2026-08-09 03:00:00+00',
+    '2026-08-09 03:55:00+00',
+    null,
+    '2026-08-09 03:55:00+00'
   );
 
 select lives_ok(
@@ -602,6 +641,25 @@ select throws_like(
   '%signals_supersedes_signal_same_project_fkey%',
   'a signal cannot supersede history from another project'
 );
+
+insert into public.evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+values (
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee0',
+  'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1',
+  'article_raw_text', 'Published active signal Evidence fixture quote.',
+  public.evidence_quote_sha256_v1('Published active signal Evidence fixture quote.'),
+  '2026-08-09 03:56:00+00', '2026-08-09 03:56:00+00'
+);
+
+insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+values
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', '2026-08-09 03:56:00+00'),
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccc2', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', '2026-08-09 03:56:00+00'),
+  ('cccccccc-cccc-4ccc-8ccc-ccccccccccc5', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2', '2026-08-09 03:56:00+00');
 
 select lives_ok(
   $$
@@ -993,6 +1051,12 @@ select results_eq(
   $$,
   'anonymous users see published signals for active projects including disputed evidence'
 );
+select is(
+  (select count(*)::integer from public.signals
+   where id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc7'),
+  0,
+  'anonymous users cannot see an otherwise-public signal without Evidence'
+);
 select results_eq(
   $$select id from public.project_scores where model_version is not null order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
@@ -1187,7 +1251,7 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.signals), 8, 'service role can read all signal history');
+select is((select count(*)::integer from public.signals), 9, 'service role can read all signal history');
 select is((select count(*)::integer from public.project_scores), 3, 'service role can read all score history');
 select throws_like(
   $$

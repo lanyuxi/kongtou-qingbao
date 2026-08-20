@@ -303,9 +303,67 @@ select ok(
 from (values
   ('public.normalize_evidence_text_v1(text)'),
   ('public.evidence_quote_sha256_v1(text)'),
+  ('public.signal_has_valid_evidence(uuid)'),
+  ('public.score_has_complete_evidence(uuid)'),
   ('public.execute_extraction_candidate_review(uuid,jsonb,text,text,timestamp with time zone)'),
   ('public.reconcile_extraction_candidate_evidence(uuid,uuid,bigint,text,timestamp with time zone)')
 ) as expected(signature);
+
+select ok(
+  coalesce(
+    procedure_info.prosecdef
+      and pg_catalog.pg_get_userbyid(procedure_info.proowner) = 'postgres'
+      and procedure_info.proconfig = array['search_path=pg_catalog, public']::text[],
+    false
+  ),
+  pg_catalog.format('%s is a postgres-owned security definer with fixed search_path', expected.signature)
+)
+from (values
+  ('public.signal_has_valid_evidence(uuid)'),
+  ('public.score_has_complete_evidence(uuid)')
+) as expected(signature)
+left join pg_catalog.pg_proc as procedure_info
+  on procedure_info.oid = pg_catalog.to_regprocedure(expected.signature);
+
+select results_eq(
+  $$
+    select routine_info.routine_name::text collate "C",
+      privilege_info.grantee::text collate "C"
+    from information_schema.routines as routine_info
+    join information_schema.routine_privileges as privilege_info
+      on privilege_info.specific_schema = routine_info.specific_schema
+      and privilege_info.specific_name = routine_info.specific_name
+    where routine_info.specific_schema = 'public'
+      and routine_info.routine_name in (
+        'signal_has_valid_evidence', 'score_has_complete_evidence'
+      )
+      and privilege_info.privilege_type = 'EXECUTE'
+    order by routine_info.routine_name, privilege_info.grantee
+  $$,
+  $$
+    select expected.routine_name collate "C", expected.grantee collate "C"
+    from (values
+      ('score_has_complete_evidence'::text, 'ai_stage_worker'::text),
+      ('score_has_complete_evidence', 'anon'),
+      ('score_has_complete_evidence', 'authenticated'),
+      ('score_has_complete_evidence', 'postgres'),
+      ('score_has_complete_evidence', 'service_role'),
+      ('signal_has_valid_evidence', 'ai_stage_worker'),
+      ('signal_has_valid_evidence', 'anon'),
+      ('signal_has_valid_evidence', 'authenticated'),
+      ('signal_has_valid_evidence', 'postgres'),
+      ('signal_has_valid_evidence', 'service_role')
+    ) as expected(routine_name, grantee)
+    order by expected.routine_name, expected.grantee
+  $$,
+  'Evidence read helpers have only their owner and four intended application role grants'
+);
+
+select ok(
+  not has_table_privilege('anon', 'public.evidence', 'SELECT')
+    and not has_table_privilege('authenticated', 'public.evidence', 'SELECT'),
+  'browser roles receive no direct Evidence SELECT while using read helpers'
+);
 
 select ok(
   procedure_info.prosecdef
@@ -1155,6 +1213,160 @@ select results_eq(
   $$,
   $$ values (0::bigint, 0::bigint, 0::bigint, 2::bigint) $$,
   'malformed command and quote-state failures leave all governance side effects unchanged'
+);
+
+insert into public.projects (id, slug, name, lifecycle, created_at, updated_at)
+values
+  ('11000000-0000-4000-8000-000000000010', 'evidence-gate-mixed', 'Evidence Gate Mixed',
+    'active', '2026-08-20 01:00:00+00', '2026-08-20 01:00:00+00'),
+  ('11000000-0000-4000-8000-000000000011', 'evidence-gate-never-linked', 'Evidence Gate Never Linked',
+    'active', '2026-08-20 01:00:00+00', '2026-08-20 01:00:00+00'),
+  ('11000000-0000-4000-8000-000000000012', 'evidence-gate-zero-score-links', 'Evidence Gate Zero Score Links',
+    'active', '2026-08-20 01:00:00+00', '2026-08-20 01:00:00+00');
+
+insert into public.raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at
+)
+values (
+  '11000000-0000-4000-8000-000000000030',
+  '11000000-0000-4000-8000-000000000010',
+  '10000000-0000-4000-8000-000000000020',
+  'https://governance.example/evidence-gate',
+  'https://governance.example/evidence-gate',
+  'feed_article_html', 'text/html',
+  'A deterministic evidence gate fixture quote appears in this article.',
+  repeat('1', 64), '2026-08-20 01:01:00+00'
+);
+
+insert into public.signals (
+  id, project_id, signal_type, title, summary, verification, lifecycle,
+  confidence, published_at, created_at
+)
+values
+  ('11000000-0000-4000-8000-000000000080', '11000000-0000-4000-8000-000000000010',
+    'evidenced', 'Evidenced public signal', 'This signal has structurally valid Evidence.',
+    'unverified', 'published', 80, '2026-08-20 01:02:00+00', '2026-08-20 01:02:00+00'),
+  ('11000000-0000-4000-8000-000000000081', '11000000-0000-4000-8000-000000000010',
+    'unevidenced', 'Unevidenced public signal', 'This signal intentionally has no Evidence.',
+    'unverified', 'published', 70, '2026-08-20 01:03:00+00', '2026-08-20 01:03:00+00'),
+  ('11000000-0000-4000-8000-000000000082', '11000000-0000-4000-8000-000000000011',
+    'never_linked', 'Never linked public signal', 'This separate fixture is never linked to Evidence.',
+    'unverified', 'published', 60, '2026-08-20 01:04:00+00', '2026-08-20 01:04:00+00'),
+  ('11000000-0000-4000-8000-000000000083', '11000000-0000-4000-8000-000000000012',
+    'zero_score_links', 'Zero score links signal', 'This signal proves zero-link scores remain private.',
+    'unverified', 'published', 65, '2026-08-20 01:05:00+00', '2026-08-20 01:05:00+00');
+
+insert into public.evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+values (
+  '11000000-0000-4000-8000-000000000070',
+  '10000000-0000-4000-8000-000000000020',
+  '11000000-0000-4000-8000-000000000030',
+  'article_raw_text',
+  'deterministic evidence gate fixture quote',
+  public.evidence_quote_sha256_v1('deterministic evidence gate fixture quote'),
+  '2026-08-20 01:06:00+00', '2026-08-20 01:06:00+00'
+);
+
+insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+values (
+  '11000000-0000-4000-8000-000000000080',
+  '11000000-0000-4000-8000-000000000070',
+  '2026-08-20 01:06:00+00'
+);
+
+insert into public.project_scores (
+  id, project_id, model_version, input_version, opportunity_score, risk_score,
+  confidence, recommendation, explanation, calculated_at, created_at
+)
+values
+  ('11000000-0000-4000-8000-000000000090', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'complete-older', 81, 20, 80, 'act_now',
+    'Older complete score.', '2026-08-20 01:10:00+00', '2026-08-20 01:10:00+00'),
+  ('11000000-0000-4000-8000-000000000091', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'incomplete-newer', 99, 10, 90, 'act_now',
+    'Newer incomplete score.', '2026-08-20 01:11:00+00', '2026-08-20 01:11:00+00'),
+  ('11000000-0000-4000-8000-000000000092', '11000000-0000-4000-8000-000000000010',
+    'evidence-gate-v1', 'zero-link-newest', 100, 1, 99, 'act_now',
+    'Newest zero-link score.', '2026-08-20 01:12:00+00', '2026-08-20 01:12:00+00'),
+  ('11000000-0000-4000-8000-000000000093', '11000000-0000-4000-8000-000000000011',
+    'evidence-gate-v1', 'never-evidenced', 95, 15, 85, 'act_now',
+    'Score linked only to an unevidenced signal.', '2026-08-20 01:13:00+00', '2026-08-20 01:13:00+00'),
+  ('11000000-0000-4000-8000-000000000094', '11000000-0000-4000-8000-000000000012',
+    'evidence-gate-v1', 'zero-link-only', 90, 25, 75, 'watch',
+    'Score with no signal links.', '2026-08-20 01:14:00+00', '2026-08-20 01:14:00+00');
+
+insert into public.score_signal_links (project_score_id, signal_id)
+values
+  ('11000000-0000-4000-8000-000000000090', '11000000-0000-4000-8000-000000000080'),
+  ('11000000-0000-4000-8000-000000000091', '11000000-0000-4000-8000-000000000080'),
+  ('11000000-0000-4000-8000-000000000091', '11000000-0000-4000-8000-000000000081'),
+  ('11000000-0000-4000-8000-000000000093', '11000000-0000-4000-8000-000000000082');
+
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+
+select results_eq(
+  $$
+    select id from public.signals
+    where id in (
+      '11000000-0000-4000-8000-000000000080',
+      '11000000-0000-4000-8000-000000000081'
+    )
+    order by id
+  $$,
+  $$ values ('11000000-0000-4000-8000-000000000080'::uuid) $$,
+  'anonymous users see the evidenced signal but not the unevidenced signal'
+);
+
+select results_eq(
+  $$
+    select opportunity_score, score_input_version, latest_published_signal_at
+    from public.project_current_state
+    where project_id = '11000000-0000-4000-8000-000000000010'
+  $$,
+  $$ values (81.00::numeric, 'complete-older'::text, '2026-08-20 01:02:00+00'::timestamptz) $$,
+  'project current state chooses the older complete score and latest evidenced signal'
+);
+
+select results_eq(
+  $$
+    select project_id, opportunity_score
+    from public.opportunity_list
+    where project_id in (
+      '11000000-0000-4000-8000-000000000010',
+      '11000000-0000-4000-8000-000000000011',
+      '11000000-0000-4000-8000-000000000012'
+    )
+    order by project_id
+  $$,
+  $$ values ('11000000-0000-4000-8000-000000000010'::uuid, 81.00::numeric) $$,
+  'opportunities exclude never-evidenced and zero-link-score projects without deleting history'
+);
+
+reset role;
+select set_config('request.jwt.claims', '{}', true);
+
+select results_eq(
+  $$
+    select
+      (select count(*) from public.signals where id in (
+        '11000000-0000-4000-8000-000000000082',
+        '11000000-0000-4000-8000-000000000083'
+      ))::bigint,
+      (select count(*) from public.project_scores where id in (
+        '11000000-0000-4000-8000-000000000092',
+        '11000000-0000-4000-8000-000000000093',
+        '11000000-0000-4000-8000-000000000094'
+      ))::bigint,
+      (select count(*) from public.score_signal_links
+       where project_score_id = '11000000-0000-4000-8000-000000000093')::bigint
+  $$,
+  $$ values (2::bigint, 3::bigint, 1::bigint) $$,
+  'visibility gates preserve never-linked signals, incomplete scores, zero-link scores, and their history'
 );
 
 select throws_ok($$ update public.evidence set quote_text = quote_text $$, '55000', 'governance_history_append_only', 'Evidence is append-only');
