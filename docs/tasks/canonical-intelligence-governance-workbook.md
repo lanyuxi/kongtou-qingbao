@@ -5,7 +5,7 @@
 | 1. Add strict governance contracts | COMPLETED | See log | See log | `feat(contracts): add intelligence governance contracts` |
 | 2. Add governed promotion boundary | READY | — | — | — |
 | 3. Add evidence-gated read models | READY | — | — | — |
-| 4. Add deterministic grounding rules | READY | — | — | — |
+| 4. Add deterministic grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
 | 5. Add promotion repository | READY | — | — | — |
 | 6. Add reconciliation worker | READY | — | — | — |
 | 7. Add reviewer CLI | READY | — | — | — |
@@ -21,3 +21,14 @@
 | GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/contracts lint` | Lint passes | Passed. |
 | GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/contracts typecheck` | Typecheck passes | Passed. |
 | GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/contracts test` | All contracts pass | 5 files and 60 tests passed. |
+
+## Task 2 execution log
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| RED | `env -u NODE_OPTIONS pnpm --filter @airdrop/domain test -- src/intelligence/evidence-grounding.test.ts` | Fails because the grounding module is absent | Could not start because the shell lacked the required Node runtime (`env: node: No such file or directory`). |
+| RED | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain test -- src/intelligence/evidence-grounding.test.ts` | Fails because the grounding module is absent | Failed as expected: the target suite could not import the absent module; 8 existing files and 210 tests passed. |
+| GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain test -- src/intelligence/evidence-grounding.test.ts` | Grounding tests pass | 9 files and 221 tests passed. |
+| GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain lint` | Lint passes | Passed. |
+| GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain typecheck` | Typecheck passes | Passed. |
+| GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain test` | All domain tests pass | 9 files and 221 tests passed. |

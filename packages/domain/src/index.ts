@@ -120,3 +120,9 @@ export {
   backoffDelayMs,
 } from './orchestration/backoff.js';
 export type { OrchestrationPolicyErrorCode } from './orchestration/backoff.js';
+export {
+  EvidenceGroundingError,
+  groundExactEvidence,
+  normalizeEvidenceText,
+} from './intelligence/evidence-grounding.js';
+export type { EvidenceGroundingErrorCode } from './intelligence/evidence-grounding.js';
