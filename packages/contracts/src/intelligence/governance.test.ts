@@ -107,6 +107,13 @@ describe('intelligence governance contracts', () => {
       .toBe(false);
   });
 
+  it('rejects a terminal high surrogate that PostgreSQL UTF-8 text cannot represent', () => {
+    expect(candidateReviewCommandV1Schema.safeParse({
+      ...command,
+      note: 'terminal\ud800',
+    }).success).toBe(false);
+  });
+
   it('defines exact-quote evidence locators with strict bounds', () => {
     const locator = {
       version: 1,

@@ -137,9 +137,11 @@ describe('PromotionRepository', () => {
   it.each([
     ['NUL note', { command: { ...reviewInput().command, note: 'before\u0000after' } }],
     ['high lone-surrogate note', { command: { ...reviewInput().command, note: 'high\ud800surrogate' } }],
+    ['terminal high-surrogate note', { command: { ...reviewInput().command, note: 'terminal\ud800' } }],
     ['low lone-surrogate note', { command: { ...reviewInput().command, note: 'low\udc00surrogate' } }],
     ['NUL idempotency key', { idempotencyKey: 'review\u0000key' }],
     ['high lone-surrogate idempotency key', { idempotencyKey: 'review\ud800key' }],
+    ['terminal high-surrogate idempotency key', { idempotencyKey: 'review\ud800' }],
     ['low lone-surrogate idempotency key', { idempotencyKey: 'review\udc00key' }],
   ])('rejects %s before opening a transaction', async (_caseName, override) => {
     const client = new RecordingClient([[promotedResultRow()]]);
