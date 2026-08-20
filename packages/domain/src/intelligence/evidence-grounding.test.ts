@@ -33,6 +33,11 @@ describe('normalizeEvidenceText', () => {
   it('trims leading and trailing whitespace without changing other characters', () => {
     expect(normalizeEvidenceText('\u3000Case, punctuation!\n')).toBe('Case, punctuation!');
   });
+
+  it('preserves U+FEFF while trimming only whitespace from the explicit set', () => {
+    expect(normalizeEvidenceText(`${whitespace}alpha${whitespace}`)).toBe('alpha');
+    expect(normalizeEvidenceText('\uFEFFalpha\uFEFF')).toBe('\uFEFFalpha\uFEFF');
+  });
 });
 
 describe('groundExactEvidence', () => {

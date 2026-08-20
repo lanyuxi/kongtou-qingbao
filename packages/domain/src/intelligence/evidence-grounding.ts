@@ -17,7 +17,7 @@ export class EvidenceGroundingError extends Error {
 }
 
 export function normalizeEvidenceText(value: string): string {
-  return value.replace(evidenceWhitespace, ' ').trim();
+  return value.replace(evidenceWhitespace, ' ').replace(/^ +| +$/g, '');
 }
 
 export function groundExactEvidence(input: {
