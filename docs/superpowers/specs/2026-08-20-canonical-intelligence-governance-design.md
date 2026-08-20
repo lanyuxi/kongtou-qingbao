@@ -1,6 +1,6 @@
 # Phase 6A Canonical Intelligence Governance Design
 
-**Status:** Approved in conversation on 2026-08-20; pending written-spec review
+**Status:** Approved in conversation and written-spec review on 2026-08-20
 
 ## 1. Purpose
 
