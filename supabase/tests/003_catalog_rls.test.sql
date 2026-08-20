@@ -239,13 +239,13 @@ select ok(
 );
 select ok(
   has_column_privilege('anon', 'public.projects', 'slug', 'SELECT')
-    and not has_column_privilege('anon', 'public.projects', 'official_website_url', 'SELECT')
+    and has_column_privilege('anon', 'public.projects', 'official_website_url', 'SELECT')
     and has_column_privilege('anon', 'public.sources', 'name', 'SELECT')
     and not has_column_privilege('anon', 'public.sources', 'canonical_url', 'SELECT')
     and has_column_privilege('anon', 'public.project_sources', 'verified_at', 'SELECT')
     and not has_column_privilege('anon', 'public.project_sources', 'verified_by', 'SELECT')
     and has_column_privilege('authenticated', 'public.projects', 'slug', 'SELECT')
-    and not has_column_privilege(
+    and has_column_privilege(
       'authenticated',
       'public.projects',
       'official_website_url',
@@ -273,7 +273,7 @@ select ok(
     )
     and has_column_privilege('service_role', 'public.sources', 'canonical_url', 'SELECT')
     and has_column_privilege('service_role', 'public.project_sources', 'verified_by', 'SELECT'),
-  'column privileges expose safe public fields while reserving links and verifier identity for backend reads'
+  'column privileges expose project-detail links while reserving source links and verifier identity for backend reads'
 );
 
 insert into auth.users (
@@ -511,6 +511,18 @@ select lives_ok(
     values ('minimum-port-project', 'Minimum Port Project', 'https://project.example.invalid:1/path')
   $$,
   'official project URLs accept the minimum explicit port'
+);
+insert into public.projects (
+  id, slug, name, lifecycle, official_website_url, created_at, updated_at
+)
+values (
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3',
+  'paused-link-project',
+  'Paused Link Project',
+  'paused',
+  'https://paused.example.invalid',
+  '2026-08-09 01:00:00+00',
+  '2026-08-09 01:00:00+00'
 );
 select throws_like(
   $$
@@ -1142,10 +1154,10 @@ select results_eq(
   $$,
   'anonymous users see relations only when both catalog parents are active'
 );
-select throws_like(
-  $$select official_website_url from public.projects$$,
-  'permission denied for table projects',
-  'anonymous users cannot read unpromoted official project links'
+select results_eq(
+  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
+  'anonymous users read intended project links while RLS hides the paused project link'
 );
 select throws_like(
   $$select canonical_url from public.sources$$,
@@ -1202,10 +1214,10 @@ select results_eq(
   $$,
   'an authenticated owner sees relations only when both catalog parents are active'
 );
-select throws_like(
-  $$select official_website_url from public.projects$$,
-  'permission denied for table projects',
-  'an authenticated owner cannot read unpromoted official project links'
+select results_eq(
+  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
+  'an authenticated owner reads intended project links while RLS hides the paused project link'
 );
 select throws_like(
   $$select canonical_url from public.sources$$,
@@ -1299,10 +1311,10 @@ select results_eq(
   $$,
   'a browser admin still sees only active catalog relations'
 );
-select throws_like(
-  $$select official_website_url from public.projects$$,
-  'permission denied for table projects',
-  'a browser admin cannot read unpromoted official project links'
+select results_eq(
+  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
+  'a browser admin reads intended project links while RLS hides the paused project link'
 );
 select throws_like(
   $$select canonical_url from public.sources$$,
@@ -1335,7 +1347,7 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.projects), 3, 'service role can read every project lifecycle');
+select is((select count(*)::integer from public.projects), 4, 'service role can read every project lifecycle');
 select is((select count(*)::integer from public.sources), 7, 'service role can read every source status');
 select is((select count(*)::integer from public.project_sources), 3, 'service role can read every catalog relation');
 select is(

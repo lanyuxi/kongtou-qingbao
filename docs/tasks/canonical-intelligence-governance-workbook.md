@@ -3,13 +3,13 @@
 | Task | Status | RED | GREEN | Commit |
 | --- | --- | --- | --- | --- |
 | 1. Add strict governance contracts | COMPLETED | See log | See log | `feat(contracts): add intelligence governance contracts` |
-| 2. Add deterministic grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
-| 3. Add governance schema and protected Promotion command | COMPLETED WITH BASELINE CONCERNS — FIX ROUND 1 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary` |
-| 4. Add evidence-gated reads | READY | — | — | — |
-| 5. Add promotion repository | READY | — | — | — |
-| 6. Add governed CLI | READY | — | — | — |
-| 7. Add historical reconciliation and fixtures | READY | — | — | — |
-| 8. Add types, docs, and final gates | READY | — | — | — |
+| 2. Add deterministic Evidence grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
+| 3. Add governance schema and protected Promotion command | COMPLETED — FIX ROUND 2 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary`; `test(db): align pgTAP with current schema` |
+| 4. Gate public reads and scoring inputs on Evidence | READY | — | — | — |
+| 5. Add the server-only Promotion repository | READY | — | — | — |
+| 6. Replace the legacy Promotion CLI with governed review commands | READY | — | — | — |
+| 7. Reconcile historical Evidence and update fixtures | READY | — | — | — |
+| 8. Regenerate types, document operations, and run final gates | READY | — | — | — |
 
 ## Task 1 execution log
 
@@ -49,6 +49,9 @@
 | Fix round 1 concurrency | Two simultaneous PostgreSQL sessions per idempotency case | Exact duplicates replay stable IDs; changed input returns `AI104` after waiting for the first transaction | Exact duplicate returned the same command and decision IDs with `replayed=true`; changed input returned `AI104`; each key had one receipt and the alternate candidate remained `pending`, version 1. |
 | Fix round 1 sensitivity: candidate INSERT | Temporarily restore broad candidate INSERT and permissive INSERT RLS, isolated reset, focused file 010 | Direct-write guards turn RED | Failed 2/120 at tests 31 and 82. Exact clean migration SHA-256 `48a50405af02478ff0d31bfcd1ec3777360baa6110bf8221414521aabd732569` restored; final focused GREEN passed 120/120. |
 | Fix round 1 full database gate | Isolated `supabase test db` | Task 3 stays GREEN; unchanged baseline failures remain separate | File 010 passed. Full run: 10 files, 902 tests; only unchanged files 003 (4), 004 (5), 006 (12), and 008 (1) failed. |
+| Fix round 2 RED | Full isolated `supabase test db` before test repair | Later committed migrations expose stale exact matrices and permission-exception expectations | 003 failed 4/135, 004 failed 5/88, 006 failed 12/78, and 008 failed 1/45; all other files passed, including 010 at 120/120. |
+| Fix round 2 focused GREEN | `supabase test db` with files 003, 004, 006, and 008 | Updated exact contracts and runtime RLS assertions pass | 4 files, 346 tests, 346 passed. |
+| Fix round 2 full database GREEN | Isolated non-destructive `supabase test db` | Every pgTAP file passes against the current migration contract | 10 files, 902 tests, 902 passed. |
 | Repository verification | Bundled-runtime `env -u NODE_OPTIONS pnpm verify` | Lint, typecheck, unit tests, build, and placeholders pass | All workspace lint passed. Typecheck then stopped in the pre-existing Task 2 file `packages/domain/src/intelligence/evidence-grounding.ts:1` because its `@ts-expect-error` is unused when compiled through `apps/worker`; no Task 3 file caused the failure. |
 
-The aggregate database gate remains nonzero only because the controller-confirmed baseline topology contains stale failures in files 003, 004, 006, and 008. Those files were not modified by this task.
+Fix round 2 reconciled the stale pgTAP expectations with the later committed migration contract without changing database behavior. The complete database gate is now GREEN.

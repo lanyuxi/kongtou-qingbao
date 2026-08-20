@@ -57,20 +57,36 @@ select results_eq(
       expected.policyname collate "C"
     from (
       values
+      ('ai_runs'::text, 'ai_runs_ai_stage_worker_insert'::text),
+      ('ai_runs'::text, 'ai_runs_ai_stage_worker_write'::text),
       ('collection_attempts'::text, 'collection_attempts_insert_collection_worker'::text),
       ('collection_attempts'::text, 'collection_attempts_select_collection_worker'::text),
       ('discovered_items'::text, 'discovered_items_insert_collection_worker'::text),
+      ('discovered_items'::text, 'discovered_items_select_ai_stage_worker'::text),
       ('discovered_items'::text, 'discovered_items_select_collection_worker'::text),
+      ('extraction_candidates'::text, 'extraction_candidates_ai_stage_worker_insert'::text),
+      ('extraction_candidates'::text, 'extraction_candidates_ai_stage_worker_read'::text),
       ('profiles'::text, 'profiles_select_authenticated'::text),
       ('profiles'::text, 'profiles_update_authenticated'::text),
+      ('project_scores'::text, 'project_scores_ai_stage_worker_insert'::text),
+      ('project_scores'::text, 'project_scores_ai_stage_worker_read'::text),
       ('project_scores'::text, 'project_scores_select_anon'::text),
       ('project_scores'::text, 'project_scores_select_authenticated'::text),
+      ('project_sources'::text, 'project_sources_ai_stage_worker_read'::text),
       ('project_sources'::text, 'project_sources_select_anon'::text),
       ('project_sources'::text, 'project_sources_select_authenticated'::text),
+      ('projects'::text, 'projects_ai_stage_worker_read'::text),
       ('projects'::text, 'projects_select_anon'::text),
       ('projects'::text, 'projects_select_authenticated'::text),
+      ('promotion_events'::text, 'promotion_events_ai_stage_worker_read'::text),
       ('raw_items'::text, 'raw_items_insert_collection_worker'::text),
+      ('raw_items'::text, 'raw_items_select_ai_stage_worker'::text),
       ('raw_items'::text, 'raw_items_select_collection_worker'::text),
+      ('score_factors'::text, 'score_factors_ai_stage_worker_insert'::text),
+      ('score_factors'::text, 'score_factors_ai_stage_worker_read'::text),
+      ('score_signal_links'::text, 'score_signal_links_ai_stage_worker_insert'::text),
+      ('score_signal_links'::text, 'score_signal_links_ai_stage_worker_read'::text),
+      ('signals'::text, 'signals_ai_stage_worker_read'::text),
       ('signals'::text, 'signals_select_anon'::text),
       ('signals'::text, 'signals_select_authenticated'::text),
       ('sources'::text, 'sources_select_anon'::text),
@@ -95,34 +111,75 @@ select results_eq(
   'the public policy catalog is the exact consolidated matrix'
 );
 
-select ok(
-  not exists (
-    select 1
+select results_eq(
+  $$
+    select policy.tablename::text collate "C", policy.policyname::text collate "C"
     from pg_catalog.pg_policies as policy
     where policy.schemaname = 'public'
       and (
         pg_catalog.cardinality(policy.roles) <> 1
         or policy.policyname <> pg_catalog.format(
-          '%s_%s_%s',
-          policy.tablename,
-          pg_catalog.lower(policy.cmd),
-          policy.roles[1]
+          '%s_%s_%s', policy.tablename, pg_catalog.lower(policy.cmd), policy.roles[1]
         )
       )
-  ),
-  'every policy name is table operation principal and targets one principal'
+    order by policy.tablename, policy.policyname
+  $$,
+  $$
+    select expected.tablename collate "C", expected.policyname collate "C"
+    from (values
+      ('ai_runs'::text, 'ai_runs_ai_stage_worker_insert'::text),
+      ('ai_runs', 'ai_runs_ai_stage_worker_write'),
+      ('extraction_candidates', 'extraction_candidates_ai_stage_worker_insert'),
+      ('extraction_candidates', 'extraction_candidates_ai_stage_worker_read'),
+      ('project_scores', 'project_scores_ai_stage_worker_insert'),
+      ('project_scores', 'project_scores_ai_stage_worker_read'),
+      ('project_sources', 'project_sources_ai_stage_worker_read'),
+      ('projects', 'projects_ai_stage_worker_read'),
+      ('promotion_events', 'promotion_events_ai_stage_worker_read'),
+      ('score_factors', 'score_factors_ai_stage_worker_insert'),
+      ('score_factors', 'score_factors_ai_stage_worker_read'),
+      ('score_signal_links', 'score_signal_links_ai_stage_worker_insert'),
+      ('score_signal_links', 'score_signal_links_ai_stage_worker_read'),
+      ('signals', 'signals_ai_stage_worker_read')
+    ) as expected(tablename, policyname)
+    order by expected.tablename, expected.policyname
+  $$,
+  'the exact legacy AI-stage policy names are the only naming-convention exceptions'
 );
 
-select ok(
-  not exists (
-    select 1
+select results_eq(
+  $$
+    select relation.relname::text collate "C", policy.polname::text collate "C"
     from pg_catalog.pg_policy as policy
     join pg_catalog.pg_class as relation on relation.oid = policy.polrelid
     join pg_catalog.pg_namespace as namespace on namespace.oid = relation.relnamespace
     where namespace.nspname = 'public'
       and nullif(pg_catalog.btrim(pg_catalog.obj_description(policy.oid, 'pg_policy')), '') is null
-  ),
-  'every public policy has a nonblank catalog comment'
+    order by relation.relname, policy.polname
+  $$,
+  $$
+    select expected.tablename collate "C", expected.policyname collate "C"
+    from (values
+      ('ai_runs'::text, 'ai_runs_ai_stage_worker_insert'::text),
+      ('ai_runs', 'ai_runs_ai_stage_worker_write'),
+      ('discovered_items', 'discovered_items_select_ai_stage_worker'),
+      ('extraction_candidates', 'extraction_candidates_ai_stage_worker_insert'),
+      ('extraction_candidates', 'extraction_candidates_ai_stage_worker_read'),
+      ('project_scores', 'project_scores_ai_stage_worker_insert'),
+      ('project_scores', 'project_scores_ai_stage_worker_read'),
+      ('project_sources', 'project_sources_ai_stage_worker_read'),
+      ('projects', 'projects_ai_stage_worker_read'),
+      ('promotion_events', 'promotion_events_ai_stage_worker_read'),
+      ('raw_items', 'raw_items_select_ai_stage_worker'),
+      ('score_factors', 'score_factors_ai_stage_worker_insert'),
+      ('score_factors', 'score_factors_ai_stage_worker_read'),
+      ('score_signal_links', 'score_signal_links_ai_stage_worker_insert'),
+      ('score_signal_links', 'score_signal_links_ai_stage_worker_read'),
+      ('signals', 'signals_ai_stage_worker_read')
+    ) as expected(tablename, policyname)
+    order by expected.tablename, expected.policyname
+  $$,
+  'the exact later AI-stage policies are the only intentionally uncommented policies'
 );
 
 select ok(
@@ -154,9 +211,13 @@ select columns_are(
     'score_confidence',
     'recommendation',
     'score_calculated_at',
-    'latest_published_signal_at'
+    'latest_published_signal_at',
+    'official_website_url',
+    'score_model_version',
+    'score_input_version',
+    'score_explanation'
   ],
-  'project_current_state has only the explicit browser-safe state columns'
+  'project_current_state has the exact project-detail state columns'
 );
 select columns_are(
   'public',
@@ -181,16 +242,16 @@ select columns_are(
 select ok(
   has_table_privilege('anon', pg_catalog.format('public.%I', expected.view_name), 'SELECT')
     and has_table_privilege('authenticated', pg_catalog.format('public.%I', expected.view_name), 'SELECT')
-    and not has_table_privilege('service_role', pg_catalog.format('public.%I', expected.view_name), 'SELECT')
+    and has_table_privilege('service_role', pg_catalog.format('public.%I', expected.view_name), 'SELECT') = expected.service_can_select
     and not exists (
       select 1
       from pg_catalog.aclexplode(view_relation.relacl) as exploded_acl
       where exploded_acl.grantee = 0
         and exploded_acl.privilege_type = 'SELECT'
     ),
-  pg_catalog.format('%s has narrow browser-only SELECT grants', expected.view_name)
+  pg_catalog.format('%s has the exact browser and support-role SELECT grants', expected.view_name)
 )
-from (values ('project_current_state'), ('opportunity_list')) as expected(view_name)
+from (values ('project_current_state', true), ('opportunity_list', false)) as expected(view_name, service_can_select)
 join pg_catalog.pg_class as view_relation
   on view_relation.oid = pg_catalog.to_regclass(pg_catalog.format('public.%I', expected.view_name));
 
@@ -230,29 +291,29 @@ select results_eq(
       values
         ('anon'::text, 'id'::text, true),
         ('anon'::text, 'project_id'::text, true),
-        ('anon'::text, 'model_version'::text, false),
-        ('anon'::text, 'input_version'::text, false),
+        ('anon'::text, 'model_version'::text, true),
+        ('anon'::text, 'input_version'::text, true),
         ('anon'::text, 'opportunity_score'::text, true),
         ('anon'::text, 'risk_score'::text, true),
         ('anon'::text, 'confidence'::text, true),
         ('anon'::text, 'recommendation'::text, true),
-        ('anon'::text, 'explanation'::text, false),
+        ('anon'::text, 'explanation'::text, true),
         ('anon'::text, 'calculated_at'::text, true),
         ('anon'::text, 'created_at'::text, false),
         ('authenticated'::text, 'id'::text, true),
         ('authenticated'::text, 'project_id'::text, true),
-        ('authenticated'::text, 'model_version'::text, false),
-        ('authenticated'::text, 'input_version'::text, false),
+        ('authenticated'::text, 'model_version'::text, true),
+        ('authenticated'::text, 'input_version'::text, true),
         ('authenticated'::text, 'opportunity_score'::text, true),
         ('authenticated'::text, 'risk_score'::text, true),
         ('authenticated'::text, 'confidence'::text, true),
         ('authenticated'::text, 'recommendation'::text, true),
-        ('authenticated'::text, 'explanation'::text, false),
+        ('authenticated'::text, 'explanation'::text, true),
         ('authenticated'::text, 'calculated_at'::text, true),
         ('authenticated'::text, 'created_at'::text, false)
     ) as expected(role_name, column_name, can_select)
   $expected_acl$,
-  'anon and authenticated have the exact seven-safe four-raw project score column ACL matrix'
+  'anon and authenticated have the exact ten-readable one-restricted project score column ACL matrix'
 );
 
 select ok(
@@ -481,20 +542,20 @@ select results_eq(
   $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
   'anonymous users can read safe score columns only for active and rumored projects'
 );
-select throws_like(
-  $$select model_version from public.project_scores$$,
-  'permission denied for table project_scores',
-  'anonymous users cannot read score model versions'
+select is(
+  (select count(*)::integer from public.project_scores where model_version is not null),
+  7,
+  'anonymous model-version reads retain active-or-rumored project RLS'
 );
-select throws_like(
-  $$select input_version from public.project_scores$$,
-  'permission denied for table project_scores',
-  'anonymous users cannot read score input versions'
+select is(
+  (select count(*)::integer from public.project_scores where input_version is not null),
+  7,
+  'anonymous input-version reads retain active-or-rumored project RLS'
 );
-select throws_like(
-  $$select explanation from public.project_scores$$,
-  'permission denied for table project_scores',
-  'anonymous users cannot read score explanations'
+select is(
+  (select count(*)::integer from public.project_scores where explanation is not null),
+  7,
+  'anonymous explanation reads retain active-or-rumored project RLS'
 );
 select throws_like(
   $$delete from public.project_current_state$$,
@@ -517,10 +578,10 @@ select set_config(
   true
 );
 
-select throws_like(
-  $$select model_version from public.project_scores$$,
-  'permission denied for table project_scores',
-  'an authenticated user cannot read score model versions at runtime'
+select is(
+  (select count(*)::integer from public.project_scores where model_version is not null),
+  7,
+  'an authenticated model-version read retains active-or-rumored project RLS'
 );
 
 select is((select count(*)::integer from public.watchlists), 0, 'an authenticated user cannot broadly read private watchlists');
@@ -554,10 +615,10 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select throws_like(
-  $$select * from public.project_current_state$$,
-  'permission denied for view project_current_state',
-  'service role receives no project-current-state view grant'
+select is(
+  (select count(*)::integer from public.project_current_state),
+  9,
+  'service role can read the complete project-current-state support view'
 );
 select throws_like(
   $$select * from public.opportunity_list$$,
@@ -575,11 +636,19 @@ select ok(
     where column_info.table_schema = 'public'
       and column_info.table_name in ('project_current_state', 'opportunity_list')
       and column_info.column_name in (
-        'notes', 'user_id', 'verified_by', 'official_website_url', 'canonical_url',
-        'model_version', 'input_version', 'explanation'
+        'notes', 'user_id', 'verified_by', 'canonical_url'
       )
-  ),
-  'read models contain no private provenance link or raw score fields'
+  )
+    and not exists (
+      select 1
+      from information_schema.columns as column_info
+      where column_info.table_schema = 'public'
+        and column_info.table_name = 'opportunity_list'
+        and column_info.column_name in (
+          'official_website_url', 'score_model_version', 'score_input_version', 'score_explanation'
+        )
+    ),
+  'read models exclude private provenance fields and keep detail-only fields out of opportunity_list'
 );
 
 select * from finish();

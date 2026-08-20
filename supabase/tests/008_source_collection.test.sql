@@ -425,12 +425,14 @@ select results_eq(
       ('collection_attempts'::text, 'collection_attempts_insert_collection_worker'::text, 'INSERT'::text, '{collection_worker}'::text),
       ('collection_attempts', 'collection_attempts_select_collection_worker', 'SELECT', '{collection_worker}'),
       ('discovered_items', 'discovered_items_insert_collection_worker', 'INSERT', '{collection_worker}'),
+      ('discovered_items', 'discovered_items_select_ai_stage_worker', 'SELECT', '{ai_stage_worker}'),
       ('discovered_items', 'discovered_items_select_collection_worker', 'SELECT', '{collection_worker}'),
       ('raw_items', 'raw_items_insert_collection_worker', 'INSERT', '{collection_worker}'),
+      ('raw_items', 'raw_items_select_ai_stage_worker', 'SELECT', '{ai_stage_worker}'),
       ('raw_items', 'raw_items_select_collection_worker', 'SELECT', '{collection_worker}')
     ) as expected(table_name, policy_name, command, roles)
   $$,
-  'collection history has exactly one select and insert policy for collection_worker'
+  'collection history has the exact collection-worker policies plus AI-stage input reads'
 );
 
 select ok(

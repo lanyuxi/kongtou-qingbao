@@ -165,13 +165,13 @@ select ok(
     and has_table_privilege('service_role', 'public.signals', 'SELECT')
     and has_column_privilege('anon', 'public.project_scores', 'opportunity_score', 'SELECT')
     and has_column_privilege('authenticated', 'public.project_scores', 'calculated_at', 'SELECT')
-    and not has_column_privilege('anon', 'public.project_scores', 'model_version', 'SELECT')
-    and not has_column_privilege('authenticated', 'public.project_scores', 'input_version', 'SELECT')
-    and not has_column_privilege('authenticated', 'public.project_scores', 'explanation', 'SELECT')
+    and has_column_privilege('anon', 'public.project_scores', 'model_version', 'SELECT')
+    and has_column_privilege('authenticated', 'public.project_scores', 'input_version', 'SELECT')
+    and has_column_privilege('authenticated', 'public.project_scores', 'explanation', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'model_version', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'input_version', 'SELECT')
     and has_column_privilege('service_role', 'public.project_scores', 'explanation', 'SELECT'),
-  'browser roles receive safe score columns while raw inputs and explanations remain backend-only'
+  'browser roles receive the exact score columns required by the project-detail read model'
 );
 select ok(
   not has_any_column_privilege('anon', 'public.signals', 'INSERT,UPDATE')
@@ -993,10 +993,10 @@ select results_eq(
   $$,
   'anonymous users see published signals for active projects including disputed evidence'
 );
-select throws_like(
-  $$select model_version from public.project_scores$$,
-  'permission denied for table project_scores',
-  'anonymous users cannot read raw score history'
+select results_eq(
+  $$select id from public.project_scores where model_version is not null order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'anonymous model-version reads remain limited by project score RLS'
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
@@ -1042,20 +1042,20 @@ select results_eq(
   $$,
   'an ordinary user sees only published signals for active projects'
 );
-select throws_like(
-  $$select explanation from public.project_scores$$,
-  'permission denied for table project_scores',
-  'an ordinary user cannot read raw score explanations'
+select results_eq(
+  $$select id from public.project_scores where explanation is not null order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'an ordinary user explanation reads remain limited by project score RLS'
 );
 select results_eq(
   $$select id from public.project_scores order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
   'an ordinary user can read only safe score columns for active or rumored projects'
 );
-select throws_like(
-  $$select input_version from public.project_scores$$,
-  'permission denied for table project_scores',
-  'an ordinary user cannot read raw score input versions'
+select results_eq(
+  $$select id from public.project_scores where input_version is not null order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'an ordinary user input-version reads remain limited by project score RLS'
 );
 select throws_like(
   $$
@@ -1151,10 +1151,10 @@ select results_eq(
   $$,
   'a browser admin still sees only published signals for active projects'
 );
-select throws_like(
-  $$select explanation from public.project_scores$$,
-  'permission denied for table project_scores',
-  'a browser admin cannot read raw score explanations'
+select results_eq(
+  $$select id from public.project_scores where explanation is not null order by id$$,
+  $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid), ('dddddddd-dddd-4ddd-8ddd-ddddddddddd2'::uuid)$$,
+  'a browser admin explanation reads remain limited by project score RLS'
 );
 select throws_like(
   $$
