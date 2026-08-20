@@ -77,6 +77,18 @@ describe('intelligence governance contracts', () => {
     );
   });
 
+  it('accepts PostgreSQL-safe BMP and astral notes while rejecting NUL and lone surrogates', () => {
+    expect(candidateReviewCommandV1Schema.parse({ ...command, note: '审查 café 🚀' }).note).toBe(
+      '审查 café 🚀',
+    );
+    expect(candidateReviewCommandV1Schema.safeParse({ ...command, note: 'before\u0000after' }).success)
+      .toBe(false);
+    expect(candidateReviewCommandV1Schema.safeParse({ ...command, note: 'high\ud800surrogate' }).success)
+      .toBe(false);
+    expect(candidateReviewCommandV1Schema.safeParse({ ...command, note: 'low\udc00surrogate' }).success)
+      .toBe(false);
+  });
+
   it('defines exact-quote evidence locators with strict bounds', () => {
     const locator = {
       version: 1,

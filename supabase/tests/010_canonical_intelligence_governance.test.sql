@@ -758,6 +758,36 @@ select is(
   'Promotion command hashing matches the fixed-order TypeScript JSON vector'
 );
 
+select results_eq(
+  $vectors$
+    select vector.case_name, pg_temp.governance_input_hash(vector.payload)
+    from (values
+      (1, 'null note'::text, $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":null,"reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (2, 'quotes', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"He said \"yes\".","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (3, 'backslashes', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"C:\\review\\quote","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (4, 'permitted controls', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"A\n\tB\b\fC\rD\u0001E","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (5, 'BMP Unicode', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"审查 café","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (6, 'astral Unicode', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"审查 🚀","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb),
+      (7, 'maximum safe version', $json${"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":9007199254740991,"note":null,"reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}$json$::jsonb)
+    ) as vector(ordinal, case_name, payload)
+    order by vector.ordinal
+  $vectors$,
+  $expected$
+    select expected.case_name, expected.input_hash
+    from (values
+      (1, 'null note'::text, '604a54c555e5deb66746358ac6594734324a5fd8237381a5e7150693ce98cb82'::text),
+      (2, 'quotes', 'b4214318ad35d35adef150fbbbff6a2231f31de5a9481d266d2b8a7a0d87dc2b'),
+      (3, 'backslashes', '7b6beabdfeb86542a842f29cdcbdc38e43cb40dfede02f64b686a117084bb540'),
+      (4, 'permitted controls', '455b46d121359b3d548badc5efab146b09733bb4677672eb1cca0384f3daa730'),
+      (5, 'BMP Unicode', 'e1f20ffc8db8244dd4f5a4d004273b78b6a06f6deb1fa6fb7f07aa7fb902da99'),
+      (6, 'astral Unicode', '0c228233b52059c6fb9ae2c3b52491e1b1d1d6f75dd0c33d0d21ad4fad4a5657'),
+      (7, 'maximum safe version', '9cdb6cb8a20c424d59f289b1852d9d8c021a6d41dd6b4dac0041ef649cb75b9a')
+    ) as expected(ordinal, case_name, input_hash)
+    order by expected.ordinal
+  $expected$,
+  'PostgreSQL command hashing matches every independent TypeScript canonical vector'
+);
+
 grant select, insert on table pg_temp.governance_command_results to promotion_service;
 
 set local role promotion_service;

@@ -70,6 +70,17 @@ values
     null,
     '2026-08-09 08:00:00+00',
     '2026-08-09 08:00:00+00'
+  ),
+  (
+    '90000000-0000-4000-8000-000000000019',
+    'disposable-integration-database-marker',
+    'Disposable Integration Database Marker',
+    'Marker proving an explicit local seed reset.',
+    'paused',
+    null,
+    null,
+    '2026-08-09 08:00:00+00',
+    '2026-08-09 08:00:00+00'
   )
 on conflict (id) do nothing;
 

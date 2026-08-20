@@ -1,6 +1,23 @@
 begin;
 
-select plan(6);
+select plan(7);
+
+select results_eq(
+  $$
+    select id, slug, name, lifecycle
+    from public.projects
+    where id = '90000000-0000-4000-8000-000000000019'::uuid
+  $$,
+  $$
+    values (
+      '90000000-0000-4000-8000-000000000019'::uuid,
+      'disposable-integration-database-marker'::text,
+      'Disposable Integration Database Marker'::text,
+      'paused'::public.project_lifecycle
+    )
+  $$,
+  'an explicit local seed reset creates the exact paused disposable database marker'
+);
 
 insert into public.raw_items (
   id, project_id, source_id, logical_url, final_url, content_kind, media_type,

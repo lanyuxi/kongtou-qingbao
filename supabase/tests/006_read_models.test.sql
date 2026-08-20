@@ -13,7 +13,7 @@ where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8
 delete from auth.users
 where id = '90000000-0000-4000-8000-000000000001'::uuid;
 
-select plan(80);
+select plan(81);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -575,6 +575,12 @@ select results_eq(
   'project current state respects active and rumored project visibility'
 );
 select is(
+  (select count(*)::integer from public.project_current_state
+   where project_id = '90000000-0000-4000-8000-000000000019'::uuid),
+  0,
+  'the paused disposable seed marker remains hidden from browser project state'
+);
+select is(
   (select opportunity_score from public.project_current_state where project_id = '10000000-0000-4000-8000-000000000001'),
   90.00::numeric,
   'latest score breaks calculated-at ties by descending score id'
@@ -690,7 +696,7 @@ select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 select is(
   (select count(*)::integer from public.project_current_state),
-  9,
+  10,
   'service role can read the complete project-current-state support view'
 );
 select throws_like(

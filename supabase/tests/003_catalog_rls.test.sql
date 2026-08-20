@@ -1347,7 +1347,7 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.projects), 4, 'service role can read every project lifecycle');
+select is((select count(*)::integer from public.projects), 5, 'service role can read every project lifecycle and the disposable seed marker');
 select is((select count(*)::integer from public.sources), 7, 'service role can read every source status');
 select is((select count(*)::integer from public.project_sources), 3, 'service role can read every catalog relation');
 select is(

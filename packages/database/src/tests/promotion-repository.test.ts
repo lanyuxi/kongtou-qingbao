@@ -21,6 +21,22 @@ const signalId = '85000000-0000-4000-8000-000000000103';
 const evidenceId = '85000000-0000-4000-8000-000000000104';
 
 describe('PromotionRepository', () => {
+  it('loads the default promotion worker export in Node', () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--import=tsx',
+        '--eval',
+        "import('@airdrop/database/promotion-worker').then((module) => process.stdout.write(typeof module.createPromotionRepository))",
+      ],
+      { encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe('function');
+    expect(result.stderr).toBe('');
+  });
+
   it('forwards the exact canonical payload, literal SHA-256 vector, and transaction time', async () => {
     const client = new RecordingClient([[promotedResultRow()]]);
 
@@ -48,6 +64,104 @@ describe('PromotionRepository', () => {
       },
     }]);
     expect(client.transactions).toBe(1);
+  });
+
+  it.each([
+    [
+      'null note',
+      null,
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":null,"reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      '604a54c555e5deb66746358ac6594734324a5fd8237381a5e7150693ce98cb82',
+    ],
+    [
+      'quotes',
+      'He said "yes".',
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"He said \\"yes\\".","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      'b4214318ad35d35adef150fbbbff6a2231f31de5a9481d266d2b8a7a0d87dc2b',
+    ],
+    [
+      'backslashes',
+      'C:\\review\\quote',
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"C:\\\\review\\\\quote","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      '7b6beabdfeb86542a842f29cdcbdc38e43cb40dfede02f64b686a117084bb540',
+    ],
+    [
+      'permitted controls',
+      'A\n\tB\b\fC\rD\u0001E',
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"A\\n\\tB\\b\\fC\\rD\\u0001E","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      '455b46d121359b3d548badc5efab146b09733bb4677672eb1cca0384f3daa730',
+    ],
+    [
+      'BMP Unicode',
+      '审查 café',
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"审查 café","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      'e1f20ffc8db8244dd4f5a4d004273b78b6a06f6deb1fa6fb7f07aa7fb902da99',
+    ],
+    [
+      'astral Unicode',
+      '审查 🚀',
+      1,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"审查 🚀","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      '0c228233b52059c6fb9ae2c3b52491e1b1d1d6f75dd0c33d0d21ad4fad4a5657',
+    ],
+    [
+      'maximum safe version',
+      null,
+      Number.MAX_SAFE_INTEGER,
+      '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":9007199254740991,"note":null,"reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}',
+      '9cdb6cb8a20c424d59f289b1852d9d8c021a6d41dd6b4dac0041ef649cb75b9a',
+    ],
+  ] as const)('matches the independent canonical JSON/SHA vector for %s', async (
+    _caseName,
+    note,
+    expectedCandidateVersion,
+    payload,
+    inputHash,
+  ) => {
+    const client = new RecordingClient([[promotedResultRow()]]);
+
+    await createPromotionRepositoryFromClient(client).reviewCandidate({
+      ...reviewInput(),
+      command: { ...reviewInput().command, note, expectedCandidateVersion },
+    });
+
+    expect(client.calls[0]?.args.p_command_payload).toBe(payload);
+    expect(client.calls[0]?.args.p_input_hash).toBe(inputHash);
+  });
+
+  it.each([
+    ['NUL note', { command: { ...reviewInput().command, note: 'before\u0000after' } }],
+    ['high lone-surrogate note', { command: { ...reviewInput().command, note: 'high\ud800surrogate' } }],
+    ['low lone-surrogate note', { command: { ...reviewInput().command, note: 'low\udc00surrogate' } }],
+    ['NUL idempotency key', { idempotencyKey: 'review\u0000key' }],
+    ['high lone-surrogate idempotency key', { idempotencyKey: 'review\ud800key' }],
+    ['low lone-surrogate idempotency key', { idempotencyKey: 'review\udc00key' }],
+  ])('rejects %s before opening a transaction', async (_caseName, override) => {
+    const client = new RecordingClient([[promotedResultRow()]]);
+
+    await expect(createPromotionRepositoryFromClient(client).reviewCandidate({
+      ...reviewInput(),
+      ...override,
+    })).rejects.toEqual(new PromotionPersistenceError());
+    expect(client.transactions).toBe(0);
+    expect(client.calls).toEqual([]);
+  });
+
+  it('preserves PostgreSQL-safe control, BMP, and astral idempotency text', async () => {
+    const client = new RecordingClient([[promotedResultRow()]]);
+    const idempotencyKey = 'review-\u0001-审查-🚀';
+
+    await createPromotionRepositoryFromClient(client).reviewCandidate({
+      ...reviewInput(),
+      idempotencyKey,
+    });
+
+    expect(client.calls[0]?.args.p_idempotency_key).toBe(idempotencyKey);
   });
 
   it('parses PostgreSQL bigint wire values and Date transaction timestamps', async () => {

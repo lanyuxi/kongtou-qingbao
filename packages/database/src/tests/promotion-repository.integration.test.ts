@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import postgres from 'postgres';
+import postgres, { type TransactionSql } from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -24,7 +24,12 @@ const candidateIds = {
 const baseTime = new Date('2026-08-20T04:00:00.000Z');
 const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
 const describeIntegration = integrationDatabaseUrl === undefined ? describe.skip : describe;
-const loginRole = 'promotion_repository_test_login';
+const disposableMarker = {
+  id: '90000000-0000-4000-8000-000000000019',
+  slug: 'disposable-integration-database-marker',
+  name: 'Disposable Integration Database Marker',
+  lifecycle: 'paused',
+} as const;
 
 describeIntegration('PromotionRepository PostgreSQL integration', () => {
   const owner = integrationDatabaseUrl === undefined ? null : postgres(integrationDatabaseUrl, {
@@ -34,20 +39,26 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
   let login: postgres.Sql | null = null;
   let first: ReturnType<typeof createPromotionRepository> | null = null;
   let second: ReturnType<typeof createPromotionRepository> | null = null;
+  let loginRole = '';
 
   beforeAll(async () => {
     const database = requireSql(owner);
+    await assertDisposableDatabase(database);
     await removeFixtures(database);
-    await database.unsafe(`drop role if exists ${loginRole}`);
+    await assertDisposableDatabase(database);
+    loginRole = `promotion_repo_test_${randomUUID().replaceAll('-', '')}`;
     const disposablePassword = `promotion-${randomUUID()}`;
-    const createLogin = await database`
-      select pg_catalog.format(
-        'create role promotion_repository_test_login login noinherit nosuperuser nobypassrls nocreatedb nocreaterole noreplication password %L',
-        ${disposablePassword}::text
-      ) as statement
+    const roleStatements = await database`
+      select
+        pg_catalog.format(
+          'create role %I login noinherit nosuperuser nobypassrls nocreatedb nocreaterole noreplication password %L',
+          ${loginRole}::text,
+          ${disposablePassword}::text
+        ) as create_statement,
+        pg_catalog.format('grant promotion_service to %I', ${loginRole}::text) as grant_statement
     `;
-    await database.unsafe(requireStatement(createLogin[0]?.statement));
-    await database.unsafe(`grant promotion_service to ${loginRole}`);
+    await database.unsafe(requireStatement(roleStatements[0]?.create_statement));
+    await database.unsafe(requireStatement(roleStatements[0]?.grant_statement));
     const loginUrl = new URL(requireDatabaseUrl(integrationDatabaseUrl));
     loginUrl.username = loginRole;
     loginUrl.password = disposablePassword;
@@ -71,14 +82,37 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
       try {
         await dropRollbackTrigger(owner);
         await removeFixtures(owner);
-        await owner.unsafe(`drop role if exists ${loginRole}`);
+        if (loginRole !== '') await dropDisposableRole(owner, loginRole);
       } finally {
         await owner.end({ timeout: 5 });
       }
     }
   });
 
-  it('denies direct canonical/governance inserts but approves atomically through the protected command', async () => {
+  it('refuses owner cleanup authorization when the disposable marker row is tampered', async () => {
+    const database = requireSql(owner);
+    await database.begin(async (transaction) => {
+      await transaction`
+        update public.projects
+        set name = 'Tampered disposable marker'
+        where id = ${disposableMarker.id}::uuid
+      `;
+      const before = await candidateSnapshot(transaction, candidateIds.approve);
+
+      await expect(removeFixturesInTransaction(transaction)).rejects.toThrow(
+        'disposable_database_marker_missing',
+      );
+      await expect(candidateSnapshot(transaction, candidateIds.approve)).resolves.toEqual(before);
+
+      await transaction`
+        update public.projects
+        set name = ${disposableMarker.name}
+        where id = ${disposableMarker.id}::uuid
+      `;
+    });
+  });
+
+  it('denies direct canonical and governance DML after SET ROLE but approves through the protected command', async () => {
     const restricted = requireSql(login);
     await expect(restricted`
       insert into public.signals (
@@ -88,14 +122,44 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
         'unverified', 'published', 50
       )
     `).rejects.toMatchObject({ code: '42501' });
-    await expect(restricted`
-      insert into public.candidate_review_decisions (
-        candidate_id, candidate_version, reviewer_user_id, decision, reason_code
+
+    await expectPromotionRoleDenied(restricted, async (transaction) => transaction`
+      insert into public.signals (
+        project_id, signal_type, title, summary, verification, lifecycle, confidence
       ) values (
-        ${candidateIds.approve}::uuid, 2, ${activeReviewerId}::uuid,
-        'needs_review', 'insufficient_context'
+        ${projectId}::uuid, 'bypass', 'Bypass', 'Direct canonical write',
+        'unverified', 'published', 50
       )
-    `).rejects.toMatchObject({ code: '42501' });
+    `);
+    await expectPromotionRoleDenied(restricted, async (transaction) => transaction`
+      update public.extraction_candidates
+      set review_status = 'decided'
+      where id = ${candidateIds.approve}::uuid
+    `);
+    await expectPromotionRoleDenied(restricted, async (transaction) => transaction`
+      insert into public.promotion_events (candidate_id, signal_id, actor)
+      values (${candidateIds.approve}::uuid, ${candidateIds.approve}::uuid, 'bypass')
+    `);
+    for (const table of [
+      'evidence',
+      'signal_evidence_links',
+      'candidate_review_decisions',
+      'promotion_commands',
+      'outbox_events',
+    ]) {
+      await expectPromotionRoleDenied(
+        restricted,
+        async (transaction) => transaction.unsafe(`insert into public.${table} default values`),
+      );
+      await expectPromotionRoleDenied(
+        restricted,
+        async (transaction) => transaction.unsafe(`update public.${table} set created_at = created_at where false`),
+      );
+      await expectPromotionRoleDenied(
+        restricted,
+        async (transaction) => transaction.unsafe(`delete from public.${table} where false`),
+      );
+    }
 
     const result = await requireRepository(first).reviewCandidate(
       reviewInput(candidateIds.approve, 'approve-1'),
@@ -108,29 +172,15 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
       evidenceId: expect.any(String),
     });
 
-    const rows = await requireSql(owner)`
-      select
-        (select count(*)::integer from public.evidence where id = ${result.evidenceId}::uuid) as evidence_count,
-        (select count(*)::integer from public.signals where id = ${result.signalId}::uuid) as signal_count,
-        (select count(*)::integer from public.signal_evidence_links where signal_id = ${result.signalId}::uuid) as link_count,
-        (select count(*)::integer from public.candidate_review_decisions where id = ${result.decisionId}::uuid) as decision_count,
-        (select count(*)::integer from public.promotion_events where review_decision_id = ${result.decisionId}::uuid) as audit_count,
-        (select count(*)::integer from public.promotion_commands where id = ${result.commandId}::uuid) as receipt_count,
-        (select count(*)::integer from public.outbox_events where aggregate_id = ${candidateIds.approve}::uuid) as outbox_count
-    `;
-    expect(rows[0]).toEqual({
-      evidence_count: 1,
-      signal_count: 1,
-      link_count: 1,
-      decision_count: 1,
-      audit_count: 1,
-      receipt_count: 1,
-      outbox_count: 1,
-    });
+    await expect(candidateSnapshot(requireSql(owner), candidateIds.approve)).resolves.toEqual(
+      reviewedSnapshot('promoted', 'decided', result.signalId, 1),
+    );
   });
 
   it('returns stable IDs on exact replay and rejects conflicting key reuse', async () => {
     const repository = requireRepository(first);
+    const rejectBefore = await candidateSnapshot(requireSql(owner), candidateIds.reject);
+    const needsReviewBefore = await candidateSnapshot(requireSql(owner), candidateIds.needsReview);
     const original = await repository.reviewCandidate(reviewInput(candidateIds.reject, 'replay-1', {
       decision: 'reject',
       reasonCode: 'claim_not_supported',
@@ -139,16 +189,29 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
       decision: 'reject',
       reasonCode: 'claim_not_supported',
     }));
+    const afterOriginal = await candidateSnapshot(requireSql(owner), candidateIds.reject);
 
     expect(replay).toEqual({ ...original, replayed: true });
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.reject)).toEqual(afterOriginal);
     await expect(repository.reviewCandidate(reviewInput(candidateIds.needsReview, 'replay-1', {
       decision: 'needs_review',
       reasonCode: 'insufficient_context',
     }))).rejects.toMatchObject({ code: 'promotion_idempotency_conflict' });
+    expect(afterOriginal).toEqual(reviewedSnapshot('rejected', 'decided', null, 1, {
+      evidence: 0,
+      signals: 0,
+      links: 0,
+      audits: 0,
+    }));
+    expect(afterOriginal).not.toEqual(rejectBefore);
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.reject)).toEqual(afterOriginal);
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.needsReview)).toEqual(needsReviewBefore);
   });
 
   it('rejects stale versions and revoked reviewers without receipts', async () => {
     const repository = requireRepository(first);
+    const staleBefore = await candidateSnapshot(requireSql(owner), candidateIds.reject);
+    const revokedBefore = await candidateSnapshot(requireSql(owner), candidateIds.needsReview);
     await expect(repository.reviewCandidate({
       ...reviewInput(candidateIds.reject, 'stale-1', {
         decision: 'reject',
@@ -175,12 +238,8 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
         reviewerUserId: revokedReviewerId,
       },
     })).rejects.toMatchObject({ code: 'promotion_reviewer_not_authorized' });
-
-    const receipts = await requireSql(owner)`
-      select count(*)::integer as count from public.promotion_commands
-      where idempotency_key in ('stale-1', 'revoked-1')
-    `;
-    expect(receipts[0]?.count).toBe(0);
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.reject)).toEqual(staleBefore);
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.needsReview)).toEqual(revokedBefore);
   });
 
   it('records reject and needs-review without creating canonical signals or Evidence', async () => {
@@ -196,18 +255,22 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
 
     expect(rejected).toMatchObject({ outcome: 'rejected', signalId: null, evidenceId: null });
     expect(parked).toMatchObject({ outcome: 'needs_review', signalId: null, evidenceId: null });
-    const rows = await requireSql(owner)`
-      select candidate.id, candidate.status, candidate.review_status, candidate.version,
-        (select count(*)::integer from public.candidate_review_decisions as decision where decision.candidate_id = candidate.id) as decisions,
-        (select count(*)::integer from public.outbox_events as event where event.aggregate_id = candidate.id) as outbox_events
-      from public.extraction_candidates as candidate
-      where candidate.id in (${candidateIds.reject}::uuid, ${candidateIds.needsReview}::uuid)
-      order by candidate.id
-    `;
-    expect(rows).toEqual([
-      { id: candidateIds.reject, status: 'rejected', review_status: 'decided', version: '2', decisions: 1, outbox_events: 1 },
-      { id: candidateIds.needsReview, status: 'pending', review_status: 'needs_review', version: '2', decisions: 1, outbox_events: 1 },
-    ]);
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.reject)).toEqual(
+      reviewedSnapshot('rejected', 'decided', null, 1, {
+        evidence: 0,
+        signals: 0,
+        links: 0,
+        audits: 0,
+      }),
+    );
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.needsReview)).toEqual(
+      reviewedSnapshot('pending', 'needs_review', null, 1, {
+        evidence: 0,
+        signals: 0,
+        links: 0,
+        audits: 0,
+      }),
+    );
   });
 
   it('serializes concurrent approvals to one promoted result', async () => {
@@ -222,17 +285,16 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
     expect(fulfilled[0]).toMatchObject({ value: { outcome: 'promoted' } });
     expect(rejected).toHaveLength(1);
     expect(rejected[0]).toMatchObject({ reason: { code: 'promotion_version_conflict' } });
-    const counts = await requireSql(owner)`
-      select
-        (select count(*)::integer from public.promotion_commands where candidate_id = ${candidateIds.concurrent}::uuid) as receipts,
-        (select count(*)::integer from public.candidate_review_decisions where candidate_id = ${candidateIds.concurrent}::uuid) as decisions,
-        (select count(*)::integer from public.outbox_events where aggregate_id = ${candidateIds.concurrent}::uuid) as outbox_events
-    `;
-    expect(counts[0]).toEqual({ receipts: 1, decisions: 1, outbox_events: 1 });
+    const promoted = fulfilled[0]?.status === 'fulfilled' ? fulfilled[0].value : undefined;
+    expect(await candidateSnapshot(requireSql(owner), candidateIds.concurrent)).toEqual(
+      reviewedSnapshot('promoted', 'decided', promoted?.signalId ?? null, 1),
+    );
   });
 
   it('rolls back every approve-path record when outbox insertion fails', async () => {
     const database = requireSql(owner);
+    await assertDisposableDatabase(database);
+    const before = await candidateSnapshot(database, candidateIds.rollback);
     await database`
       create function public.reject_promotion_repository_outbox()
       returns trigger language plpgsql set search_path = pg_catalog as $$
@@ -255,31 +317,7 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
         reviewInput(candidateIds.rollback, 'rollback-1'),
       )).rejects.toMatchObject({ code: 'promotion_persistence_failed' });
 
-      const rows = await database`
-        select candidate.status, candidate.review_status, candidate.version, candidate.signal_id,
-          (select count(*)::integer from public.evidence as evidence where evidence.discovered_item_id = candidate.discovered_item_id) as evidence_count,
-          (select count(*)::integer from public.signals as signal where signal.project_id = candidate.project_id and signal.title = candidate.payload ->> 'title') as signal_count,
-          (select count(*)::integer from public.signal_evidence_links as link join public.signals as signal on signal.id = link.signal_id where signal.title = candidate.payload ->> 'title') as link_count,
-          (select count(*)::integer from public.candidate_review_decisions as decision where decision.candidate_id = candidate.id) as decision_count,
-          (select count(*)::integer from public.promotion_events as event where event.candidate_id = candidate.id) as audit_count,
-          (select count(*)::integer from public.promotion_commands as command where command.candidate_id = candidate.id) as receipt_count,
-          (select count(*)::integer from public.outbox_events as event where event.aggregate_id = candidate.id) as outbox_count
-        from public.extraction_candidates as candidate
-        where candidate.id = ${candidateIds.rollback}::uuid
-      `;
-      expect(rows[0]).toEqual({
-        status: 'pending',
-        review_status: 'pending',
-        version: '1',
-        signal_id: null,
-        evidence_count: 0,
-        signal_count: 0,
-        link_count: 0,
-        decision_count: 0,
-        audit_count: 0,
-        receipt_count: 0,
-        outbox_count: 0,
-      });
+      expect(await candidateSnapshot(database, candidateIds.rollback)).toEqual(before);
     } finally {
       await dropRollbackTrigger(database);
     }
@@ -419,31 +457,131 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
 }
 
 async function dropRollbackTrigger(sql: postgres.Sql): Promise<void> {
+  await assertDisposableDatabase(sql);
   await sql`drop trigger if exists reject_promotion_repository_outbox on public.outbox_events`;
   await sql`drop function if exists public.reject_promotion_repository_outbox()`;
 }
 
 async function removeFixtures(sql: postgres.Sql): Promise<void> {
-  await sql.begin(async (transaction) => {
-    await transaction`set local session_replication_role = replica`;
-    await transaction`delete from public.outbox_events where aggregate_id in ${transaction(Object.values(candidateIds))}`;
-    await transaction`delete from public.promotion_commands where candidate_id in ${transaction(Object.values(candidateIds))}`;
-    await transaction`delete from public.promotion_events where candidate_id in ${transaction(Object.values(candidateIds))}`;
-    await transaction`delete from public.candidate_review_decisions where candidate_id in ${transaction(Object.values(candidateIds))}`;
-    await transaction`delete from public.signal_evidence_links where signal_id in (select id from public.signals where project_id = ${projectId}::uuid)`;
-    await transaction`delete from public.evidence where discovered_item_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
-    await transaction`delete from public.extraction_candidates where project_id = ${projectId}::uuid`;
-    await transaction`delete from public.signals where project_id = ${projectId}::uuid`;
-    await transaction`delete from public.ai_runs where input_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
-    await transaction`delete from public.discovered_items where project_id = ${projectId}::uuid`;
-    await transaction`delete from public.raw_items where project_id = ${projectId}::uuid`;
-    await transaction`delete from public.project_sources where project_id = ${projectId}::uuid`;
-    await transaction`delete from public.sources where id = ${sourceId}::uuid`;
-    await transaction`delete from public.projects where id = ${projectId}::uuid`;
-    await transaction`delete from public.user_roles where user_id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
-    await transaction`delete from public.profiles where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
-    await transaction`delete from auth.users where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
-  });
+  await assertDisposableDatabase(sql);
+  await sql.begin(removeFixturesInTransaction);
+}
+
+async function removeFixturesInTransaction(transaction: TransactionSql): Promise<void> {
+  await assertDisposableDatabase(transaction);
+  await transaction`set local session_replication_role = replica`;
+  await transaction`delete from public.outbox_events where aggregate_id in ${transaction(Object.values(candidateIds))}`;
+  await transaction`delete from public.promotion_commands where candidate_id in ${transaction(Object.values(candidateIds))}`;
+  await transaction`delete from public.promotion_events where candidate_id in ${transaction(Object.values(candidateIds))}`;
+  await transaction`delete from public.candidate_review_decisions where candidate_id in ${transaction(Object.values(candidateIds))}`;
+  await transaction`delete from public.signal_evidence_links where signal_id in (select id from public.signals where project_id = ${projectId}::uuid)`;
+  await transaction`delete from public.evidence where discovered_item_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
+  await transaction`delete from public.extraction_candidates where project_id = ${projectId}::uuid`;
+  await transaction`delete from public.signals where project_id = ${projectId}::uuid`;
+  await transaction`delete from public.ai_runs where input_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
+  await transaction`delete from public.discovered_items where project_id = ${projectId}::uuid`;
+  await transaction`delete from public.raw_items where project_id = ${projectId}::uuid`;
+  await transaction`delete from public.project_sources where project_id = ${projectId}::uuid`;
+  await transaction`delete from public.sources where id = ${sourceId}::uuid`;
+  await transaction`delete from public.projects where id = ${projectId}::uuid`;
+  await transaction`delete from public.user_roles where user_id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
+  await transaction`delete from public.profiles where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
+  await transaction`delete from auth.users where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
+}
+
+async function dropDisposableRole(sql: postgres.Sql, roleName: string): Promise<void> {
+  await assertDisposableDatabase(sql);
+  if (!/^promotion_repo_test_[0-9a-f]{32}$/.test(roleName)) {
+    throw new Error('invalid_disposable_role_name');
+  }
+  const statement = await sql`
+    select pg_catalog.format('drop role if exists %I', ${roleName}::text) as statement
+  `;
+  await sql.unsafe(requireStatement(statement[0]?.statement));
+}
+
+async function assertDisposableDatabase(sql: postgres.Sql | TransactionSql): Promise<void> {
+  const rows = await sql`
+    select id, slug, name, lifecycle
+    from public.projects
+    where id = ${disposableMarker.id}::uuid
+  `;
+  const marker = rows[0];
+  if (
+    marker?.id !== disposableMarker.id
+    || marker.slug !== disposableMarker.slug
+    || marker.name !== disposableMarker.name
+    || marker.lifecycle !== disposableMarker.lifecycle
+  ) {
+    throw new Error('disposable_database_marker_missing');
+  }
+}
+
+async function expectPromotionRoleDenied(
+  sql: postgres.Sql,
+  work: (transaction: TransactionSql) => Promise<unknown>,
+): Promise<void> {
+  await expect(sql.begin(async (transaction) => {
+    await transaction`set local role promotion_service`;
+    await work(transaction);
+  })).rejects.toMatchObject({ code: '42501' });
+}
+
+async function candidateSnapshot(sql: postgres.Sql | TransactionSql, candidateId: string) {
+  const rows = await sql`
+    select candidate.status, candidate.review_status, candidate.version,
+      candidate.signal_id,
+      (select count(*)::integer from public.evidence as evidence
+       where evidence.discovered_item_id = candidate.discovered_item_id) as evidence_count,
+      (select count(*)::integer from public.signals as signal
+       where signal.project_id = candidate.project_id
+         and signal.title = candidate.payload ->> 'title') as signal_count,
+      (select count(*)::integer
+       from public.signal_evidence_links as link
+       join public.signals as signal on signal.id = link.signal_id
+       where signal.project_id = candidate.project_id
+         and signal.title = candidate.payload ->> 'title') as link_count,
+      (select count(*)::integer from public.candidate_review_decisions as decision
+       where decision.candidate_id = candidate.id) as decision_count,
+      (select count(*)::integer from public.promotion_events as event
+       where event.candidate_id = candidate.id) as audit_count,
+      (select count(*)::integer from public.promotion_commands as command
+       where command.candidate_id = candidate.id) as receipt_count,
+      (select count(*)::integer from public.outbox_events as event
+       where event.aggregate_id = candidate.id) as outbox_count
+    from public.extraction_candidates as candidate
+    where candidate.id = ${candidateId}::uuid
+  `;
+  const row = rows[0];
+  if (row === undefined) throw new Error('candidate_snapshot_missing');
+  return row;
+}
+
+function reviewedSnapshot(
+  status: 'pending' | 'promoted' | 'rejected',
+  reviewStatus: 'pending' | 'needs_review' | 'decided',
+  signalId: string | null,
+  historyCount: number,
+  canonicalCounts: {
+    readonly evidence: number;
+    readonly signals: number;
+    readonly links: number;
+    readonly audits: number;
+  } = { evidence: 1, signals: 1, links: 1, audits: 1 },
+) {
+  return {
+    status,
+    review_status: reviewStatus,
+    version: '2',
+    signal_id: signalId,
+    evidence_count: canonicalCounts.evidence,
+    signal_count: canonicalCounts.signals,
+    link_count: canonicalCounts.links,
+    decision_count: historyCount,
+    audit_count: canonicalCounts.audits,
+    receipt_count: historyCount,
+    outbox_count: historyCount,
+  };
 }
 
 function requireDatabaseUrl(value: string | undefined): string {

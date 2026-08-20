@@ -3,6 +3,10 @@ import { z } from 'zod';
 const uuidSchema = z.string().uuid();
 const positiveVersionSchema = z.number().int().safe().positive();
 const occurredAtSchema = z.string().datetime({ offset: true });
+const postgresTextSchema = z.string().refine(
+  isPostgresText,
+  'value must be valid PostgreSQL UTF-8 text',
+);
 
 export const evidenceLocatorV1Schema = z
   .object({
@@ -33,7 +37,7 @@ const commandBase = z.object({
   candidateId: uuidSchema,
   reviewerUserId: uuidSchema,
   expectedCandidateVersion: positiveVersionSchema,
-  note: z.string().trim().min(1).max(1000).nullable(),
+  note: postgresTextSchema.trim().min(1).max(1000).nullable(),
 });
 
 export const candidateReviewCommandV1Schema = z.discriminatedUnion('decision', [
@@ -125,3 +129,18 @@ export type CandidateReviewReasonCode = z.infer<typeof candidateReviewReasonCode
 export type CandidateReviewCommandV1 = z.infer<typeof candidateReviewCommandV1Schema>;
 export type CandidateReviewResultV1 = z.infer<typeof candidateReviewResultV1Schema>;
 export type GovernanceOutboxEventV1 = z.infer<typeof governanceOutboxEventV1Schema>;
+
+function isPostgresText(value: string): boolean {
+  if (value.includes('\u0000')) return false;
+  for (let index = 0; index < value.length; index += 1) {
+    const codeUnit = value.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) return false;
+      index += 1;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      return false;
+    }
+  }
+  return true;
+}
