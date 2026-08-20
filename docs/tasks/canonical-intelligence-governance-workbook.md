@@ -7,7 +7,7 @@
 | 3. Add governance schema and protected Promotion command | COMPLETED — FIX ROUND 2 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary`; `test(db): align pgTAP with current schema` |
 | 4. Gate public reads and scoring inputs on Evidence | COMPLETED — FIX ROUND 1 | See log | See log | `feat(db): gate public intelligence on evidence`; `fix(db): close public score evidence bypass` |
 | 5. Add the server-only Promotion repository | COMPLETED | See log | See log | `fix(db): align promotion command hashing`; `feat(database): add promotion service repository` |
-| 6. Replace the legacy Promotion CLI with governed review commands | READY | — | — | — |
+| 6. Replace the legacy Promotion CLI with governed review commands | COMPLETED | See log | See log | `fix(contracts): reject terminal surrogate text`; `feat(worker): add governed candidate review CLI` |
 | 7. Reconcile historical Evidence and update fixtures | READY | — | — | — |
 | 8. Regenerate types, document operations, and run final gates | READY | — | — | — |
 
@@ -137,3 +137,15 @@ Fix-round ruling: destructive integration authority is established only by the e
 | Final verification | Repository `pnpm verify`, diff/boundary/sensitive scans | Whole repository remains green with no SQL/reset requirement | `pnpm verify` and all scans passed. No database, seed, migration, canonical ordering, or hash file changed. |
 
 Fix-round ruling: user-visible Promotion limits are measured in Unicode code points to match PostgreSQL `char_length`, not UTF-16 code units. Cost if wrong: astral text would be rejected earlier than the database contract, producing avoidable concealed persistence failures and inconsistent retry/idempotency behavior across boundaries.
+
+## Governed candidate review CLI execution log
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| CLI RED | Focused `review-candidate.test.ts` before the new entry existed | The exact approve/reject/needs-review parser and runner contract cannot load | Failed on the absent `src/promotion/review-candidate.ts`; the existing worker baseline remained 164 passed with 2 environment-gated skips. |
+| Shared text RED | Focused governance-contract and Promotion-repository tests with terminal high-surrogate note/key vectors | PostgreSQL-unrepresentable terminal high surrogates fail before persistence | Contracts failed exactly 1 new assertion; the repository failed exactly the terminal note and terminal Idempotency-Key cases. |
+| Shared text GREEN | Contracts/database package tests, lint, and typecheck | Terminal high surrogate is rejected while valid astral pairs remain accepted | Contracts passed 65/65; database passed 122 with 29 environment-gated integration skips; both package lint/typecheck gates passed. Prerequisite commit: `d5d6025 fix(contracts): reject terminal surrogate text`. |
+| CLI GREEN | Worker focused/full tests, lint, and typecheck | Strict governed commands, injected lifecycle, bounded output, stable errors, and fail-closed import behavior pass without a database | Worker passed 197 with 2 unrelated environment-gated skips; lint and typecheck passed. |
+| Repository verification | Bundled-runtime `pnpm verify` | All workspace lint, typecheck, unit tests, builds, and placeholder checks pass | Passed. Local runtime was Node 24.19 and emitted the known Node 22 engine warning. |
+
+The new CLI reads only `AIRDROP_PROMOTION_DATABASE_URL` and `AIRDROP_PROMOTION_REVIEWER_USER_ID`. It accepts the database URL only from server environment configuration, uses contract-allowed reason combinations with `note: null`, closes its repository in `finally`, and never prints connection values, source content, reviewer notes, stack traces, or database messages. The legacy `promote-candidate` entry remains the already-tested fail-closed compatibility message introduced in Task 5.
