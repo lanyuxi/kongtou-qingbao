@@ -17,6 +17,10 @@
     "./schedule-admin": {
       "browser": "./src/queue/admin-browser-denied.ts",
       "default": "./src/queue/admin-entry.ts"
+    },
+    "./promotion-worker": {
+      "browser": "./src/promotion/browser-denied.ts",
+      "default": "./src/promotion/worker-entry.ts"
     }
   },
   "scripts": {
@@ -24,7 +28,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "node scripts/require-integration-env.mjs && vitest run --no-file-parallelism src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts src/tests/schedule-command-repository.integration.test.ts src/tests/scoring-repository.integration.test.ts"
+    "test:integration": "node scripts/require-integration-env.mjs && vitest run --no-file-parallelism src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts src/tests/schedule-command-repository.integration.test.ts src/tests/scoring-repository.integration.test.ts src/tests/promotion-repository.integration.test.ts"
   },
   "dependencies": {
     "@airdrop/contracts": "workspace:*",

@@ -62,7 +62,6 @@ export interface ExtractionRepository {
     candidates: readonly ExtractionCandidateInput[],
   ): Promise<number>;
   listPendingCandidates(limit: number): Promise<PendingCandidateRecord[]>;
-  promoteCandidate(candidateId: string, actor: string): Promise<string>;
 }
 
 export function createExtractionRepository(sql: Sql): ExtractionRepository {
@@ -205,19 +204,6 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
           payload: row.payload as ExtractionCandidatePayload,
           createdAt: new Date(row.created_at).toISOString(),
         }));
-      });
-    },
-
-    async promoteCandidate(candidateId, actor) {
-      return run(async () => {
-        const rows = await sql`
-          select public.promote_extraction_candidate(${candidateId}, ${actor}) as signal_id
-        `;
-        const row = rows.at(0);
-        if (row === undefined) {
-          throw new ExtractionPersistenceError();
-        }
-        return row.signal_id;
       });
     },
   };

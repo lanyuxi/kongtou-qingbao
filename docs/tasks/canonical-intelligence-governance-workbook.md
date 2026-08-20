@@ -6,7 +6,7 @@
 | 2. Add deterministic Evidence grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
 | 3. Add governance schema and protected Promotion command | COMPLETED — FIX ROUND 2 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary`; `test(db): align pgTAP with current schema` |
 | 4. Gate public reads and scoring inputs on Evidence | COMPLETED — FIX ROUND 1 | See log | See log | `feat(db): gate public intelligence on evidence`; `fix(db): close public score evidence bypass` |
-| 5. Add the server-only Promotion repository | READY | — | — | — |
+| 5. Add the server-only Promotion repository | COMPLETED | See log | See log | `fix(db): align promotion command hashing`; `feat(database): add promotion service repository` |
 | 6. Replace the legacy Promotion CLI with governed review commands | READY | — | — | — |
 | 7. Reconcile historical Evidence and update fixtures | READY | — | — | — |
 | 8. Regenerate types, document operations, and run final gates | READY | — | — | — |
@@ -90,3 +90,20 @@ The append-only ruling is enforced by separate linked and never-linked fixtures.
 | Package checks | Database lint, typecheck, and unit tests | Static and unit checks pass | Lint and typecheck passed; unit run passed 80 tests with 22 environment-gated integration tests skipped in that unit-only command. Node 24.19 emitted the known Node 22 engine warning. |
 
 Fix round 1 replaces exactly the two browser score SELECT policies in the existing forward Task 4 migration. Active/rumored lifecycle checks remain intact and `score_has_complete_evidence(id)` is added. Separate invalid fixtures cover Evidence-source/Raw Item mismatch, Evidence-source/Discovered Item mismatch, and `discovered_summary` feed Raw Item mismatch without deleting or mutating history.
+
+## Server-only Promotion repository execution log
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| Unit RED | Focused `promotion-repository.test.ts` before creating the Promotion modules | Import fails because the repository boundary does not exist | Failed at the absent `promotion-repository.js` import; the existing 80 database unit tests remained green. |
+| Unit GREEN | Focused Promotion repository unit suite | Canonical payload/hash, strict row parsing, SQLSTATE mapping, concealed persistence errors, and browser denial pass | Passed; the full database unit run later reported 102 passed with environment-gated integrations skipped. |
+| Integration RED / hash sensitivity | Real Promotion integration against the isolated 64322 stack before aligning the database hash | The fixed-order TypeScript SHA reaches the protected function | All 6 real cases returned `AI106`. TypeScript hashed the required compact JSON bytes to `b42169ab608fa7f3087bfa75f1b92f723a73c4d3debe8ad4024e2534fae00ef5`; PostgreSQL `jsonb::text` reordered/spaced the object and produced `bae33381fd21a1b03f1fa1b5b985a2836bbac526e2fa8b86e63d53c1f8cc5d5f`. |
+| Hash prerequisite GREEN | Safety-checked isolated reset, focused 010, and full pgTAP after reconstructing the fixed compact JSON bytes | Cross-language literal vector and all database governance contracts pass | Focused governance passed 142/142; full pgTAP passed 10 files and 929/929. Production remained healthy and untouched. Prerequisite commit: `ac83778 fix(db): align promotion command hashing`. |
+| Focused integration GREEN | Real `promotion-repository.integration.test.ts` through isolated login + SET-role boundary | Direct writes denied; approve/replay/conflicts/reviewer status/reject/needs-review/concurrency/rollback pass | 6/6 passed. The login is disposable, non-superuser, and receives only membership needed to `SET ROLE promotion_service`; owner-only fixture cleanup preserves append-only production behavior. |
+| Full integration GREEN | Serialized `@airdrop/database test:integration` with isolated DB/API variables | Every repository integration runs without an environment skip | 6 files and 28/28 tests passed with zero skips, including the Promotion repository. |
+| Package GREEN | Database lint, typecheck, unit tests; affected worker test; repository `pnpm verify` | Static boundaries, legacy interface removal, all workspace tests, and builds remain compatible | Database lint/typecheck passed; database unit run passed 102 with environment-gated integrations skipped; worker run passed 164 with 2 unrelated environment-gated skips; repository `pnpm verify` passed. |
+| Legacy CLI RED/GREEN | Focused `promote-candidate.test.ts`, then worker typecheck | The retired entry fails closed without retaining a typed legacy Promotion call | RED captured the old configuration stack trace; GREEN passed 164 worker tests with 2 unrelated environment-gated skips, and worker typecheck passed. The compatibility entry now emits only `legacy_promotion_cli_disabled_use_review_candidate` and exits nonzero. |
+
+Ruling: fixed-order JavaScript `JSON.stringify` bytes are the canonical command JSON persisted and compared end to end. The not-yet-production-applied Phase 6A migration reconstructs and hashes those exact UTF-8 bytes after strict typed JSON validation; the PostgreSQL adapter does not substitute a second database-specific hash. Cost if wrong: changing the canonical byte contract later requires an explicit versioned compatibility strategy for existing idempotency receipts.
+
+Ruling: Task 6's legacy CLI retirement moved forward into Task 5 because deleting the typed `promoteCandidate` repository method otherwise leaves a broken compile and an unsafe operational path. Cost if wrong: the legacy `list` command becomes unavailable one task earlier; the new governed review CLI is added in Task 6.

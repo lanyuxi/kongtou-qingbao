@@ -77,9 +77,6 @@ function recordingRepository(inputs: PendingExtractionInput[]) {
     async listPendingCandidates() {
       return [];
     },
-    async promoteCandidate() {
-      throw new Error('not used in these tests');
-    },
   };
   return { repository, runs, candidateBatches };
 }
