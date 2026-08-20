@@ -722,17 +722,41 @@ create temporary table governance_command_results (
 
 create function pg_temp.governance_input_hash(payload jsonb)
 returns text
-language sql
+language plpgsql
 immutable
 strict
 security definer
 set search_path = pg_catalog, extensions
 as $$
-  select pg_catalog.encode(
-    extensions.digest(pg_catalog.convert_to(payload::text, 'UTF8'), 'sha256'),
+declare
+  canonical_command_text text;
+begin
+  canonical_command_text :=
+    '{"candidateId":' || pg_catalog.to_json(payload ->> 'candidateId')::text ||
+    ',"decision":' || pg_catalog.to_json(payload ->> 'decision')::text ||
+    ',"expectedCandidateVersion":' || (payload ->> 'expectedCandidateVersion') ||
+    ',"note":' || case
+      when pg_catalog.jsonb_typeof(payload -> 'note') = 'null' then 'null'
+      else pg_catalog.to_json(payload ->> 'note')::text
+    end ||
+    ',"reasonCode":' || pg_catalog.to_json(payload ->> 'reasonCode')::text ||
+    ',"reviewerUserId":' || pg_catalog.to_json(payload ->> 'reviewerUserId')::text ||
+    ',"version":' || (payload ->> 'version') ||
+    '}';
+  return pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(canonical_command_text, 'UTF8'), 'sha256'),
     'hex'
   );
+end;
 $$;
+
+select is(
+  pg_temp.governance_input_hash(
+    '{"candidateId":"85000000-0000-4000-8000-000000000001","decision":"approve","expectedCandidateVersion":1,"note":"Verified exact quote.","reasonCode":"evidence_verified","reviewerUserId":"85000000-0000-4000-8000-000000000090","version":1}'::jsonb
+  ),
+  'b42169ab608fa7f3087bfa75f1b92f723a73c4d3debe8ad4024e2534fae00ef5',
+  'Promotion command hashing matches the fixed-order TypeScript JSON vector'
+);
 
 grant select, insert on table pg_temp.governance_command_results to promotion_service;
 

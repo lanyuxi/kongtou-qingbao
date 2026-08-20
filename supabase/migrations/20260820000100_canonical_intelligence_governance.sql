@@ -455,6 +455,7 @@ declare
   source_identity_matches boolean := true;
   grounding_matches boolean := false;
   occurred_at_text text;
+  canonical_command_text text;
 begin
   if p_reviewer_user_id is null
     or p_command_payload is null
@@ -499,11 +500,27 @@ begin
         and pg_catalog.char_length(p_command_payload ->> 'note') between 1 and 1000
       )
     )
-    or pg_catalog.encode(
-      extensions.digest(pg_catalog.convert_to(p_command_payload::text, 'UTF8'), 'sha256'),
-      'hex'
-    ) <> p_input_hash
   then
+    raise exception 'promotion_command_invalid' using errcode = 'AI106';
+  end if;
+
+  canonical_command_text :=
+    '{"candidateId":' || pg_catalog.to_json(p_command_payload ->> 'candidateId')::text ||
+    ',"decision":' || pg_catalog.to_json(p_command_payload ->> 'decision')::text ||
+    ',"expectedCandidateVersion":' || (p_command_payload ->> 'expectedCandidateVersion') ||
+    ',"note":' || case
+      when pg_catalog.jsonb_typeof(p_command_payload -> 'note') = 'null' then 'null'
+      else pg_catalog.to_json(p_command_payload ->> 'note')::text
+    end ||
+    ',"reasonCode":' || pg_catalog.to_json(p_command_payload ->> 'reasonCode')::text ||
+    ',"reviewerUserId":' || pg_catalog.to_json(p_command_payload ->> 'reviewerUserId')::text ||
+    ',"version":' || (p_command_payload ->> 'version') ||
+    '}';
+
+  if pg_catalog.encode(
+    extensions.digest(pg_catalog.convert_to(canonical_command_text, 'UTF8'), 'sha256'),
+    'hex'
+  ) <> p_input_hash then
     raise exception 'promotion_command_invalid' using errcode = 'AI106';
   end if;
 
