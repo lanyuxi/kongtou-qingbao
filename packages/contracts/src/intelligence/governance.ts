@@ -37,7 +37,14 @@ const commandBase = z.object({
   candidateId: uuidSchema,
   reviewerUserId: uuidSchema,
   expectedCandidateVersion: positiveVersionSchema,
-  note: postgresTextSchema.trim().min(1).max(1000).nullable(),
+  note: postgresTextSchema
+    .trim()
+    .min(1)
+    .refine(
+      (value) => Array.from(value).length <= 1000,
+      'note must contain at most 1000 Unicode code points',
+    )
+    .nullable(),
 });
 
 export const candidateReviewCommandV1Schema = z.discriminatedUnion('decision', [

@@ -172,9 +172,9 @@ function sqlState(error: unknown): string | undefined {
 function parseIdempotencyKey(value: unknown): string {
   if (typeof value !== 'string'
     || value.length < 1
-    || value.length > 200
     || value.trim().length === 0
-    || !isPostgresText(value)) {
+    || !isPostgresText(value)
+    || Array.from(value).length > 200) {
     throw new Error('invalid_idempotency_key');
   }
   return value;

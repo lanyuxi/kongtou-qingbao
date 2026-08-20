@@ -124,3 +124,16 @@ Ruling: Task 6's legacy CLI retirement moved forward into Task 5 because deletin
 Fix-round ruling: PostgreSQL text cannot represent NUL or unpaired UTF-16 surrogates, so those values are rejected at the shared command and repository idempotency boundaries before any transaction. Valid BMP and astral Unicode remain supported. Cost if wrong: accepting non-PostgreSQL text would move a deterministic client error into a concealed persistence failure and could destabilize cross-language idempotency bytes.
 
 Fix-round ruling: destructive integration authority is established only by the exact paused seed-project marker created during an explicit disposable reset. Cost if wrong: an accidental matching marker row could authorize fixture cleanup, so the guard binds four fixed fields, cleanup targets only Task 5 UUIDs, roles are randomized with a fixed safe prefix, and production is never seeded with this fixture.
+
+## Server-only Promotion repository fix round 2
+
+| Phase | Command | Expected result | Actual result |
+| --- | --- | --- | --- |
+| Review verification | Compare TypeScript limits with PostgreSQL `char_length` | Identify whether both boundaries count the same unit | Confirmed mismatch: JavaScript counted UTF-16 code units; PostgreSQL counts Unicode code points. Astral notes/keys failed at 501/101 instead of 1001/201. |
+| Contracts RED | Focused governance contract tests with literal BMP/astral boundaries | Astral 1000 and former 501 cases expose the code-unit maximum | Exactly those 2 cases failed with Zod `too_big`; 62 tests passed. BMP 1000/1001 already behaved correctly. |
+| Repository RED | Focused Promotion repository tests with literal BMP/astral boundaries | Astral 200 and former 101 keys expose the code-unit maximum before transaction | Exactly those 2 cases failed with concealed persistence errors; 118 tests passed with 29 integration skips. BMP 200/201 already behaved correctly. |
+| Unit GREEN | Code-point limits after existing trim/representability rules | BMP/astral exact boundaries pass without changing bytes or hashes | Contracts passed 64/64; database unit run passed 120 with 29 integration skips. Accepted idempotency keys were forwarded exactly. |
+| Package GREEN | Contracts/database/worker lint, typecheck, tests | Affected workspaces remain compatible | All lint/typecheck gates passed; worker passed 164 with 2 unrelated environment skips. |
+| Final verification | Repository `pnpm verify`, diff/boundary/sensitive scans | Whole repository remains green with no SQL/reset requirement | `pnpm verify` and all scans passed. No database, seed, migration, canonical ordering, or hash file changed. |
+
+Fix-round ruling: user-visible Promotion limits are measured in Unicode code points to match PostgreSQL `char_length`, not UTF-16 code units. Cost if wrong: astral text would be rejected earlier than the database contract, producing avoidable concealed persistence failures and inconsistent retry/idempotency behavior across boundaries.

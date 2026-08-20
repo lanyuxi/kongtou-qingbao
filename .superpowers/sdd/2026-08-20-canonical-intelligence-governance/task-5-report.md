@@ -1,6 +1,6 @@
 # Task 5 implementation report
 
-Status: DONE (fix round 1 verified)
+Status: DONE (fix round 2 verified)
 
 ## Scope and commits
 
@@ -89,3 +89,21 @@ Status: DONE (fix round 1 verified)
 - Full serialized integration with isolated DB/API credentials (controller): 6/6 files, 29/29 tests, zero skips, exit 0. One preceding run had only a legacy source-collection 5000 ms timeout; the exact case passed alone in 1885 ms, and a post-run check showed zero lock waiters, fixture rows, attempts, or test role. The clean full rerun confirmed transient remote/tunnel latency, so no code or timeout was changed.
 - Contracts: lint/typecheck passed; 61/61 tests passed. Database: lint/typecheck passed; 117 unit tests passed with 29 environment-gated integration skips. Worker: lint/typecheck passed; 164 tests passed with 2 unrelated environment-gated skips.
 - Repository `pnpm verify` passed lint, typecheck, unit tests, builds, and placeholder scan. `git diff --check` and the sensitive-string scan passed. Node 24.19 emitted only the known Node 22 engine warning.
+
+## Fix round 2
+
+### Remaining review finding and TDD evidence
+
+- Review verification confirmed one cross-language boundary mismatch: JavaScript's prior `string.length`/Zod `.max()` limits counted UTF-16 code units, while PostgreSQL `char_length` counts Unicode code points. Valid astral-only values therefore failed at note length 501 and idempotency-key length 101 even though the database contract allowed 1000 and 200 code points.
+- RED contracts run: the new exact astral 1000 and former 501 cases failed with Zod `too_big`; 62 other tests passed. BMP 1000/1001 already matched the intended boundary.
+- RED database run: exact astral 200 and former 101 idempotency keys failed before transaction with the concealed persistence error; 118 other tests passed with 29 environment-gated integration skips. BMP 200/201 already matched the intended boundary.
+- GREEN uses `Array.from(value).length` only after the existing note trim/PostgreSQL-text rules and idempotency representability rules. The conflicting code-unit maximum checks were removed; no database, seed, migration, canonical payload order, or hash logic changed.
+- Boundary coverage proves BMP and astral note lengths 1000 accepted/1001 rejected, BMP and astral idempotency-key lengths 200 accepted/201 rejected, and the former astral 501/101 failures accepted. Accepted idempotency text is asserted byte-for-byte at the function-client boundary.
+
+### Fix-round verification
+
+- Contracts full package tests: 64/64 passed; lint and typecheck passed.
+- Database unit package tests: 120 passed with 29 environment-gated integration skips; lint and typecheck passed.
+- Affected worker tests: 164 passed with 2 unrelated environment-gated skips; lint and typecheck passed.
+- Repository `pnpm verify`, `git diff --check`, boundary scan, and sensitive-string scan passed. Node 24.19 emitted only the known Node 22 engine warning.
+- Database reset/integration was intentionally not run: this fix changes only pre-transaction TypeScript validation and tests, with no SQL, seed, migration, or adapter behavior change.

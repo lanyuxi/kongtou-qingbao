@@ -164,6 +164,40 @@ describe('PromotionRepository', () => {
     expect(client.calls[0]?.args.p_idempotency_key).toBe(idempotencyKey);
   });
 
+  it.each([
+    ['BMP', 'k'],
+    ['astral', '🚀'],
+  ] as const)('counts %s idempotency-key limits in Unicode code points', async (_kind, character) => {
+    const maximum = character.repeat(200);
+    const accepted = new RecordingClient([[promotedResultRow()]]);
+
+    await createPromotionRepositoryFromClient(accepted).reviewCandidate({
+      ...reviewInput(),
+      idempotencyKey: maximum,
+    });
+    expect(accepted.calls[0]?.args.p_idempotency_key).toBe(maximum);
+
+    const rejected = new RecordingClient([[promotedResultRow()]]);
+    await expect(createPromotionRepositoryFromClient(rejected).reviewCandidate({
+      ...reviewInput(),
+      idempotencyKey: character.repeat(201),
+    })).rejects.toEqual(new PromotionPersistenceError());
+    expect(rejected.transactions).toBe(0);
+    expect(rejected.calls).toEqual([]);
+  });
+
+  it('preserves the former 101-astral-code-point failure boundary exactly', async () => {
+    const idempotencyKey = '🚀'.repeat(101);
+    const client = new RecordingClient([[promotedResultRow()]]);
+
+    await createPromotionRepositoryFromClient(client).reviewCandidate({
+      ...reviewInput(),
+      idempotencyKey,
+    });
+
+    expect(client.calls[0]?.args.p_idempotency_key).toBe(idempotencyKey);
+  });
+
   it('parses PostgreSQL bigint wire values and Date transaction timestamps', async () => {
     const repository = createPromotionRepositoryFromClient(new RecordingClient([[
       { ...promotedResultRow(), candidate_version: '2' },

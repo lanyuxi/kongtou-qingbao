@@ -77,6 +77,24 @@ describe('intelligence governance contracts', () => {
     );
   });
 
+  it.each([
+    ['BMP', '审'],
+    ['astral', '🚀'],
+  ] as const)('counts %s review-note limits in Unicode code points', (_kind, character) => {
+    const maximum = character.repeat(1000);
+    expect(candidateReviewCommandV1Schema.parse({ ...command, note: maximum }).note).toBe(maximum);
+    expect(candidateReviewCommandV1Schema.safeParse({
+      ...command,
+      note: character.repeat(1001),
+    }).success).toBe(false);
+  });
+
+  it('accepts the former 501-astral-code-point failure boundary', () => {
+    const note = '🚀'.repeat(501);
+
+    expect(candidateReviewCommandV1Schema.parse({ ...command, note }).note).toBe(note);
+  });
+
   it('accepts PostgreSQL-safe BMP and astral notes while rejecting NUL and lone surrogates', () => {
     expect(candidateReviewCommandV1Schema.parse({ ...command, note: '审查 café 🚀' }).note).toBe(
       '审查 café 🚀',
