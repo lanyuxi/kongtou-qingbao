@@ -252,6 +252,27 @@ select ok(
   'ai_stage_worker cannot mutate candidate review state or append Promotion audit history directly'
 );
 
+select results_eq(
+  $$
+    select column_name::text collate "C"
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'extraction_candidates'
+      and grantee = 'ai_stage_worker'
+      and privilege_type = 'INSERT'
+    order by column_name
+  $$,
+  $$
+    select expected.column_name collate "C"
+    from (values
+      ('ai_run_id'::text), ('discovered_item_id'), ('payload'), ('payload_sha256'),
+      ('project_id'), ('raw_item_id'), ('source_id')
+    ) as expected(column_name)
+    order by expected.column_name
+  $$,
+  'ai_stage_worker may insert only the seven candidate-stage columns used by the repository'
+);
+
 select function_privs_are(
   'public', 'promote_extraction_candidate', array['uuid', 'text'],
   'ai_stage_worker', array[]::text[],
@@ -298,6 +319,26 @@ from (values
 ) as expected(signature)
 left join pg_catalog.pg_proc as procedure_info
   on procedure_info.oid = pg_catalog.to_regprocedure(expected.signature);
+
+select ok(
+  lock_location > 0 and receipt_location > lock_location,
+  pg_catalog.format('%s serializes the reviewer idempotency key before receipt lookup', signature)
+)
+from (
+  select signature,
+    pg_catalog.strpos(function_definition, 'pg_advisory_xact_lock') as lock_location,
+    pg_catalog.strpos(function_definition, 'from public.promotion_commands') as receipt_location
+  from (
+    select expected.signature,
+      pg_catalog.lower(pg_catalog.pg_get_functiondef(procedure_info.oid)) as function_definition
+    from (values
+      ('public.execute_extraction_candidate_review(uuid,jsonb,text,text,timestamp with time zone)'),
+      ('public.reconcile_extraction_candidate_evidence(uuid,uuid,bigint,text,timestamp with time zone)')
+    ) as expected(signature)
+    join pg_catalog.pg_proc as procedure_info
+      on procedure_info.oid = pg_catalog.to_regprocedure(expected.signature)
+  ) as function_source
+) as lock_order;
 
 select ok(
   has_function_privilege('promotion_service', expected.signature, 'EXECUTE')
@@ -403,7 +444,7 @@ select
   'A grounded discovered summary quote for governance review number ' || item_number || '.',
   true,
   'eligible'::public.discovery_disposition
-from pg_catalog.generate_series(40, 49) as item_number;
+from pg_catalog.generate_series(40, 52) as item_number;
 
 insert into public.ai_runs (
   id, stage, input_kind, input_id, input_hash, model_id, prompt_version,
@@ -428,8 +469,8 @@ select
   ('10000000-0000-4000-8000-' || pg_catalog.lpad((candidate_number - 20)::text, 12, '0'))::uuid,
   case
     when candidate_number = 64 then '10000000-0000-4000-8000-000000000032'::uuid
-    when candidate_number = 65 then null
-    else '10000000-0000-4000-8000-000000000031'::uuid
+      when candidate_number = 65 then null
+      else '10000000-0000-4000-8000-000000000031'::uuid
   end,
   pg_catalog.jsonb_build_object(
     'claimType', 'points_program', 'signalType', 'points_program',
@@ -439,13 +480,14 @@ select
     'evidenceQuote', case
       when candidate_number = 64 then 'A grounded article quote exists'
       when candidate_number = 65 then 'grounded discovered summary quote'
+      when candidate_number = 69 then 'short'
       else 'Case, punctuation!'
     end,
     'occurredAtIso', null
   ),
   pg_catalog.md5(candidate_number::text) || pg_catalog.md5('candidate-' || candidate_number),
   'pending', null, null, '2026-08-20 00:04:00+00'
-from pg_catalog.generate_series(60, 68) as candidate_number;
+from pg_catalog.generate_series(60, 72) as candidate_number;
 
 insert into public.signals (
   id, project_id, signal_type, title, summary, verification, lifecycle,
@@ -459,6 +501,18 @@ values
   ('10000000-0000-4000-8000-000000000081', '10000000-0000-4000-8000-000000000010',
     'historical_ungrounded', 'Historical ungrounded signal',
     'A historical signal whose stored quote cannot be reconciled.',
+    'unverified', 'published', 60, '2026-08-20 00:05:00+00', '2026-08-20 00:05:00+00'),
+  ('10000000-0000-4000-8000-000000000082', '10000000-0000-4000-8000-000000000010',
+    'historical_stale', 'Historical stale-version signal',
+    'A historical signal used to reject stale reconciliation commands.',
+    'unverified', 'published', 60, '2026-08-20 00:05:00+00', '2026-08-20 00:05:00+00'),
+  ('10000000-0000-4000-8000-000000000083', '10000000-0000-4000-8000-000000000010',
+    'historical_unauthorized', 'Historical unauthorized signal',
+    'A historical signal used to reject unauthorized reconciliation.',
+    'unverified', 'published', 60, '2026-08-20 00:05:00+00', '2026-08-20 00:05:00+00'),
+  ('10000000-0000-4000-8000-000000000084', '10000000-0000-4000-8000-000000000010',
+    'historical_revoked', 'Historical revoked-reviewer signal',
+    'A historical signal used to reject revoked reviewer reconciliation.',
     'unverified', 'published', 60, '2026-08-20 00:05:00+00', '2026-08-20 00:05:00+00');
 
 update public.extraction_candidates
@@ -476,6 +530,87 @@ set payload = pg_catalog.jsonb_set(
   signal_id = '10000000-0000-4000-8000-000000000081',
   decided_at = '2026-08-20 00:05:00+00'
 where id = '10000000-0000-4000-8000-000000000063';
+
+update public.extraction_candidates
+set status = 'promoted',
+  signal_id = case id
+    when '10000000-0000-4000-8000-000000000070'::uuid
+      then '10000000-0000-4000-8000-000000000082'::uuid
+    when '10000000-0000-4000-8000-000000000071'::uuid
+      then '10000000-0000-4000-8000-000000000083'::uuid
+    else '10000000-0000-4000-8000-000000000084'::uuid
+  end,
+  decided_at = '2026-08-20 00:05:00+00'
+where id in (
+  '10000000-0000-4000-8000-000000000070',
+  '10000000-0000-4000-8000-000000000071',
+  '10000000-0000-4000-8000-000000000072'
+);
+
+create temporary table ai_candidate_insert_observations (
+  observation_name text primary key,
+  observation_value text not null
+) on commit drop;
+grant insert on table pg_temp.ai_candidate_insert_observations to ai_stage_worker;
+
+set local role ai_stage_worker;
+
+insert into public.extraction_candidates (
+  ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
+  payload, payload_sha256
+) values (
+  '10000000-0000-4000-8000-000000000050',
+  '10000000-0000-4000-8000-000000000010',
+  '10000000-0000-4000-8000-000000000020',
+  '10000000-0000-4000-8000-000000000049',
+  '10000000-0000-4000-8000-000000000031',
+  '{"claimType":"points_program","signalType":"points_program","title":"Stage candidate","summary":"A stage-only candidate remains unreviewed and pending.","confidence":50,"evidenceQuote":"Case, punctuation!","occurredAtIso":null}'::jsonb,
+  repeat('e', 64)
+);
+
+do $forged_candidate_insert$
+begin
+  begin
+    insert into public.extraction_candidates (
+      ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
+      payload, payload_sha256, status, signal_id, decided_at, version, review_status
+    ) values (
+      '10000000-0000-4000-8000-000000000050',
+      '10000000-0000-4000-8000-000000000010',
+      '10000000-0000-4000-8000-000000000020',
+      '10000000-0000-4000-8000-000000000049',
+      '10000000-0000-4000-8000-000000000031',
+      '{"claimType":"points_program","signalType":"points_program","title":"Forged candidate","summary":"This candidate attempts a direct governed transition.","confidence":50,"evidenceQuote":"Case, punctuation!","occurredAtIso":null}'::jsonb,
+      repeat('f', 64), 'promoted',
+      '10000000-0000-4000-8000-000000000080',
+      '2026-08-20 00:06:00+00', 99, 'decided'
+    );
+    insert into pg_temp.ai_candidate_insert_observations
+      (observation_name, observation_value)
+    values ('forged_insert', 'succeeded');
+  exception when others then
+    insert into pg_temp.ai_candidate_insert_observations
+      (observation_name, observation_value)
+    values ('forged_insert', sqlstate);
+  end;
+end;
+$forged_candidate_insert$;
+
+reset role;
+
+select is(
+  (select pg_catalog.format('%s|%s|%s|%s', status, signal_id, version, review_status)
+   from public.extraction_candidates where payload_sha256 = repeat('e', 64)),
+  'pending||1|pending',
+  'ai_stage_worker can still append only a default pending candidate'
+);
+
+select is(
+  (select observation_value from pg_temp.ai_candidate_insert_observations
+   where observation_name = 'forged_insert'),
+  '42501',
+  'ai_stage_worker cannot forge candidate governance state during INSERT'
+);
 
 create temporary table governance_command_results (
   case_name text primary key,
@@ -729,6 +864,78 @@ from public.reconcile_extraction_candidate_evidence(
 
 reset role;
 
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000090',
+      '10000000-0000-4000-8000-000000000063', 1,
+      'reconcile-grounded-1', '2026-08-20 00:21:00+00'
+    )
+  $$,
+  'AI104', 'promotion_idempotency_conflict',
+  'reconciliation key reuse with different canonical input fails AI104'
+);
+
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000090',
+      '10000000-0000-4000-8000-000000000070', 2,
+      'reconcile-stale-1', '2026-08-20 00:22:00+00'
+    )
+  $$,
+  'AI103', 'promotion_version_conflict',
+  'reconciliation rejects a stale expected candidate version'
+);
+
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000092',
+      '10000000-0000-4000-8000-000000000071', 1,
+      'reconcile-unauthorized-1', '2026-08-20 00:23:00+00'
+    )
+  $$,
+  'AI105', 'promotion_reviewer_not_authorized',
+  'reconciliation rejects a user without a reviewer role'
+);
+
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000091',
+      '10000000-0000-4000-8000-000000000072', 1,
+      'reconcile-revoked-1', '2026-08-20 00:24:00+00'
+    )
+  $$,
+  'AI105', 'promotion_reviewer_not_authorized',
+  'reconciliation rejects a revoked reviewer grant'
+);
+
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000090',
+      '10000000-0000-4000-8000-000000000068', 2,
+      'reconcile-linked-1', '2026-08-20 00:25:00+00'
+    )
+  $$,
+  'AI102', 'promotion_candidate_not_reviewable',
+  'reconciliation rejects an already Evidence-linked historical candidate'
+);
+
+select throws_ok(
+  $$
+    select * from public.reconcile_extraction_candidate_evidence(
+      '10000000-0000-4000-8000-000000000090',
+      '10000000-0000-4000-8000-000000000061', 2,
+      'reconcile-invalid-state-1', '2026-08-20 00:26:00+00'
+    )
+  $$,
+  'AI102', 'promotion_candidate_not_reviewable',
+  'reconciliation rejects a non-promoted candidate state'
+);
+
 select results_eq(
   $$
     select result.outcome, candidate.status, candidate.review_status, result.signal_id, result.evidence_id
@@ -808,6 +1015,22 @@ select results_eq(
 
 select results_eq(
   $$
+    select replay.replayed, replay.command_id, replay.decision_id,
+      replay.signal_id, replay.evidence_id
+    from pg_temp.governance_command_results as replay
+    where replay.case_name = 'reconcile-ungrounded-replay'
+  $$,
+  $$
+    select true, original.command_id, original.decision_id,
+      original.signal_id, original.evidence_id
+    from pg_temp.governance_command_results as original
+    where original.case_name = 'reconcile-ungrounded'
+  $$,
+  'ungrounded reconciliation exact replay returns the original receipt IDs'
+);
+
+select results_eq(
+  $$
     select result.outcome, result.candidate_version, result.signal_id,
       result.evidence_id, candidate.status, candidate.signal_id,
       candidate.review_status, decision.reason_code
@@ -840,18 +1063,98 @@ select results_eq(
   'grounded reconciliation appends one link, hardened audit, reviewed outbox event, and receipt'
 );
 
-select throws_ok(
+select results_eq(
   $$
-    select * from public.execute_extraction_candidate_review(
-      '10000000-0000-4000-8000-000000000090',
-      '{"version":1,"candidateId":"not-a-uuid","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":0,"decision":"approve","reasonCode":"claim_not_supported","note":null}'::jsonb,
-      'invalid-1',
-      pg_temp.governance_input_hash('{"version":1,"candidateId":"not-a-uuid","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":0,"decision":"approve","reasonCode":"claim_not_supported","note":null}'::jsonb),
-      '2026-08-20 00:17:00+00'
-    )
+    select
+      (select count(*) from public.candidate_review_decisions where candidate_id = result.candidate_id)::bigint,
+      (select count(*) from public.promotion_commands where candidate_id = result.candidate_id)::bigint,
+      (select count(*) from public.outbox_events where aggregate_id = result.candidate_id)::bigint,
+      (select count(*) from public.signal_evidence_links where signal_id = '10000000-0000-4000-8000-000000000081')::bigint
+    from pg_temp.governance_command_results as result
+    where result.case_name = 'reconcile-ungrounded'
   $$,
-  'AI106', 'promotion_command_invalid',
-  'malformed UUID, version, and decision reason inputs fail with the stable invalid-command code'
+  $$ values (1::bigint, 1::bigint, 1::bigint, 0::bigint) $$,
+  'ungrounded reconciliation replay appends no duplicate decision, receipt, outbox, or Evidence link'
+);
+
+select is(
+  (select count(*) from public.promotion_commands
+   where idempotency_key in (
+     'reconcile-stale-1', 'reconcile-unauthorized-1', 'reconcile-revoked-1',
+     'reconcile-linked-1', 'reconcile-invalid-state-1'
+   )),
+  0::bigint,
+  'failed reconciliation commands write no receipts'
+);
+
+select throws_ok(
+  pg_catalog.format(
+    'select * from public.execute_extraction_candidate_review(%L, %L::jsonb, %L, %L, %L)',
+    '10000000-0000-4000-8000-000000000090',
+    invalid_case.payload::text,
+    invalid_case.idempotency_key,
+    pg_temp.governance_input_hash(invalid_case.payload),
+    '2026-08-20 00:27:00+00'
+  ),
+  invalid_case.expected_sqlstate,
+  invalid_case.expected_message,
+  invalid_case.description
+)
+from (values
+  (
+    '{"version":1,"candidateId":"10000000-0000-4000-8000-000000000066","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":1,"decision":"reject","reasonCode":"claim_not_supported","note":null,"extra":true}'::jsonb,
+    'invalid-keys-1'::text, 'AI106'::text, 'promotion_command_invalid'::text,
+    'review command rejects non-exact JSON keys with AI106'::text
+  ),
+  (
+    '{"version":"1","candidateId":"10000000-0000-4000-8000-000000000066","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":1,"decision":"reject","reasonCode":"claim_not_supported","note":null}'::jsonb,
+    'invalid-type-1', 'AI106', 'promotion_command_invalid',
+    'review command rejects incorrect JSON scalar types with AI106'
+  ),
+  (
+    '{"version":1,"candidateId":"not-a-uuid","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":1,"decision":"reject","reasonCode":"claim_not_supported","note":null}'::jsonb,
+    'invalid-uuid-1', 'AI106', 'promotion_command_invalid',
+    'review command rejects malformed candidate UUIDs with AI106'
+  ),
+  (
+    '{"version":1,"candidateId":"10000000-0000-4000-8000-000000000066","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":0,"decision":"reject","reasonCode":"claim_not_supported","note":null}'::jsonb,
+    'invalid-version-1', 'AI106', 'promotion_command_invalid',
+    'review command rejects non-positive candidate versions with AI106'
+  ),
+  (
+    '{"version":1,"candidateId":"10000000-0000-4000-8000-000000000066","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":1,"decision":"approve","reasonCode":"claim_not_supported","note":null}'::jsonb,
+    'invalid-decision-reason-1', 'AI106', 'promotion_command_invalid',
+    'review command rejects an invalid decision and reason combination with AI106'
+  ),
+  (
+    '{"version":1,"candidateId":"10000000-0000-4000-8000-000000000069","reviewerUserId":"10000000-0000-4000-8000-000000000090","expectedCandidateVersion":1,"decision":"approve","reasonCode":"evidence_verified","note":null}'::jsonb,
+    'invalid-quote-1', 'AI107', 'promotion_evidence_quote_invalid',
+    'review command rejects invalid stored quote state with AI107'
+  )
+) as invalid_case(payload, idempotency_key, expected_sqlstate, expected_message, description);
+
+select results_eq(
+  $$
+    select
+      (select count(*) from public.promotion_commands where idempotency_key like 'invalid-%')::bigint,
+      (select count(*) from public.candidate_review_decisions
+       where candidate_id in (
+         '10000000-0000-4000-8000-000000000066',
+         '10000000-0000-4000-8000-000000000069'
+       ))::bigint,
+      (select count(*) from public.outbox_events
+       where aggregate_id in (
+         '10000000-0000-4000-8000-000000000066',
+         '10000000-0000-4000-8000-000000000069'
+       ))::bigint,
+      (select count(*) from public.extraction_candidates
+       where id in (
+         '10000000-0000-4000-8000-000000000066',
+         '10000000-0000-4000-8000-000000000069'
+       ) and version = 1 and status = 'pending' and review_status = 'pending')::bigint
+  $$,
+  $$ values (0::bigint, 0::bigint, 0::bigint, 2::bigint) $$,
+  'malformed command and quote-state failures leave all governance side effects unchanged'
 );
 
 select throws_ok($$ update public.evidence set quote_text = quote_text $$, '55000', 'governance_history_append_only', 'Evidence is append-only');

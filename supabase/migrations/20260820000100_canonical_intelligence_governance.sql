@@ -56,6 +56,13 @@ on public.extraction_candidates;
 revoke insert on table public.promotion_events from ai_stage_worker;
 drop policy if exists promotion_events_ai_stage_worker_insert
 on public.promotion_events;
+revoke insert on table public.extraction_candidates from ai_stage_worker;
+grant insert (
+  ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
+  payload, payload_sha256
+) on table public.extraction_candidates to ai_stage_worker;
+drop policy if exists extraction_candidates_ai_stage_worker_insert
+on public.extraction_candidates;
 
 alter table public.extraction_candidates
   add column version bigint not null default 1
@@ -71,6 +78,18 @@ alter table public.extraction_candidates
     or (status = 'rejected' and signal_id is null and decided_at is not null)
     or (status = 'pending' and signal_id is null and decided_at is null)
   );
+
+create policy extraction_candidates_ai_stage_worker_insert
+on public.extraction_candidates
+for insert
+to ai_stage_worker
+with check (
+  status = 'pending'
+  and signal_id is null
+  and decided_at is null
+  and version = 1
+  and review_status = 'pending'
+);
 
 create table public.evidence (
   id uuid primary key default extensions.gen_random_uuid(),
@@ -499,6 +518,15 @@ begin
     raise exception 'promotion_command_invalid' using errcode = 'AI106';
   end if;
 
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      p_reviewer_user_id::text || ':' ||
+      pg_catalog.char_length(p_idempotency_key)::text || ':' ||
+      p_idempotency_key,
+      0
+    )
+  );
+
   select receipt.* into receipt_record
   from public.promotion_commands as receipt
   where receipt.reviewer_user_id = p_reviewer_user_id
@@ -877,6 +905,15 @@ begin
   canonical_input_hash := pg_catalog.encode(
     extensions.digest(pg_catalog.convert_to(canonical_input::text, 'UTF8'), 'sha256'),
     'hex'
+  );
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(
+      p_reviewer_user_id::text || ':' ||
+      pg_catalog.char_length(p_idempotency_key)::text || ':' ||
+      p_idempotency_key,
+      0
+    )
   );
 
   select receipt.* into receipt_record

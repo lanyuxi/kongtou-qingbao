@@ -3,13 +3,13 @@
 | Task | Status | RED | GREEN | Commit |
 | --- | --- | --- | --- | --- |
 | 1. Add strict governance contracts | COMPLETED | See log | See log | `feat(contracts): add intelligence governance contracts` |
-| 2. Add governed promotion boundary | COMPLETED WITH BASELINE CONCERNS | See log | See log | `feat(db): add governed promotion boundary` |
-| 3. Add evidence-gated read models | READY | — | — | — |
-| 4. Add deterministic grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
+| 2. Add deterministic grounding rules | COMPLETED | See log | See log | `feat(domain): add deterministic evidence grounding` |
+| 3. Add governance schema and protected Promotion command | COMPLETED WITH BASELINE CONCERNS — FIX ROUND 1 | See log | See log | `feat(db): add governed promotion boundary`; `fix(db): harden governed promotion boundary` |
+| 4. Add evidence-gated reads | READY | — | — | — |
 | 5. Add promotion repository | READY | — | — | — |
-| 6. Add reconciliation worker | READY | — | — | — |
-| 7. Add reviewer CLI | READY | — | — | — |
-| 8. Add governance verification | READY | — | — | — |
+| 6. Add governed CLI | READY | — | — | — |
+| 7. Add historical reconciliation and fixtures | READY | — | — | — |
+| 8. Add types, docs, and final gates | READY | — | — | — |
 
 ## Task 1 execution log
 
@@ -44,6 +44,11 @@
 | Sensitivity: AI signal INSERT | Temporarily restore the AI-stage signal INSERT grant/policy, isolated reset, focused file 010 | Governance test turns RED | Failed 1/97 at test 27. Exact bytes restored; migration SHA-256 returned to `0a1abc12ea3057ad579ad7133445aaf7aaefc08088c052a9431803152030e060`; focused GREEN returned 97/97. |
 | Sensitivity: missing outbox | Temporarily bypass both live-review outbox branches, isolated reset, focused file 010 | Governance test turns RED | Failed 2/97 at tests 77–78: outbox count was zero and payload was null. Exact bytes/SHA restored; focused GREEN returned 97/97. |
 | Sensitivity: revoked reviewer | Temporarily remove the live-review `revoked_at is null` predicate, isolated reset, focused file 010 | Governance test turns RED | Failed 1/97 at test 83 because the revoked reviewer raised no `AI105`. Exact bytes/SHA restored; final focused GREEN passed 100/100 after exact catalog assertions were added. |
+| Fix round 1 RED | Focused file 010 against the original Task 3 migration | Candidate-stage INSERT ACL, lock ordering, and forged-state tests fail before implementation | 120 assertions ran; only tests 31, 74, 75, and 82 failed as expected. The expanded malformed-input and reconciliation matrix already passed. |
+| Fix round 1 GREEN | Revised migration plus focused file 010 after isolated reset | Exact seven-column candidate INSERT, protected pending state, serialized receipt lookup, and expanded matrices pass | 1 file, 120 tests, 120 passed. |
+| Fix round 1 concurrency | Two simultaneous PostgreSQL sessions per idempotency case | Exact duplicates replay stable IDs; changed input returns `AI104` after waiting for the first transaction | Exact duplicate returned the same command and decision IDs with `replayed=true`; changed input returned `AI104`; each key had one receipt and the alternate candidate remained `pending`, version 1. |
+| Fix round 1 sensitivity: candidate INSERT | Temporarily restore broad candidate INSERT and permissive INSERT RLS, isolated reset, focused file 010 | Direct-write guards turn RED | Failed 2/120 at tests 31 and 82. Exact clean migration SHA-256 `48a50405af02478ff0d31bfcd1ec3777360baa6110bf8221414521aabd732569` restored; final focused GREEN passed 120/120. |
+| Fix round 1 full database gate | Isolated `supabase test db` | Task 3 stays GREEN; unchanged baseline failures remain separate | File 010 passed. Full run: 10 files, 902 tests; only unchanged files 003 (4), 004 (5), 006 (12), and 008 (1) failed. |
 | Repository verification | Bundled-runtime `env -u NODE_OPTIONS pnpm verify` | Lint, typecheck, unit tests, build, and placeholders pass | All workspace lint passed. Typecheck then stopped in the pre-existing Task 2 file `packages/domain/src/intelligence/evidence-grounding.ts:1` because its `@ts-expect-error` is unused when compiled through `apps/worker`; no Task 3 file caused the failure. |
 
 The aggregate database gate remains nonzero only because the controller-confirmed baseline topology contains stale failures in files 003, 004, 006, and 008. Those files were not modified by this task.
