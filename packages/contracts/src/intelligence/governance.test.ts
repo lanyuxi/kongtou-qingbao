@@ -85,6 +85,18 @@ describe('intelligence governance contracts', () => {
       quote: 'A grounded quote.',
     } as const;
     expect(evidenceLocatorV1Schema.parse(locator)).toEqual(locator);
+    expect(evidenceLocatorV1Schema.parse({ ...locator, quote: 'a'.repeat(10) })).toEqual({
+      ...locator,
+      quote: 'a'.repeat(10),
+    });
+    expect(evidenceLocatorV1Schema.parse({ ...locator, quote: 'a'.repeat(500) })).toEqual({
+      ...locator,
+      quote: 'a'.repeat(500),
+    });
+    expect(evidenceLocatorV1Schema.parse({ ...locator, sourceField: 'discovered_summary' })).toEqual({
+      ...locator,
+      sourceField: 'discovered_summary',
+    });
     expect(evidenceLocatorV1Schema.safeParse({ ...locator, quote: 'short' }).success).toBe(false);
     expect(evidenceLocatorV1Schema.safeParse({ ...locator, quote: ' '.repeat(10) }).success).toBe(false);
     expect(evidenceLocatorV1Schema.safeParse({ ...locator, quote: 'a'.repeat(501) }).success).toBe(false);
