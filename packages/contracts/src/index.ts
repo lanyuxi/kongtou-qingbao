@@ -83,3 +83,19 @@ export type {
 } from './queue/durable-collection-queue.js';
 export { createJobEnvelopeSchema } from './jobs/envelope.js';
 export type { JobEnvelope } from './jobs/envelope.js';
+export {
+  candidateReviewCommandV1Schema,
+  candidateReviewDecisionSchema,
+  candidateReviewReasonCodeSchema,
+  candidateReviewResultV1Schema,
+  evidenceLocatorV1Schema,
+  governanceOutboxEventV1Schema,
+} from './intelligence/governance.js';
+export type {
+  CandidateReviewCommandV1,
+  CandidateReviewDecision,
+  CandidateReviewReasonCode,
+  CandidateReviewResultV1,
+  EvidenceLocatorV1,
+  GovernanceOutboxEventV1,
+} from './intelligence/governance.js';
