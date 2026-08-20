@@ -132,6 +132,20 @@ airdrops.io feed ──dev_fixture_admin 注入──▶（同上表结构）
 
 ### 远程 Supabase（当前唯一真实数据库，本地无 Docker）
 
+固定服务器信息：
+
+| 项目 | 值 |
+|------|----|
+| 公网 IP | `115.190.206.200` |
+| 私网 IP | `172.31.0.2` |
+| SSH 用户 | `root` |
+| 首选认证 | `~/.ssh/airdrop_intelligence_ecs_ed25519` |
+| 备用密码凭据 | macOS Keychain service：`airdrop-intelligence-ssh-115.190.206.200`，account：`root` |
+
+> 服务器密码不得写入仓库、命令历史、日志或环境变量。需要备用密码时，从本机 Keychain 读取：
+> `security find-generic-password -a root -s airdrop-intelligence-ssh-115.190.206.200 -w`。
+> 后续接手者应优先使用 SSH 密钥；只有密钥不可用时才读取备用密码，不要再次向项目所有者询问已经保存的凭据。
+
 ```bash
 # SSH（密钥与地址）
 ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200
