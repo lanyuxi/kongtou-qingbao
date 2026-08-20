@@ -33,6 +33,8 @@
 | GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain typecheck` | Typecheck passes | Passed. |
 | GREEN | `PATH=/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/Users/xixi/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/usr/bin:/bin env -u NODE_OPTIONS pnpm --filter @airdrop/domain test` | All domain tests pass | 9 files and 221 tests passed. |
 
+Cross-workspace typing regression: added `@types/node` as a domain devDependency and `types: ["node"]` to its tsconfig, removing the context-dependent suppression around `node:crypto`; domain and worker typechecks plus `pnpm verify` pass.
+
 ## Governed Promotion database boundary execution log
 
 | Phase | Command | Expected result | Actual result |

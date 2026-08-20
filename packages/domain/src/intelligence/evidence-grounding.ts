@@ -1,4 +1,3 @@
-// @ts-expect-error The domain package intentionally has no runtime dependency on Node type declarations.
 import { createHash } from 'node:crypto';
 
 // The explicit control characters are part of the PostgreSQL-compatible whitespace contract.
