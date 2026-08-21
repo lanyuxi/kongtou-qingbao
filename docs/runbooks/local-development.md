@@ -130,6 +130,34 @@ pnpm --filter @airdrop/worker test -- src/queue/tests/automatic-collection.e2e.t
 
 `createSourceCollector()` exposes only `collect` and `close`; the queue runtime owns both and closes the collector pool during shutdown.
 
+## Governed Promotion and Evidence reconciliation
+
+Canonical intelligence writes are governed by the Phase 6A boundary: AI and collection roles cannot insert canonical signals, and every publicly visible signal or score must trace through valid Evidence to a Raw Item and Source. Signals and scores recorded before Phase 6A remain stored but hidden from public read models until reconciliation links Evidence or the record is parked with an append-only `needs_review` decision.
+
+Provision the server-only Promotion login with flat SQL statements. Never send `DO $$ ... $$` blocks over SSH because they fail silently:
+
+```sql
+create role promotion_service_login with login password 'local-password' in role promotion_service;
+```
+
+The governed review CLI replaces the retired legacy entry, which now fails closed with `legacy_promotion_cli_disabled_use_review_candidate`. Review a pending extraction candidate with an active reviewer profile UUID, its exact version, and a fresh Idempotency-Key:
+
+```bash
+npx tsx apps/worker/src/promotion/review-candidate.ts approve <candidate-id> <expected-version> <idempotency-key>
+npx tsx apps/worker/src/promotion/review-candidate.ts reject <candidate-id> <expected-version> <idempotency-key> claim_not_supported
+npx tsx apps/worker/src/promotion/review-candidate.ts needs-review <candidate-id> <expected-version> <idempotency-key> grounding_failed
+```
+
+The commands read only `AIRDROP_PROMOTION_DATABASE_URL` and `AIRDROP_PROMOTION_REVIEWER_USER_ID`; they never print connection values, source content, notes, or stack traces. The review transaction performs deterministic exact-quote grounding against stored immutable data and never calls a model, DNS, or HTTP service inside the transaction.
+
+Backfill Evidence for already-promoted historical candidates in bounded, idempotent batches. The runner processes promoted candidates that still lack an Evidence link, in ascending candidate-ID order, and prints only integer counts plus the next cursor:
+
+```bash
+npx tsx apps/worker/src/promotion/reconcile-historical-evidence.ts
+```
+
+Optional controls are `AIRDROP_EVIDENCE_RECONCILE_LIMIT` (1-100, default 25) and `AIRDROP_EVIDENCE_RECONCILE_AFTER_ID` (UUID cursor for continuing after the printed cursor). Re-running with the same reviewer appends exact replays and creates no duplicate Evidence, links, decisions, or events. Ungroundable history is preserved and parked with a `historical_reconciliation_failed` needs-review decision; it is never deleted or overwritten.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:

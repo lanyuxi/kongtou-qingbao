@@ -7,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       ai_runs: {
@@ -62,6 +87,74 @@ export type Database = {
           usage?: Json | null
         }
         Relationships: []
+      }
+      candidate_review_decisions: {
+        Row: {
+          candidate_id: string
+          candidate_version: number
+          created_at: string
+          decision: string
+          evidence_id: string | null
+          id: string
+          note: string | null
+          reason_code: string
+          reviewer_user_id: string
+          signal_id: string | null
+        }
+        Insert: {
+          candidate_id: string
+          candidate_version: number
+          created_at?: string
+          decision: string
+          evidence_id?: string | null
+          id?: string
+          note?: string | null
+          reason_code: string
+          reviewer_user_id: string
+          signal_id?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          candidate_version?: number
+          created_at?: string
+          decision?: string
+          evidence_id?: string | null
+          id?: string
+          note?: string | null
+          reason_code?: string
+          reviewer_user_id?: string
+          signal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_review_decisions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_review_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_review_decisions_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_review_decisions_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       collection_attempts: {
         Row: {
@@ -469,6 +562,73 @@ export type Database = {
           },
         ]
       }
+      evidence: {
+        Row: {
+          created_at: string
+          discovered_item_id: string | null
+          id: string
+          locator_kind: string
+          locator_version: number
+          normalized_quote_sha256: string
+          quote_text: string
+          raw_item_id: string
+          source_field: string
+          source_id: string
+          verification_method: string
+          verified_at: string
+        }
+        Insert: {
+          created_at?: string
+          discovered_item_id?: string | null
+          id?: string
+          locator_kind?: string
+          locator_version?: number
+          normalized_quote_sha256: string
+          quote_text: string
+          raw_item_id: string
+          source_field: string
+          source_id: string
+          verification_method?: string
+          verified_at: string
+        }
+        Update: {
+          created_at?: string
+          discovered_item_id?: string | null
+          id?: string
+          locator_kind?: string
+          locator_version?: number
+          normalized_quote_sha256?: string
+          quote_text?: string
+          raw_item_id?: string
+          source_field?: string
+          source_id?: string
+          verification_method?: string
+          verified_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_discovered_item_id_fkey"
+            columns: ["discovered_item_id"]
+            isOneToOne: false
+            referencedRelation: "discovered_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_raw_item_id_fkey"
+            columns: ["raw_item_id"]
+            isOneToOne: false
+            referencedRelation: "raw_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "evidence_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extraction_candidates: {
         Row: {
           ai_run_id: string
@@ -480,9 +640,11 @@ export type Database = {
           payload_sha256: string
           project_id: string
           raw_item_id: string | null
+          review_status: string
           signal_id: string | null
           source_id: string
           status: string
+          version: number
         }
         Insert: {
           ai_run_id: string
@@ -494,9 +656,11 @@ export type Database = {
           payload_sha256: string
           project_id: string
           raw_item_id?: string | null
+          review_status?: string
           signal_id?: string | null
           source_id: string
           status?: string
+          version?: number
         }
         Update: {
           ai_run_id?: string
@@ -508,9 +672,11 @@ export type Database = {
           payload_sha256?: string
           project_id?: string
           raw_item_id?: string | null
+          review_status?: string
           signal_id?: string | null
           source_id?: string
           status?: string
+          version?: number
         }
         Relationships: [
           {
@@ -570,6 +736,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      outbox_events: {
+        Row: {
+          aggregate_id: string
+          aggregate_type: string
+          aggregate_version: number
+          created_at: string
+          delivery_attempts: number
+          event_type: string
+          event_version: number
+          id: string
+          last_error_code: string | null
+          occurred_at: string
+          payload: Json
+          published_at: string | null
+        }
+        Insert: {
+          aggregate_id: string
+          aggregate_type: string
+          aggregate_version: number
+          created_at?: string
+          delivery_attempts?: number
+          event_type: string
+          event_version?: number
+          id?: string
+          last_error_code?: string | null
+          occurred_at: string
+          payload: Json
+          published_at?: string | null
+        }
+        Update: {
+          aggregate_id?: string
+          aggregate_type?: string
+          aggregate_version?: number
+          created_at?: string
+          delivery_attempts?: number
+          event_type?: string
+          event_version?: number
+          id?: string
+          last_error_code?: string | null
+          occurred_at?: string
+          payload?: Json
+          published_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -767,12 +978,95 @@ export type Database = {
         }
         Relationships: []
       }
+      promotion_commands: {
+        Row: {
+          candidate_id: string
+          created_at: string
+          decision_id: string
+          evidence_id: string | null
+          expected_candidate_version: number
+          id: string
+          idempotency_key: string
+          input_hash: string
+          outcome: string
+          resulting_candidate_version: number
+          reviewer_user_id: string
+          signal_id: string | null
+        }
+        Insert: {
+          candidate_id: string
+          created_at?: string
+          decision_id: string
+          evidence_id?: string | null
+          expected_candidate_version: number
+          id?: string
+          idempotency_key: string
+          input_hash: string
+          outcome: string
+          resulting_candidate_version: number
+          reviewer_user_id: string
+          signal_id?: string | null
+        }
+        Update: {
+          candidate_id?: string
+          created_at?: string
+          decision_id?: string
+          evidence_id?: string | null
+          expected_candidate_version?: number
+          id?: string
+          idempotency_key?: string
+          input_hash?: string
+          outcome?: string
+          resulting_candidate_version?: number
+          reviewer_user_id?: string
+          signal_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_commands_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_commands_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_review_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_commands_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_commands_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_commands_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promotion_events: {
         Row: {
           actor: string
           candidate_id: string
           created_at: string
           id: string
+          review_decision_id: string | null
+          reviewer_user_id: string | null
           signal_id: string
         }
         Insert: {
@@ -780,6 +1074,8 @@ export type Database = {
           candidate_id: string
           created_at?: string
           id?: string
+          review_decision_id?: string | null
+          reviewer_user_id?: string | null
           signal_id: string
         }
         Update: {
@@ -787,6 +1083,8 @@ export type Database = {
           candidate_id?: string
           created_at?: string
           id?: string
+          review_decision_id?: string | null
+          reviewer_user_id?: string | null
           signal_id?: string
         }
         Relationships: [
@@ -795,6 +1093,20 @@ export type Database = {
             columns: ["candidate_id"]
             isOneToOne: false
             referencedRelation: "extraction_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_events_review_decision_id_fkey"
+            columns: ["review_decision_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_review_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_events_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -886,6 +1198,113 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      score_factors: {
+        Row: {
+          axis: string
+          contribution: number
+          created_at: string
+          detail: string
+          factor_code: string
+          id: string
+          input_value: number
+          project_score_id: string
+        }
+        Insert: {
+          axis: string
+          contribution: number
+          created_at?: string
+          detail: string
+          factor_code: string
+          id?: string
+          input_value: number
+          project_score_id: string
+        }
+        Update: {
+          axis?: string
+          contribution?: number
+          created_at?: string
+          detail?: string
+          factor_code?: string
+          id?: string
+          input_value?: number
+          project_score_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_factors_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_scores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      score_signal_links: {
+        Row: {
+          created_at: string
+          project_score_id: string
+          signal_id: string
+        }
+        Insert: {
+          created_at?: string
+          project_score_id: string
+          signal_id: string
+        }
+        Update: {
+          created_at?: string
+          project_score_id?: string
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "score_signal_links_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_scores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_signal_links_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_evidence_links: {
+        Row: {
+          created_at: string
+          evidence_id: string
+          signal_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_id: string
+          signal_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence_id?: string
+          signal_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signal_evidence_links_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_evidence_links_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "signals"
             referencedColumns: ["id"]
           },
         ]
@@ -1577,6 +1996,29 @@ export type Database = {
           dead_lettered_job_id: string
         }[]
       }
+      evidence_quote_sha256_v1: {
+        Args: { input_text: string }
+        Returns: string
+      }
+      execute_extraction_candidate_review: {
+        Args: {
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_input_hash: string
+          p_now: string
+          p_reviewer_user_id: string
+        }
+        Returns: {
+          candidate_id: string
+          candidate_version: number
+          command_id: string
+          decision_id: string
+          evidence_id: string
+          outcome: string
+          replayed: boolean
+          signal_id: string
+        }[]
+      }
       execute_source_schedule_command: {
         Args: {
           p_actor_id: string
@@ -1605,6 +2047,13 @@ export type Database = {
         Args: { project_id: string; source_id: string }
         Returns: boolean
       }
+      list_historical_extraction_candidates: {
+        Args: { p_after_candidate_id: string; p_limit: number }
+        Returns: {
+          candidate_id: string
+          candidate_version: number
+        }[]
+      }
       load_source_collection_context: {
         Args: { requested_project_id: string; requested_source_id: string }
         Returns: {
@@ -1613,6 +2062,10 @@ export type Database = {
           project_id: string
           source_id: string
         }[]
+      }
+      normalize_evidence_text_v1: {
+        Args: { input_text: string }
+        Returns: string
       }
       promote_extraction_candidate: {
         Args: { p_actor: string; p_candidate_id: string }
@@ -1625,6 +2078,25 @@ export type Database = {
           created_schedule_count: number
           enqueued_count: number
           lock_acquired: boolean
+        }[]
+      }
+      reconcile_extraction_candidate_evidence: {
+        Args: {
+          p_candidate_id: string
+          p_expected_candidate_version: number
+          p_idempotency_key: string
+          p_now: string
+          p_reviewer_user_id: string
+        }
+        Returns: {
+          candidate_id: string
+          candidate_version: number
+          command_id: string
+          decision_id: string
+          evidence_id: string
+          outcome: string
+          replayed: boolean
+          signal_id: string
         }[]
       }
       renew_collection_job_lease: {
@@ -1651,6 +2123,14 @@ export type Database = {
         Returns: {
           retried_job_id: string
         }[]
+      }
+      score_has_complete_evidence: {
+        Args: { p_project_score_id: string }
+        Returns: boolean
+      }
+      signal_has_valid_evidence: {
+        Args: { p_signal_id: string }
+        Returns: boolean
       }
       update_user_task: {
         Args: { expected_version: number; patch: Json; task_id: string }
@@ -1928,6 +2408,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [
