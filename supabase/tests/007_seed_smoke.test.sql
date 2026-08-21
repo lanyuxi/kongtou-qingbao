@@ -1,6 +1,6 @@
 begin;
 
-select plan(7);
+select plan(9);
 
 select results_eq(
   $$
@@ -18,33 +18,6 @@ select results_eq(
   $$,
   'an explicit local seed reset creates the exact paused disposable database marker'
 );
-
-insert into public.raw_items (
-  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
-  raw_text, sha256, collected_at
-)
-values
-  ('90000000-0000-4000-8000-000000000050', '90000000-0000-4000-8000-000000000010', '90000000-0000-4000-8000-000000000020', 'https://fixture-active.example.invalid/evidence', 'https://fixture-active.example.invalid/evidence', 'feed_article_html', 'text/html', 'Seed Evidence quote for the active fixture.', repeat('5', 64), '2026-08-09 10:00:00+00'),
-  ('90000000-0000-4000-8000-000000000051', '90000000-0000-4000-8000-000000000011', '90000000-0000-4000-8000-000000000021', 'https://fixture-research.example.invalid/evidence', 'https://fixture-research.example.invalid/evidence', 'feed_article_html', 'text/html', 'Seed Evidence quote for the rumored fixture.', repeat('6', 64), '2026-08-09 10:00:00+00');
-
-insert into public.evidence (
-  id, source_id, raw_item_id, source_field, quote_text,
-  normalized_quote_sha256, verified_at, created_at
-)
-values
-  ('90000000-0000-4000-8000-000000000060', '90000000-0000-4000-8000-000000000020', '90000000-0000-4000-8000-000000000050', 'article_raw_text', 'Seed Evidence quote for the active fixture.', public.evidence_quote_sha256_v1('Seed Evidence quote for the active fixture.'), '2026-08-09 10:00:00+00', '2026-08-09 10:00:00+00'),
-  ('90000000-0000-4000-8000-000000000061', '90000000-0000-4000-8000-000000000021', '90000000-0000-4000-8000-000000000051', 'article_raw_text', 'Seed Evidence quote for the rumored fixture.', public.evidence_quote_sha256_v1('Seed Evidence quote for the rumored fixture.'), '2026-08-09 10:00:00+00', '2026-08-09 10:00:00+00');
-
-insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
-values
-  ('90000000-0000-4000-8000-000000000030', '90000000-0000-4000-8000-000000000060', '2026-08-09 10:00:00+00'),
-  ('90000000-0000-4000-8000-000000000031', '90000000-0000-4000-8000-000000000061', '2026-08-09 10:00:00+00');
-
-insert into public.score_signal_links (project_score_id, signal_id)
-values
-  ('90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000030'),
-  ('90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000030'),
-  ('90000000-0000-4000-8000-000000000042', '90000000-0000-4000-8000-000000000031');
 
 insert into public.project_scores (
   id, project_id, model_version, input_version, opportunity_score, risk_score,
@@ -145,6 +118,46 @@ select results_eq(
 
 select results_eq(
   $$
+    select signal.id, source.id, raw_item.id, raw_item.logical_url,
+      raw_item.raw_text, evidence.quote_text,
+      public.signal_has_valid_evidence(signal.id)
+    from public.signals as signal
+    join public.signal_evidence_links as link on link.signal_id = signal.id
+    join public.evidence as evidence on evidence.id = link.evidence_id
+    join public.raw_items as raw_item on raw_item.id = evidence.raw_item_id
+    join public.sources as source on source.id = evidence.source_id
+    where signal.id in (
+      '90000000-0000-4000-8000-000000000030'::uuid,
+      '90000000-0000-4000-8000-000000000031'::uuid
+    )
+    order by signal.id
+  $$,
+  $$
+    values
+      (
+        '90000000-0000-4000-8000-000000000030'::uuid,
+        '90000000-0000-4000-8000-000000000020'::uuid,
+        '90000000-0000-4000-8000-000000000050'::uuid,
+        'https://fixture-active.example.invalid/evidence'::text,
+        'Fictional published signal for the active fixture.'::text,
+        'Fictional published signal for the active fixture.'::text,
+        true
+      ),
+      (
+        '90000000-0000-4000-8000-000000000031'::uuid,
+        '90000000-0000-4000-8000-000000000021'::uuid,
+        '90000000-0000-4000-8000-000000000051'::uuid,
+        'https://fixture-research.example.invalid/evidence'::text,
+        'Fictional published signal for the rumored fixture.'::text,
+        'Fictional published signal for the rumored fixture.'::text,
+        true
+      )
+  $$,
+  'published seed signals resolve through exact fictional Source Raw Item and Evidence paths'
+);
+
+select results_eq(
+  $$
     select id, project_id, model_version, input_version, opportunity_score, calculated_at
     from public.project_scores
     where id in (
@@ -161,6 +174,29 @@ select results_eq(
       ('90000000-0000-4000-8000-000000000042'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, 'fixture-model-v1'::text, 'fixture-input-v1'::text, 61.00::numeric, '2026-08-09 14:00:00+00'::timestamptz)
   $$,
   'the active fixture has two immutable score versions and the rumored fixture is scored'
+);
+
+select results_eq(
+  $$
+    select score.id, count(link.signal_id)::bigint,
+      bool_and(public.signal_has_valid_evidence(link.signal_id))
+    from public.project_scores as score
+    join public.score_signal_links as link on link.project_score_id = score.id
+    where score.id in (
+      '90000000-0000-4000-8000-000000000040'::uuid,
+      '90000000-0000-4000-8000-000000000041'::uuid,
+      '90000000-0000-4000-8000-000000000042'::uuid
+    )
+    group by score.id
+    order by score.id
+  $$,
+  $$
+    values
+      ('90000000-0000-4000-8000-000000000040'::uuid, 1::bigint, true),
+      ('90000000-0000-4000-8000-000000000041'::uuid, 1::bigint, true),
+      ('90000000-0000-4000-8000-000000000042'::uuid, 1::bigint, true)
+  $$,
+  'every public seed score links to its project Evidence-complete published signal'
 );
 
 select results_eq(

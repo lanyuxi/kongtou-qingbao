@@ -609,7 +609,11 @@ values (
 );
 
 insert into collection_worker_observations (observation_name, observation_value)
-values ('raw_item_count', (select count(*)::text from public.raw_items));
+values (
+  'raw_item_count',
+  (select count(*)::text from public.raw_items
+   where id = '80000000-0000-4000-8000-000000000001'::uuid)
+);
 
 reset role;
 

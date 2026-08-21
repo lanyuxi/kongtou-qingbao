@@ -13,22 +13,27 @@ import {
   type PromotionFunctionClient,
   type PromotionFunctionTransaction,
   PromotionPersistenceError,
-  type PromotionRepository,
+  type GovernedPromotionRepository,
 } from './types.js';
 
 export { PromotionCommandRejectionError, PromotionPersistenceError } from './types.js';
 export type {
   ExecuteCandidateReviewInput,
+  GovernedPromotionRepository,
+  HistoricalCandidate,
+  HistoricalEvidenceRepository,
+  ListHistoricalCandidatesInput,
   PromotionCommandRejectionCode,
   PromotionFunctionCall,
   PromotionFunctionClient,
   PromotionFunctionTransaction,
   PromotionRepository,
+  ReconcileHistoricalCandidateInput,
 } from './types.js';
 
 export function createPromotionRepository(
   databaseUrl: string,
-): PromotionRepository & { close(): Promise<void> } {
+): GovernedPromotionRepository & { close(): Promise<void> } {
   const sql = postgres(databaseUrl, {
     max: 2,
     idle_timeout: 20,
@@ -40,7 +45,7 @@ export function createPromotionRepository(
 
 export function createPromotionRepositoryFromClient(
   client: PromotionFunctionClient,
-): PromotionRepository {
+): GovernedPromotionRepository {
   return {
     reviewCandidate: async (input) => {
       try {
@@ -57,6 +62,64 @@ export function createPromotionRepositoryFromClient(
               p_command_payload: payload,
               p_idempotency_key: idempotencyKey,
               p_input_hash: inputHash,
+              p_now: occurredAt,
+            },
+          }),
+        ));
+
+        return candidateReviewResultV1Schema.parse({
+          version: 1,
+          commandId: row.command_id,
+          candidateId: row.candidate_id,
+          candidateVersion: parsePositivePgBigint(row.candidate_version),
+          decisionId: row.decision_id,
+          outcome: row.outcome,
+          signalId: row.signal_id,
+          evidenceId: row.evidence_id,
+          replayed: row.replayed,
+        });
+      } catch (error) {
+        const rejection = promotionCommandRejection(error);
+        if (rejection !== undefined) throw new PromotionCommandRejectionError(rejection);
+        throw new PromotionPersistenceError();
+      }
+    },
+    listHistoricalCandidates: async (input) => {
+      try {
+        const afterCandidateId = parseOptionalUuid(input.afterCandidateId);
+        const limit = parseBatchLimit(input.limit);
+        const rows = await client.transaction(async (transaction) => manyRows(
+          await transaction.invoke({
+            functionName: 'list_historical_extraction_candidates',
+            args: {
+              p_after_candidate_id: afterCandidateId,
+              p_limit: String(limit),
+            },
+          }),
+        ));
+        return rows.map((row) => ({
+          candidateId: parseUuid(row.candidate_id),
+          candidateVersion: parsePositivePgBigint(row.candidate_version),
+        }));
+      } catch {
+        throw new PromotionPersistenceError();
+      }
+    },
+    reconcileHistoricalCandidate: async (input) => {
+      try {
+        const candidateId = parseUuid(input.candidateId);
+        const reviewerUserId = parseUuid(input.reviewerUserId);
+        const expectedCandidateVersion = parsePositivePgBigint(input.expectedCandidateVersion);
+        const idempotencyKey = parseIdempotencyKey(input.idempotencyKey);
+        const occurredAt = parseTimestamp(input.occurredAt);
+        const row = await client.transaction(async (transaction) => oneRow(
+          await transaction.invoke({
+            functionName: 'reconcile_extraction_candidate_evidence',
+            args: {
+              p_reviewer_user_id: reviewerUserId,
+              p_candidate_id: candidateId,
+              p_expected_candidate_version: String(expectedCandidateVersion),
+              p_idempotency_key: idempotencyKey,
               p_now: occurredAt,
             },
           }),
@@ -96,18 +159,44 @@ export function createPostgresPromotionClient(sql: Sql): PromotionFunctionClient
 
 function createPostgresTransaction(sql: TransactionSql): PromotionFunctionTransaction {
   return {
-    invoke: async ({ args }) => {
+    invoke: async ({ functionName, args }) => {
+      if (functionName === 'execute_extraction_candidate_review') {
+        const reviewerUserId = requiredArgument(args, 'p_reviewer_user_id');
+        const payload = requiredArgument(args, 'p_command_payload');
+        const idempotencyKey = requiredArgument(args, 'p_idempotency_key');
+        const inputHash = requiredArgument(args, 'p_input_hash');
+        const occurredAt = requiredArgument(args, 'p_now');
+        return sql`
+          select * from public.execute_extraction_candidate_review(
+            ${reviewerUserId}::uuid,
+            ${sql.json(JSON.parse(payload))},
+            ${idempotencyKey}::text,
+            ${inputHash}::text,
+            ${occurredAt}::timestamptz
+          )
+        `;
+      }
+      if (functionName === 'list_historical_extraction_candidates') {
+        const afterCandidateId = optionalArgument(args, 'p_after_candidate_id');
+        const limit = requiredArgument(args, 'p_limit');
+        return sql`
+          select * from public.list_historical_extraction_candidates(
+            ${afterCandidateId}::uuid,
+            ${limit}::integer
+          )
+        `;
+      }
       const reviewerUserId = requiredArgument(args, 'p_reviewer_user_id');
-      const payload = requiredArgument(args, 'p_command_payload');
+      const candidateId = requiredArgument(args, 'p_candidate_id');
+      const expectedCandidateVersion = requiredArgument(args, 'p_expected_candidate_version');
       const idempotencyKey = requiredArgument(args, 'p_idempotency_key');
-      const inputHash = requiredArgument(args, 'p_input_hash');
       const occurredAt = requiredArgument(args, 'p_now');
       return sql`
-        select * from public.execute_extraction_candidate_review(
+        select * from public.reconcile_extraction_candidate_evidence(
           ${reviewerUserId}::uuid,
-          ${sql.json(JSON.parse(payload))},
+          ${candidateId}::uuid,
+          ${expectedCandidateVersion}::bigint,
           ${idempotencyKey}::text,
-          ${inputHash}::text,
           ${occurredAt}::timestamptz
         )
       `;
@@ -149,6 +238,20 @@ function oneRow(value: unknown): Record<string, unknown> {
   return row;
 }
 
+function manyRows(value: unknown): readonly Record<string, unknown>[] {
+  if (!Array.isArray(value) || value.some((row) => !isRecord(row))) {
+    throw new Error('invalid_result');
+  }
+  const expected = ['candidate_id', 'candidate_version'];
+  for (const row of value) {
+    const actual = Object.keys(row).sort();
+    if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+      throw new Error('invalid_result');
+    }
+  }
+  return value;
+}
+
 function promotionCommandRejection(error: unknown): PromotionCommandRejectionCode | undefined {
   switch (sqlState(error)) {
     case 'AI101': return 'promotion_candidate_not_found';
@@ -176,6 +279,25 @@ function parseIdempotencyKey(value: unknown): string {
     || !isPostgresText(value)
     || Array.from(value).length > 200) {
     throw new Error('invalid_idempotency_key');
+  }
+  return value;
+}
+
+function parseBatchLimit(value: unknown): number {
+  if (!Number.isInteger(value) || typeof value !== 'number' || value < 1 || value > 100) {
+    throw new Error('invalid_batch_limit');
+  }
+  return value;
+}
+
+function parseOptionalUuid(value: unknown): string | null {
+  if (value === null) return null;
+  return parseUuid(value);
+}
+
+function parseUuid(value: unknown): string {
+  if (typeof value !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    throw new Error('invalid_uuid');
   }
   return value;
 }
@@ -215,7 +337,13 @@ function parseTimestamp(value: unknown): string {
   return value.toISOString();
 }
 
-function requiredArgument(args: Readonly<Record<string, string>>, key: string): string {
+function requiredArgument(args: Readonly<Record<string, string | null>>, key: string): string {
+  const value = args[key];
+  if (value === undefined || value === null) throw new Error('missing_argument');
+  return value;
+}
+
+function optionalArgument(args: Readonly<Record<string, string | null>>, key: string): string | null {
   const value = args[key];
   if (value === undefined) throw new Error('missing_argument');
   return value;

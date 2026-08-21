@@ -21,6 +21,20 @@ const candidateIds = {
   concurrent: `${namespace}000000000064`,
   rollback: `${namespace}000000000065`,
 };
+const historicalCandidateIds = {
+  grounded: `${namespace}000000000071`,
+  ungrounded: `${namespace}000000000072`,
+  linked: `${namespace}000000000073`,
+  concurrent: `${namespace}000000000074`,
+  pagination: `${namespace}000000000075`,
+} as const;
+const historicalSignalIds = {
+  grounded: `${namespace}000000000081`,
+  ungrounded: `${namespace}000000000082`,
+  linked: `${namespace}000000000083`,
+  concurrent: `${namespace}000000000084`,
+  pagination: `${namespace}000000000085`,
+} as const;
 const baseTime = new Date('2026-08-20T04:00:00.000Z');
 const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
 const describeIntegration = integrationDatabaseUrl === undefined ? describe.skip : describe;
@@ -175,6 +189,133 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
     await expect(candidateSnapshot(requireSql(owner), candidateIds.approve)).resolves.toEqual(
       reviewedSnapshot('promoted', 'decided', result.signalId, 1),
     );
+  });
+
+  it('denies Promotion role direct candidate-table SELECT before historical listing', async () => {
+    await expectPromotionRoleDenied(requireSql(login), async (transaction) => transaction`
+      select id, version
+      from public.extraction_candidates
+      where status = 'promoted'
+      order by id
+      limit 1
+    `);
+  });
+
+  it('lists only unlinked promoted history with stable UUID cursor pagination', async () => {
+    const repository = requireRepository(first);
+
+    await expect(repository.listHistoricalCandidates({
+      afterCandidateId: null,
+      limit: 2,
+    })).resolves.toEqual([
+      { candidateId: historicalCandidateIds.grounded, candidateVersion: 1 },
+      { candidateId: historicalCandidateIds.ungrounded, candidateVersion: 1 },
+    ]);
+    await expect(repository.listHistoricalCandidates({
+      afterCandidateId: historicalCandidateIds.ungrounded,
+      limit: 2,
+    })).resolves.toEqual([
+      { candidateId: historicalCandidateIds.concurrent, candidateVersion: 1 },
+      { candidateId: historicalCandidateIds.pagination, candidateVersion: 1 },
+    ]);
+  });
+
+  it('reconciles grounded and ungrounded history append-only and replays exact IDs', async () => {
+    const repository = requireRepository(first);
+    const groundedBefore = await candidateSnapshot(requireSql(owner), historicalCandidateIds.grounded);
+    const ungroundedBefore = await candidateSnapshot(requireSql(owner), historicalCandidateIds.ungrounded);
+
+    const grounded = await repository.reconcileHistoricalCandidate(
+      historicalReconciliationInput(historicalCandidateIds.grounded),
+    );
+    const groundedAfter = await candidateSnapshot(requireSql(owner), historicalCandidateIds.grounded);
+    const groundedReplay = await repository.reconcileHistoricalCandidate(
+      historicalReconciliationInput(historicalCandidateIds.grounded),
+    );
+    const ungrounded = await repository.reconcileHistoricalCandidate(
+      historicalReconciliationInput(historicalCandidateIds.ungrounded),
+    );
+    const ungroundedAfter = await candidateSnapshot(requireSql(owner), historicalCandidateIds.ungrounded);
+    const ungroundedReplay = await repository.reconcileHistoricalCandidate(
+      historicalReconciliationInput(historicalCandidateIds.ungrounded),
+    );
+
+    expect(groundedBefore).toEqual(historicalSnapshot(historicalSignalIds.grounded));
+    expect(grounded).toMatchObject({
+      outcome: 'promoted',
+      candidateVersion: 2,
+      signalId: historicalSignalIds.grounded,
+      evidenceId: expect.any(String),
+      replayed: false,
+    });
+    expect(groundedAfter).toEqual(historicalSnapshot(historicalSignalIds.grounded, {
+      reviewStatus: 'decided', version: 2, evidence: 1, links: 1,
+      decisions: 1, audits: 1, receipts: 1, outbox: 1,
+    }));
+    expect(groundedReplay).toEqual({ ...grounded, replayed: true });
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.grounded))
+      .toEqual(groundedAfter);
+
+    expect(ungroundedBefore).toEqual(historicalSnapshot(historicalSignalIds.ungrounded));
+    expect(ungrounded).toMatchObject({
+      outcome: 'needs_review',
+      candidateVersion: 2,
+      signalId: null,
+      evidenceId: null,
+      replayed: false,
+    });
+    expect(ungroundedAfter).toEqual(historicalSnapshot(historicalSignalIds.ungrounded, {
+      reviewStatus: 'needs_review', version: 2,
+      decisions: 1, receipts: 1, outbox: 1,
+    }));
+    expect(ungroundedReplay).toEqual({ ...ungrounded, replayed: true });
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.ungrounded))
+      .toEqual(ungroundedAfter);
+  });
+
+  it('rejects linked, stale, and revoked reconciliation without changing complete state', async () => {
+    const repository = requireRepository(first);
+    const linkedBefore = await candidateSnapshot(requireSql(owner), historicalCandidateIds.linked);
+    const staleBefore = await candidateSnapshot(requireSql(owner), historicalCandidateIds.concurrent);
+    const revokedBefore = await candidateSnapshot(requireSql(owner), historicalCandidateIds.pagination);
+
+    await expect(repository.reconcileHistoricalCandidate(
+      historicalReconciliationInput(historicalCandidateIds.linked),
+    )).rejects.toMatchObject({ code: 'promotion_candidate_not_reviewable' });
+    await expect(repository.reconcileHistoricalCandidate({
+      ...historicalReconciliationInput(historicalCandidateIds.concurrent),
+      expectedCandidateVersion: 2,
+    })).rejects.toMatchObject({ code: 'promotion_version_conflict' });
+    await expect(repository.reconcileHistoricalCandidate({
+      ...historicalReconciliationInput(historicalCandidateIds.pagination),
+      reviewerUserId: revokedReviewerId,
+    })).rejects.toMatchObject({ code: 'promotion_reviewer_not_authorized' });
+
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.linked)).toEqual(linkedBefore);
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.concurrent)).toEqual(staleBefore);
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.pagination)).toEqual(revokedBefore);
+  });
+
+  it('serializes concurrent historical reconciliation to one result and one exact replay', async () => {
+    const outcomes = await Promise.allSettled([
+      requireRepository(first).reconcileHistoricalCandidate(
+        historicalReconciliationInput(historicalCandidateIds.concurrent),
+      ),
+      requireRepository(second).reconcileHistoricalCandidate(
+        historicalReconciliationInput(historicalCandidateIds.concurrent),
+      ),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(2);
+    expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toEqual([]);
+    const values = outcomes.flatMap((outcome) => outcome.status === 'fulfilled' ? [outcome.value] : []);
+    expect(values.map((value) => value.replayed).sort()).toEqual([false, true]);
+    expect(new Set(values.map((value) => value.commandId)).size).toBe(1);
+    expect(await candidateSnapshot(requireSql(owner), historicalCandidateIds.concurrent))
+      .toEqual(historicalSnapshot(historicalSignalIds.concurrent, {
+        reviewStatus: 'decided', version: 2, evidence: 1, links: 1,
+        decisions: 1, audits: 1, receipts: 1, outbox: 1,
+      }));
   });
 
   it('returns stable IDs on exact replay and rejects conflicting key reuse', async () => {
@@ -360,6 +501,16 @@ function reviewInput(
   };
 }
 
+function historicalReconciliationInput(candidateId: string) {
+  return {
+    candidateId,
+    reviewerUserId: activeReviewerId,
+    expectedCandidateVersion: 1,
+    idempotencyKey: `historical-evidence-v1:${candidateId}`,
+    occurredAt: baseTime,
+  };
+}
+
 async function seedFixtures(sql: postgres.Sql): Promise<void> {
   await sql`
     insert into auth.users (
@@ -409,7 +560,11 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
     )
   `;
 
-  for (const [index, candidateId] of Object.values(candidateIds).entries()) {
+  const allCandidateIds = [
+    ...Object.values(candidateIds),
+    ...Object.values(historicalCandidateIds),
+  ];
+  for (const [index, candidateId] of allCandidateIds.entries()) {
     const discoveredItemId = `${namespace}${String(40 + index).padStart(12, '0')}`;
     const aiRunId = `${namespace}${String(50 + index).padStart(12, '0')}`;
     const quote = `Candidate ${index + 1} public points program continues through week twelve.`;
@@ -429,7 +584,7 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
         schema_version, pipeline_version, status, output, created_at
       ) values (
         ${aiRunId}::uuid, 'extract.v1', 'discovered_item', ${discoveredItemId}::uuid,
-        ${String(index + 1).repeat(64)}, 'integration-model', 'extract-prompt-v1',
+        ${String((index + 1) % 10).repeat(64)}, 'integration-model', 'extract-prompt-v1',
         'extract-schema-v1', 'extract-pipeline-v1', 'succeeded', '{}'::jsonb,
         ${baseTime}::timestamptz
       )
@@ -454,6 +609,58 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
       )
     `;
   }
+
+  for (const [kind, signalId] of Object.entries(historicalSignalIds)) {
+    const candidateId = historicalCandidateIds[kind as keyof typeof historicalCandidateIds];
+    const candidateIndex = allCandidateIds.indexOf(candidateId);
+    await sql`
+      insert into public.signals (
+        id, project_id, signal_type, title, summary, verification, lifecycle,
+        confidence, published_at, created_at
+      ) values (
+        ${signalId}::uuid, ${projectId}::uuid, 'historical_fixture',
+        ${`Promotion candidate ${candidateIndex + 1}`},
+        ${`Historical ${kind} signal remains canonically immutable.`},
+        'unverified', 'published', 70,
+        ${baseTime}::timestamptz, ${baseTime}::timestamptz
+      )
+    `;
+    await sql`
+      update public.extraction_candidates
+      set status = 'promoted', signal_id = ${signalId}::uuid,
+        decided_at = ${baseTime}::timestamptz
+      where id = ${candidateId}::uuid
+    `;
+  }
+
+  await sql`
+    update public.extraction_candidates
+    set payload = jsonb_set(
+      payload, '{evidenceQuote}', '"This historical quote is absent."'::jsonb
+    )
+    where id = ${historicalCandidateIds.ungrounded}::uuid
+  `;
+  const linkedIndex = allCandidateIds.indexOf(historicalCandidateIds.linked);
+  const linkedDiscoveredItemId = `${namespace}${String(40 + linkedIndex).padStart(12, '0')}`;
+  const linkedQuote = `Candidate ${linkedIndex + 1} public points program continues through week twelve.`;
+  await sql`
+    insert into public.evidence (
+      id, source_id, raw_item_id, discovered_item_id, source_field, quote_text,
+      normalized_quote_sha256, verified_at, created_at
+    ) values (
+      ${`${namespace}000000000086`}::uuid, ${sourceId}::uuid, ${feedRawItemId}::uuid,
+      ${linkedDiscoveredItemId}::uuid, 'discovered_summary', ${linkedQuote},
+      public.evidence_quote_sha256_v1(${linkedQuote}),
+      ${baseTime}::timestamptz, ${baseTime}::timestamptz
+    )
+  `;
+  await sql`
+    insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+    values (
+      ${historicalSignalIds.linked}::uuid, ${`${namespace}000000000086`}::uuid,
+      ${baseTime}::timestamptz
+    )
+  `;
 }
 
 async function dropRollbackTrigger(sql: postgres.Sql): Promise<void> {
@@ -470,10 +677,11 @@ async function removeFixtures(sql: postgres.Sql): Promise<void> {
 async function removeFixturesInTransaction(transaction: TransactionSql): Promise<void> {
   await assertDisposableDatabase(transaction);
   await transaction`set local session_replication_role = replica`;
-  await transaction`delete from public.outbox_events where aggregate_id in ${transaction(Object.values(candidateIds))}`;
-  await transaction`delete from public.promotion_commands where candidate_id in ${transaction(Object.values(candidateIds))}`;
-  await transaction`delete from public.promotion_events where candidate_id in ${transaction(Object.values(candidateIds))}`;
-  await transaction`delete from public.candidate_review_decisions where candidate_id in ${transaction(Object.values(candidateIds))}`;
+  const allCandidateIds = [...Object.values(candidateIds), ...Object.values(historicalCandidateIds)];
+  await transaction`delete from public.outbox_events where aggregate_id in ${transaction(allCandidateIds)}`;
+  await transaction`delete from public.promotion_commands where candidate_id in ${transaction(allCandidateIds)}`;
+  await transaction`delete from public.promotion_events where candidate_id in ${transaction(allCandidateIds)}`;
+  await transaction`delete from public.candidate_review_decisions where candidate_id in ${transaction(allCandidateIds)}`;
   await transaction`delete from public.signal_evidence_links where signal_id in (select id from public.signals where project_id = ${projectId}::uuid)`;
   await transaction`delete from public.evidence where discovered_item_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
   await transaction`delete from public.extraction_candidates where project_id = ${projectId}::uuid`;
@@ -581,6 +789,34 @@ function reviewedSnapshot(
     audit_count: canonicalCounts.audits,
     receipt_count: historyCount,
     outbox_count: historyCount,
+  };
+}
+
+function historicalSnapshot(
+  signalId: string,
+  counts: {
+    readonly reviewStatus?: 'pending' | 'needs_review' | 'decided';
+    readonly version?: number;
+    readonly evidence?: number;
+    readonly links?: number;
+    readonly decisions?: number;
+    readonly audits?: number;
+    readonly receipts?: number;
+    readonly outbox?: number;
+  } = {},
+) {
+  return {
+    status: 'promoted',
+    review_status: counts.reviewStatus ?? 'pending',
+    version: String(counts.version ?? 1),
+    signal_id: signalId,
+    evidence_count: counts.evidence ?? 0,
+    signal_count: 1,
+    link_count: counts.links ?? 0,
+    decision_count: counts.decisions ?? 0,
+    audit_count: counts.audits ?? 0,
+    receipt_count: counts.receipts ?? 0,
+    outbox_count: counts.outbox ?? 0,
   };
 }
 

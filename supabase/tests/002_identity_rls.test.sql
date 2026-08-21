@@ -1,18 +1,5 @@
 begin;
 
-delete from public.project_scores
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.signals
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.project_sources
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.sources
-where id in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid);
-delete from public.projects
-where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from auth.users
-where id = '90000000-0000-4000-8000-000000000001'::uuid;
-
 select plan(61);
 
 select has_table('public', 'profiles', 'profiles table exists');
@@ -87,12 +74,23 @@ values
   );
 
 select is(
-  (select count(*)::integer from public.profiles),
+  (select count(*)::integer from public.profiles
+   where id in (
+     '11111111-1111-4111-8111-111111111111'::uuid,
+     '22222222-2222-4222-8222-222222222222'::uuid,
+     '33333333-3333-4333-8333-333333333333'::uuid
+   )),
   3,
   'creating auth users automatically creates one profile per user'
 );
 select is(
-  (select count(*)::integer from public.profiles where timezone = 'UTC'),
+  (select count(*)::integer from public.profiles
+   where timezone = 'UTC'
+     and id in (
+       '11111111-1111-4111-8111-111111111111'::uuid,
+       '22222222-2222-4222-8222-222222222222'::uuid,
+       '33333333-3333-4333-8333-333333333333'::uuid
+     )),
   3,
   'automatic profiles use the UTC timezone default'
 );
@@ -320,7 +318,12 @@ set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 select is(
-  (select count(*)::integer from public.profiles),
+  (select count(*)::integer from public.profiles
+   where id in (
+     '11111111-1111-4111-8111-111111111111'::uuid,
+     '22222222-2222-4222-8222-222222222222'::uuid,
+     '33333333-3333-4333-8333-333333333333'::uuid
+   )),
   3,
   'service role can read all profiles'
 );

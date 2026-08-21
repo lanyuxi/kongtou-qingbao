@@ -1,18 +1,5 @@
 begin;
 
-delete from public.project_scores
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.signals
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.project_sources
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.sources
-where id in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid);
-delete from public.projects
-where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from auth.users
-where id = '90000000-0000-4000-8000-000000000001'::uuid;
-
 select plan(90);
 
 select has_table('public', 'signals', 'signals table exists');
@@ -1049,7 +1036,7 @@ set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select results_eq(
-  $$select id from public.signals order by id$$,
+  $$select id from public.signals where id::text like 'cccccccc-%' order by id$$,
   $$
     values
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1'::uuid),
@@ -1065,12 +1052,12 @@ select is(
   'anonymous users cannot see an otherwise-public signal without Evidence'
 );
 select results_eq(
-  $$select id from public.project_scores where model_version is not null order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' and model_version is not null order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'anonymous model-version reads require complete Evidence and public project lifecycle'
 );
 select results_eq(
-  $$select id from public.project_scores order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'anonymous users can read only Evidence-complete scores for active or rumored projects'
 );
@@ -1110,7 +1097,7 @@ select set_config(
 );
 
 select results_eq(
-  $$select id from public.signals order by id$$,
+  $$select id from public.signals where id::text like 'cccccccc-%' order by id$$,
   $$
     values
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1'::uuid),
@@ -1120,17 +1107,17 @@ select results_eq(
   'an ordinary user sees only published signals for active projects'
 );
 select results_eq(
-  $$select id from public.project_scores where explanation is not null order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' and explanation is not null order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'an ordinary user explanation reads require complete Evidence and public project lifecycle'
 );
 select results_eq(
-  $$select id from public.project_scores order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'an ordinary user can read only Evidence-complete scores for active or rumored projects'
 );
 select results_eq(
-  $$select id from public.project_scores where input_version is not null order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' and input_version is not null order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'an ordinary user input-version reads require complete Evidence and public project lifecycle'
 );
@@ -1179,7 +1166,7 @@ select set_config(
 
 select ok(public.has_active_role('reviewer'), 'the browser principal has an active reviewer grant');
 select results_eq(
-  $$select id from public.signals order by id$$,
+  $$select id from public.signals where id::text like 'cccccccc-%' order by id$$,
   $$
     values
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1'::uuid),
@@ -1219,7 +1206,7 @@ select set_config(
 
 select ok(public.has_active_role('admin'), 'the browser principal has an active admin grant');
 select results_eq(
-  $$select id from public.signals order by id$$,
+  $$select id from public.signals where id::text like 'cccccccc-%' order by id$$,
   $$
     values
       ('cccccccc-cccc-4ccc-8ccc-ccccccccccc1'::uuid),
@@ -1229,7 +1216,7 @@ select results_eq(
   'a browser admin still sees only published signals for active projects'
 );
 select results_eq(
-  $$select id from public.project_scores where explanation is not null order by id$$,
+  $$select id from public.project_scores where id::text like 'dddddddd-%' and explanation is not null order by id$$,
   $$values ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1'::uuid)$$,
   'a browser admin explanation reads require complete Evidence and public project lifecycle'
 );
@@ -1264,8 +1251,8 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.signals), 9, 'service role can read all signal history');
-select is((select count(*)::integer from public.project_scores), 3, 'service role can read all score history');
+select is((select count(*)::integer from public.signals where project_id::text like 'aaaaaaaa-%'), 9, 'service role can read all test signal history');
+select is((select count(*)::integer from public.project_scores where id::text like 'dddddddd-%'), 3, 'service role can read all test score history');
 select throws_like(
   $$
     insert into public.signals (project_id, signal_type, title, summary, confidence)

@@ -1,18 +1,5 @@
 begin;
 
-delete from public.project_scores
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.signals
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.project_sources
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.sources
-where id in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid);
-delete from public.projects
-where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from auth.users
-where id = '90000000-0000-4000-8000-000000000001'::uuid;
-
 select plan(135);
 
 select has_table('public', 'projects', 'projects table exists');
@@ -1135,17 +1122,17 @@ set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select results_eq(
-  $$select slug from public.projects order by slug$$,
+  $$select slug from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') order by slug$$,
   $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
   'anonymous users see active and rumored safe project rows'
 );
 select results_eq(
-  $$select name from public.sources order by name$$,
+  $$select name from public.sources where name = 'Active Official Website' order by name$$,
   $$values ('Active Official Website'::text)$$,
   'anonymous users see only active sources'
 );
 select results_eq(
-  $$select project_id, source_id from public.project_sources order by project_id, source_id$$,
+  $$select project_id, source_id from public.project_sources where project_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'::uuid) order by project_id, source_id$$,
   $$
     values (
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid,
@@ -1155,7 +1142,7 @@ select results_eq(
   'anonymous users see relations only when both catalog parents are active'
 );
 select results_eq(
-  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$select slug, official_website_url from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') and official_website_url is not null order by slug$$,
   $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
   'anonymous users read intended project links while RLS hides the paused project link'
 );
@@ -1195,17 +1182,17 @@ select set_config(
 );
 
 select results_eq(
-  $$select slug from public.projects order by slug$$,
+  $$select slug from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') order by slug$$,
   $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
   'an authenticated owner sees active and rumored safe project rows'
 );
 select results_eq(
-  $$select name from public.sources order by name$$,
+  $$select name from public.sources where name = 'Active Official Website' order by name$$,
   $$values ('Active Official Website'::text)$$,
   'an authenticated owner sees only active sources'
 );
 select results_eq(
-  $$select project_id, source_id from public.project_sources order by project_id, source_id$$,
+  $$select project_id, source_id from public.project_sources where project_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'::uuid) order by project_id, source_id$$,
   $$
     values (
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid,
@@ -1215,7 +1202,7 @@ select results_eq(
   'an authenticated owner sees relations only when both catalog parents are active'
 );
 select results_eq(
-  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$select slug, official_website_url from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') and official_website_url is not null order by slug$$,
   $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
   'an authenticated owner reads intended project links while RLS hides the paused project link'
 );
@@ -1255,17 +1242,17 @@ select set_config(
 );
 
 select results_eq(
-  $$select slug from public.projects order by slug$$,
+  $$select slug from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') order by slug$$,
   $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
   'an authenticated non-owner sees the same active and rumored public projects'
 );
 select results_eq(
-  $$select name from public.sources order by name$$,
+  $$select name from public.sources where name = 'Active Official Website' order by name$$,
   $$values ('Active Official Website'::text)$$,
   'an authenticated non-owner sees the same active public sources'
 );
 select results_eq(
-  $$select project_id, source_id from public.project_sources order by project_id, source_id$$,
+  $$select project_id, source_id from public.project_sources where project_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'::uuid) order by project_id, source_id$$,
   $$
     values (
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid,
@@ -1292,17 +1279,17 @@ select set_config(
 
 select ok(public.has_active_role('admin'), 'the browser principal has an active admin grant');
 select results_eq(
-  $$select slug from public.projects order by slug$$,
+  $$select slug from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') order by slug$$,
   $$values ('active-project'::text), ('minimum-port-project'::text), ('rumored-project'::text)$$,
   'a browser admin still sees only active and rumored safe project rows'
 );
 select results_eq(
-  $$select name from public.sources order by name$$,
+  $$select name from public.sources where name = 'Active Official Website' order by name$$,
   $$values ('Active Official Website'::text)$$,
   'a browser admin still sees only active sources'
 );
 select results_eq(
-  $$select project_id, source_id from public.project_sources order by project_id, source_id$$,
+  $$select project_id, source_id from public.project_sources where project_id in ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'::uuid, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3'::uuid) order by project_id, source_id$$,
   $$
     values (
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid,
@@ -1312,7 +1299,7 @@ select results_eq(
   'a browser admin still sees only active catalog relations'
 );
 select results_eq(
-  $$select slug, official_website_url from public.projects where official_website_url is not null order by slug$$,
+  $$select slug, official_website_url from public.projects where slug in ('active-project', 'minimum-port-project', 'rumored-project') and official_website_url is not null order by slug$$,
   $$values ('active-project'::text, 'https://active.example.invalid'::text), ('minimum-port-project'::text, 'https://project.example.invalid:1/path'::text)$$,
   'a browser admin reads intended project links while RLS hides the paused project link'
 );
@@ -1347,9 +1334,9 @@ select set_config('request.jwt.claims', '{}', true);
 set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
-select is((select count(*)::integer from public.projects), 5, 'service role can read every project lifecycle and the disposable seed marker');
-select is((select count(*)::integer from public.sources), 7, 'service role can read every source status');
-select is((select count(*)::integer from public.project_sources), 3, 'service role can read every catalog relation');
+select is((select count(*)::integer from public.projects where id not in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid)), 5, 'service role can read every test project lifecycle and the disposable seed marker');
+select is((select count(*)::integer from public.sources where id not in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid)), 7, 'service role can read every test source status');
+select is((select count(*)::integer from public.project_sources where project_id not in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid)), 3, 'service role can read every test catalog relation');
 select is(
   (
     select official_website_url

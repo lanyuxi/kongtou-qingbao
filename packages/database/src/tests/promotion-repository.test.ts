@@ -21,6 +21,117 @@ const signalId = '85000000-0000-4000-8000-000000000103';
 const evidenceId = '85000000-0000-4000-8000-000000000104';
 
 describe('PromotionRepository', () => {
+  it('lists historical candidates through the protected cursor function', async () => {
+    const client = new RecordingClient([[
+      { candidate_id: candidateId, candidate_version: '2' },
+      { candidate_id: '85000000-0000-4000-8000-000000000002', candidate_version: '7' },
+    ]]);
+
+    await expect(createPromotionRepositoryFromClient(client).listHistoricalCandidates({
+      afterCandidateId: '85000000-0000-4000-8000-000000000000',
+      limit: 2,
+    })).resolves.toEqual([
+      { candidateId, candidateVersion: 2 },
+      { candidateId: '85000000-0000-4000-8000-000000000002', candidateVersion: 7 },
+    ]);
+
+    expect(client.calls).toEqual([{
+      functionName: 'list_historical_extraction_candidates',
+      args: {
+        p_after_candidate_id: '85000000-0000-4000-8000-000000000000',
+        p_limit: '2',
+      },
+    }]);
+  });
+
+  it('preserves a null initial cursor and an empty protected result', async () => {
+    const client = new RecordingClient([[]]);
+
+    await expect(createPromotionRepositoryFromClient(client).listHistoricalCandidates({
+      afterCandidateId: null,
+      limit: 25,
+    })).resolves.toEqual([]);
+
+    expect(client.calls).toEqual([{
+      functionName: 'list_historical_extraction_candidates',
+      args: { p_after_candidate_id: null, p_limit: '25' },
+    }]);
+  });
+
+  it.each([
+    ['malformed cursor', { afterCandidateId: 'not-a-uuid', limit: 25 }],
+    ['zero limit', { afterCandidateId: null, limit: 0 }],
+    ['over-limit batch', { afterCandidateId: null, limit: 101 }],
+    ['fractional limit', { afterCandidateId: null, limit: 1.5 }],
+  ])('rejects historical list input before a transaction (%s)', async (_caseName, input) => {
+    const client = new RecordingClient([[]]);
+
+    await expect(createPromotionRepositoryFromClient(client).listHistoricalCandidates(input))
+      .rejects.toEqual(new PromotionPersistenceError());
+    expect(client.transactions).toBe(0);
+    expect(client.calls).toEqual([]);
+  });
+
+  it.each([
+    ['extra key', [{ candidate_id: candidateId, candidate_version: '1', payload: 'secret' }]],
+    ['invalid UUID', [{ candidate_id: 'not-a-uuid', candidate_version: '1' }]],
+    ['unsafe version', [{ candidate_id: candidateId, candidate_version: '9007199254740992' }]],
+    ['non-array result', { candidate_id: candidateId, candidate_version: '1' }],
+  ])('conceals an invalid historical list result (%s)', async (_caseName, result) => {
+    const client = new RecordingClient([result]);
+
+    await expect(createPromotionRepositoryFromClient(client).listHistoricalCandidates({
+      afterCandidateId: null,
+      limit: 25,
+    })).rejects.toEqual(new PromotionPersistenceError());
+  });
+
+  it('reconciles one historical candidate through the protected command', async () => {
+    const client = new RecordingClient([[promotedResultRow()]]);
+
+    await expect(createPromotionRepositoryFromClient(client).reconcileHistoricalCandidate({
+      candidateId,
+      reviewerUserId,
+      expectedCandidateVersion: 1,
+      idempotencyKey: `historical-evidence-v1:${candidateId}`,
+      occurredAt: new Date('2026-08-20T03:04:05.678Z'),
+    })).resolves.toMatchObject({
+      candidateId,
+      candidateVersion: 2,
+      outcome: 'promoted',
+      replayed: false,
+    });
+
+    expect(client.calls).toEqual([{
+      functionName: 'reconcile_extraction_candidate_evidence',
+      args: {
+        p_reviewer_user_id: reviewerUserId,
+        p_candidate_id: candidateId,
+        p_expected_candidate_version: '1',
+        p_idempotency_key: `historical-evidence-v1:${candidateId}`,
+        p_now: '2026-08-20T03:04:05.678Z',
+      },
+    }]);
+  });
+
+  it('maps protected reconciliation SQLSTATE without exposing its message', async () => {
+    const client = new RecordingClient(
+      [],
+      Object.assign(new Error('source URL and quote payload'), { code: 'AI105' }),
+    );
+
+    const error = await createPromotionRepositoryFromClient(client).reconcileHistoricalCandidate({
+      candidateId,
+      reviewerUserId,
+      expectedCandidateVersion: 1,
+      idempotencyKey: `historical-evidence-v1:${candidateId}`,
+      occurredAt: new Date('2026-08-20T03:04:05.678Z'),
+    }).catch((cause: unknown) => cause);
+
+    expect(error).toEqual(new PromotionCommandRejectionError('promotion_reviewer_not_authorized'));
+    expect(String(error)).not.toMatch(/source|url|quote|payload/i);
+  });
+
   it('loads the default promotion worker export in Node', () => {
     const result = spawnSync(
       process.execPath,

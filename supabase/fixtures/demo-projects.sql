@@ -109,3 +109,152 @@ join projects p on p.slug = v.slug
 where not exists (
   select 1 from signals s where s.project_id = p.id and s.title = v.title
 );
+
+insert into sources (
+  id, source_type, name, canonical_url, status, reputation_score
+)
+select
+  pg_catalog.md5('demo-evidence-source:' || fixture.slug)::uuid,
+  'independent_research',
+  'Demo Evidence Source: ' || project.name,
+  'https://' || fixture.slug || '-evidence.example.invalid/source',
+  'active',
+  50
+from (values
+  ('novanet'), ('orbitlend'), ('solforge-perp'), ('monacharge'),
+  ('zkterminal'), ('hyperbridge-x'), ('baseclique'), ('arbnav-wallet'),
+  ('tonharbor'), ('shadowroll'), ('mevrelay-pro'), ('claimmirror')
+) as fixture(slug)
+join projects as project on project.slug = fixture.slug
+on conflict (id) do nothing;
+
+insert into project_sources (
+  project_id, source_id, authority_domains, is_official, verified_at, verified_by
+)
+select
+  project.id,
+  pg_catalog.md5('demo-evidence-source:' || fixture.slug)::uuid,
+  array[]::text[],
+  false,
+  null,
+  null
+from (values
+  ('novanet'), ('orbitlend'), ('solforge-perp'), ('monacharge'),
+  ('zkterminal'), ('hyperbridge-x'), ('baseclique'), ('arbnav-wallet'),
+  ('tonharbor'), ('shadowroll'), ('mevrelay-pro'), ('claimmirror')
+) as fixture(slug)
+join projects as project on project.slug = fixture.slug
+on conflict (project_id, source_id) do nothing;
+
+insert into raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at, created_at
+)
+select
+  pg_catalog.md5('demo-evidence-raw:' || fixture.slug)::uuid,
+  project.id,
+  pg_catalog.md5('demo-evidence-source:' || fixture.slug)::uuid,
+  'https://' || fixture.slug || '-evidence.example.invalid/signal',
+  'https://' || fixture.slug || '-evidence.example.invalid/signal',
+  'feed_article_html',
+  'text/plain',
+  signal.summary,
+  pg_catalog.encode(extensions.digest(
+    pg_catalog.convert_to(signal.summary, 'UTF8'), 'sha256'
+  ), 'hex'),
+  signal.created_at,
+  signal.created_at
+from (values
+  ('novanet', 'NovaNet 节点运营者积分延长至第 12 周'),
+  ('orbitlend', 'OrbitLend 第二赛季积分活动开启'),
+  ('solforge-perp', '公开任务平台开启推荐任务轮次'),
+  ('monacharge', '金库多次售罄后额度上调'),
+  ('zkterminal', '发布赏金类测试网任务'),
+  ('hyperbridge-x', '代币经济页面新增激励占位章节'),
+  ('baseclique', '每周互动活动奖励活跃小队'),
+  ('arbnav-wallet', '收集反馈后第二赛季标准审核中'),
+  ('tonharbor', '创始人访谈中暗示追溯分发'),
+  ('shadowroll', '旧版本预言机事件仍未修复'),
+  ('mevrelay-pro', '"保证额度"说法在社交渠道扩散'),
+  ('claimmirror', '社区举报领取仿冒域名')
+) as fixture(slug, signal_title)
+join projects as project on project.slug = fixture.slug
+join signals as signal
+  on signal.project_id = project.id and signal.title = fixture.signal_title
+on conflict (id) do nothing;
+
+insert into evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+select
+  pg_catalog.md5('demo-evidence-record:' || fixture.slug)::uuid,
+  pg_catalog.md5('demo-evidence-source:' || fixture.slug)::uuid,
+  pg_catalog.md5('demo-evidence-raw:' || fixture.slug)::uuid,
+  'article_raw_text',
+  signal.summary,
+  public.evidence_quote_sha256_v1(signal.summary),
+  signal.created_at,
+  signal.created_at
+from (values
+  ('novanet', 'NovaNet 节点运营者积分延长至第 12 周'),
+  ('orbitlend', 'OrbitLend 第二赛季积分活动开启'),
+  ('solforge-perp', '公开任务平台开启推荐任务轮次'),
+  ('monacharge', '金库多次售罄后额度上调'),
+  ('zkterminal', '发布赏金类测试网任务'),
+  ('hyperbridge-x', '代币经济页面新增激励占位章节'),
+  ('baseclique', '每周互动活动奖励活跃小队'),
+  ('arbnav-wallet', '收集反馈后第二赛季标准审核中'),
+  ('tonharbor', '创始人访谈中暗示追溯分发'),
+  ('shadowroll', '旧版本预言机事件仍未修复'),
+  ('mevrelay-pro', '"保证额度"说法在社交渠道扩散'),
+  ('claimmirror', '社区举报领取仿冒域名')
+) as fixture(slug, signal_title)
+join projects as project on project.slug = fixture.slug
+join signals as signal
+  on signal.project_id = project.id and signal.title = fixture.signal_title
+on conflict (id) do nothing;
+
+insert into signal_evidence_links (signal_id, evidence_id)
+select signal.id, pg_catalog.md5('demo-evidence-record:' || fixture.slug)::uuid
+from (values
+  ('novanet', 'NovaNet 节点运营者积分延长至第 12 周'),
+  ('orbitlend', 'OrbitLend 第二赛季积分活动开启'),
+  ('solforge-perp', '公开任务平台开启推荐任务轮次'),
+  ('monacharge', '金库多次售罄后额度上调'),
+  ('zkterminal', '发布赏金类测试网任务'),
+  ('hyperbridge-x', '代币经济页面新增激励占位章节'),
+  ('baseclique', '每周互动活动奖励活跃小队'),
+  ('arbnav-wallet', '收集反馈后第二赛季标准审核中'),
+  ('tonharbor', '创始人访谈中暗示追溯分发'),
+  ('shadowroll', '旧版本预言机事件仍未修复'),
+  ('mevrelay-pro', '"保证额度"说法在社交渠道扩散'),
+  ('claimmirror', '社区举报领取仿冒域名')
+) as fixture(slug, signal_title)
+join projects as project on project.slug = fixture.slug
+join signals as signal
+  on signal.project_id = project.id and signal.title = fixture.signal_title
+on conflict (signal_id, evidence_id) do nothing;
+
+insert into score_signal_links (project_score_id, signal_id)
+select score.id, signal.id
+from (values
+  ('novanet', 'NovaNet 节点运营者积分延长至第 12 周'),
+  ('orbitlend', 'OrbitLend 第二赛季积分活动开启'),
+  ('solforge-perp', '公开任务平台开启推荐任务轮次'),
+  ('monacharge', '金库多次售罄后额度上调'),
+  ('zkterminal', '发布赏金类测试网任务'),
+  ('hyperbridge-x', '代币经济页面新增激励占位章节'),
+  ('baseclique', '每周互动活动奖励活跃小队'),
+  ('arbnav-wallet', '收集反馈后第二赛季标准审核中'),
+  ('tonharbor', '创始人访谈中暗示追溯分发'),
+  ('shadowroll', '旧版本预言机事件仍未修复'),
+  ('mevrelay-pro', '"保证额度"说法在社交渠道扩散'),
+  ('claimmirror', '社区举报领取仿冒域名')
+) as fixture(slug, signal_title)
+join projects as project on project.slug = fixture.slug
+join project_scores as score
+  on score.project_id = project.id and score.model_version = 'seed-fixture-v1'
+join signals as signal
+  on signal.project_id = project.id and signal.title = fixture.signal_title
+on conflict (project_score_id, signal_id) do nothing;

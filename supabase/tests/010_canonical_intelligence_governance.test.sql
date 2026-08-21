@@ -305,6 +305,7 @@ from (values
   ('public.evidence_quote_sha256_v1(text)'),
   ('public.signal_has_valid_evidence(uuid)'),
   ('public.score_has_complete_evidence(uuid)'),
+  ('public.list_historical_extraction_candidates(uuid,integer)'),
   ('public.execute_extraction_candidate_review(uuid,jsonb,text,text,timestamp with time zone)'),
   ('public.reconcile_extraction_candidate_evidence(uuid,uuid,bigint,text,timestamp with time zone)')
 ) as expected(signature);
@@ -410,6 +411,7 @@ select ok(
   pg_catalog.format('%s is a postgres-owned security definer with fixed search_path', expected.signature)
 )
 from (values
+  ('public.list_historical_extraction_candidates(uuid,integer)'),
   ('public.execute_extraction_candidate_review(uuid,jsonb,text,text,timestamp with time zone)'),
   ('public.reconcile_extraction_candidate_evidence(uuid,uuid,bigint,text,timestamp with time zone)')
 ) as expected(signature)
@@ -447,9 +449,35 @@ select ok(
   pg_catalog.format('%s is executable only by promotion_service', expected.signature)
 )
 from (values
+  ('public.list_historical_extraction_candidates(uuid,integer)'),
   ('public.execute_extraction_candidate_review(uuid,jsonb,text,text,timestamp with time zone)'),
   ('public.reconcile_extraction_candidate_evidence(uuid,uuid,bigint,text,timestamp with time zone)')
 ) as expected(signature);
+
+select results_eq(
+  $$
+    select privilege_info.grantee::text collate "C"
+    from information_schema.routines as routine_info
+    join information_schema.routine_privileges as privilege_info
+      on privilege_info.specific_schema = routine_info.specific_schema
+      and privilege_info.specific_name = routine_info.specific_name
+    where routine_info.specific_schema = 'public'
+      and routine_info.routine_name = 'list_historical_extraction_candidates'
+      and privilege_info.privilege_type = 'EXECUTE'
+    order by privilege_info.grantee
+  $$,
+  $$
+    select expected.grantee collate "C"
+    from (values ('postgres'::text), ('promotion_service'::text)) as expected(grantee)
+    order by expected.grantee
+  $$,
+  'historical candidate listing is executable only by its owner and promotion_service'
+);
+
+select ok(
+  not has_table_privilege('promotion_service', 'public.extraction_candidates', 'SELECT'),
+  'promotion_service cannot bypass the protected historical candidate projection'
+);
 
 select is(
   public.normalize_evidence_text_v1(
@@ -641,6 +669,63 @@ where id in (
   '10000000-0000-4000-8000-000000000070',
   '10000000-0000-4000-8000-000000000071',
   '10000000-0000-4000-8000-000000000072'
+);
+
+create temporary table promotion_listing_probe (
+  listed_count integer not null
+) on commit drop;
+grant insert on table pg_temp.promotion_listing_probe to promotion_service;
+
+set local role promotion_service;
+insert into pg_temp.promotion_listing_probe (listed_count)
+select count(*)::integer
+from public.list_historical_extraction_candidates(null, 2);
+reset role;
+
+select is(
+  (select listed_count from pg_temp.promotion_listing_probe),
+  2,
+  'promotion_service can execute only the protected bounded historical projection'
+);
+
+select results_eq(
+  $$
+    select candidate_id, candidate_version
+    from public.list_historical_extraction_candidates(null, 2)
+  $$,
+  $$
+    values
+      ('10000000-0000-4000-8000-000000000063'::uuid, 1::bigint),
+      ('10000000-0000-4000-8000-000000000068'::uuid, 1::bigint)
+  $$,
+  'historical listing starts at the lowest eligible UUID and respects the batch limit'
+);
+
+select results_eq(
+  $$
+    select candidate_id, candidate_version
+    from public.list_historical_extraction_candidates(
+      '10000000-0000-4000-8000-000000000068', 2
+    )
+  $$,
+  $$
+    values
+      ('10000000-0000-4000-8000-000000000070'::uuid, 1::bigint),
+      ('10000000-0000-4000-8000-000000000071'::uuid, 1::bigint)
+  $$,
+  'historical listing continues strictly after the UUID cursor in ascending order'
+);
+
+select throws_ok(
+  $$ select * from public.list_historical_extraction_candidates(null, 0) $$,
+  'AI106', 'promotion_command_invalid',
+  'historical listing rejects a zero batch limit'
+);
+
+select throws_ok(
+  $$ select * from public.list_historical_extraction_candidates(null, 101) $$,
+  'AI106', 'promotion_command_invalid',
+  'historical listing rejects a batch limit above one hundred'
 );
 
 create temporary table ai_candidate_insert_observations (
@@ -840,7 +925,7 @@ select results_eq(
 select results_eq(
   $$
     select
-      (select count(*) from public.evidence)::bigint,
+      (select count(*) from public.evidence where id = result.evidence_id)::bigint,
       (select count(*) from public.signals where id = result.signal_id)::bigint,
       (select count(*) from public.signal_evidence_links where signal_id = result.signal_id)::bigint,
       (select count(*) from public.candidate_review_decisions where id = result.decision_id)::bigint,

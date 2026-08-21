@@ -13,9 +13,37 @@ export interface PromotionRepository {
   reviewCandidate(input: ExecuteCandidateReviewInput): Promise<CandidateReviewResultV1>;
 }
 
+export interface HistoricalCandidate {
+  readonly candidateId: string;
+  readonly candidateVersion: number;
+}
+
+export interface ListHistoricalCandidatesInput {
+  readonly afterCandidateId: string | null;
+  readonly limit: number;
+}
+
+export interface ReconcileHistoricalCandidateInput {
+  readonly candidateId: string;
+  readonly reviewerUserId: string;
+  readonly expectedCandidateVersion: number;
+  readonly idempotencyKey: string;
+  readonly occurredAt: Date;
+}
+
+export interface HistoricalEvidenceRepository {
+  listHistoricalCandidates(input: ListHistoricalCandidatesInput): Promise<readonly HistoricalCandidate[]>;
+  reconcileHistoricalCandidate(input: ReconcileHistoricalCandidateInput): Promise<CandidateReviewResultV1>;
+}
+
+export type GovernedPromotionRepository = PromotionRepository & HistoricalEvidenceRepository;
+
 export interface PromotionFunctionCall {
-  readonly functionName: 'execute_extraction_candidate_review';
-  readonly args: Readonly<Record<string, string>>;
+  readonly functionName:
+    | 'execute_extraction_candidate_review'
+    | 'list_historical_extraction_candidates'
+    | 'reconcile_extraction_candidate_evidence';
+  readonly args: Readonly<Record<string, string | null>>;
 }
 
 export interface PromotionFunctionTransaction {

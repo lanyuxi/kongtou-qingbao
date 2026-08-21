@@ -257,4 +257,87 @@ values
   )
 on conflict (id) do nothing;
 
+insert into public.raw_items (
+  id, project_id, source_id, logical_url, final_url, content_kind, media_type,
+  raw_text, sha256, collected_at, created_at
+)
+values
+  (
+    '90000000-0000-4000-8000-000000000050',
+    '90000000-0000-4000-8000-000000000010',
+    '90000000-0000-4000-8000-000000000020',
+    'https://fixture-active.example.invalid/evidence',
+    'https://fixture-active.example.invalid/evidence',
+    'feed_article_html', 'text/html',
+    'Fictional published signal for the active fixture.',
+    pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+      'Fictional published signal for the active fixture.', 'UTF8'
+    ), 'sha256'), 'hex'),
+    '2026-08-09 10:30:00+00', '2026-08-09 10:30:00+00'
+  ),
+  (
+    '90000000-0000-4000-8000-000000000051',
+    '90000000-0000-4000-8000-000000000011',
+    '90000000-0000-4000-8000-000000000021',
+    'https://fixture-research.example.invalid/evidence',
+    'https://fixture-research.example.invalid/evidence',
+    'feed_article_html', 'text/html',
+    'Fictional published signal for the rumored fixture.',
+    pg_catalog.encode(extensions.digest(pg_catalog.convert_to(
+      'Fictional published signal for the rumored fixture.', 'UTF8'
+    ), 'sha256'), 'hex'),
+    '2026-08-09 11:30:00+00', '2026-08-09 11:30:00+00'
+  )
+on conflict (id) do nothing;
+
+insert into public.evidence (
+  id, source_id, raw_item_id, source_field, quote_text,
+  normalized_quote_sha256, verified_at, created_at
+)
+values
+  (
+    '90000000-0000-4000-8000-000000000060',
+    '90000000-0000-4000-8000-000000000020',
+    '90000000-0000-4000-8000-000000000050',
+    'article_raw_text',
+    'Fictional published signal for the active fixture.',
+    public.evidence_quote_sha256_v1(
+      'Fictional published signal for the active fixture.'
+    ),
+    '2026-08-09 10:30:00+00', '2026-08-09 10:30:00+00'
+  ),
+  (
+    '90000000-0000-4000-8000-000000000061',
+    '90000000-0000-4000-8000-000000000021',
+    '90000000-0000-4000-8000-000000000051',
+    'article_raw_text',
+    'Fictional published signal for the rumored fixture.',
+    public.evidence_quote_sha256_v1(
+      'Fictional published signal for the rumored fixture.'
+    ),
+    '2026-08-09 11:30:00+00', '2026-08-09 11:30:00+00'
+  )
+on conflict (id) do nothing;
+
+insert into public.signal_evidence_links (signal_id, evidence_id, created_at)
+values
+  (
+    '90000000-0000-4000-8000-000000000030',
+    '90000000-0000-4000-8000-000000000060',
+    '2026-08-09 10:30:00+00'
+  ),
+  (
+    '90000000-0000-4000-8000-000000000031',
+    '90000000-0000-4000-8000-000000000061',
+    '2026-08-09 11:30:00+00'
+  )
+on conflict (signal_id, evidence_id) do nothing;
+
+insert into public.score_signal_links (project_score_id, signal_id)
+values
+  ('90000000-0000-4000-8000-000000000040', '90000000-0000-4000-8000-000000000030'),
+  ('90000000-0000-4000-8000-000000000041', '90000000-0000-4000-8000-000000000030'),
+  ('90000000-0000-4000-8000-000000000042', '90000000-0000-4000-8000-000000000031')
+on conflict (project_score_id, signal_id) do nothing;
+
 commit;

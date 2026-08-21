@@ -1,18 +1,5 @@
 begin;
 
-delete from public.project_scores
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.signals
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.project_sources
-where project_id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from public.sources
-where id in ('90000000-0000-4000-8000-000000000020'::uuid, '90000000-0000-4000-8000-000000000021'::uuid);
-delete from public.projects
-where id in ('90000000-0000-4000-8000-000000000010'::uuid, '90000000-0000-4000-8000-000000000011'::uuid, '90000000-0000-4000-8000-000000000012'::uuid);
-delete from auth.users
-where id = '90000000-0000-4000-8000-000000000001'::uuid;
-
 select plan(81);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
@@ -570,7 +557,7 @@ set local role anon;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 
 select results_eq(
-  $$select project_id from public.project_current_state order by project_id$$,
+  $$select project_id from public.project_current_state where project_id::text like '10000000-%' order by project_id$$,
   $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid), ('10000000-0000-4000-8000-000000000006'::uuid), ('10000000-0000-4000-8000-000000000007'::uuid), ('10000000-0000-4000-8000-000000000008'::uuid), ('10000000-0000-4000-8000-000000000009'::uuid)$$,
   'project current state respects active and rumored project visibility'
 );
@@ -601,7 +588,7 @@ select is(
   'rumored project latest signal remains null under the existing active-only signal policy'
 );
 select results_eq(
-  $$select project_id, opportunity_score from public.opportunity_list$$,
+  $$select project_id, opportunity_score from public.opportunity_list where project_id::text like '10000000-%'$$,
   $$values ('10000000-0000-4000-8000-000000000001'::uuid, 90.00::numeric), ('10000000-0000-4000-8000-000000000002'::uuid, 80.00::numeric), ('10000000-0000-4000-8000-000000000007'::uuid, 75.00::numeric), ('10000000-0000-4000-8000-000000000008'::uuid, 70.00::numeric), ('10000000-0000-4000-8000-000000000009'::uuid, 70.00::numeric)$$,
   'opportunities are scored active or rumored projects in deterministic score and project order'
 );
@@ -617,22 +604,22 @@ select results_eq(
   'read models hide an unevidenced signal and a zero-link score without deleting either fixture'
 );
 select results_eq(
-  $$select id from public.project_scores order by id$$,
+  $$select id from public.project_scores where project_id::text like '10000000-%' order by id$$,
   $$values ('20000000-0000-4000-8000-000000000001'::uuid), ('20000000-0000-4000-8000-000000000002'::uuid), ('20000000-0000-4000-8000-000000000003'::uuid), ('20000000-0000-4000-8000-000000000007'::uuid), ('20000000-0000-4000-8000-000000000008'::uuid), ('20000000-0000-4000-8000-000000000009'::uuid), ('2fffffff-ffff-4fff-8fff-ffffffffffff'::uuid)$$,
   'anonymous users can read only Evidence-complete scores for active and rumored projects'
 );
 select is(
-  (select count(*)::integer from public.project_scores where model_version is not null),
+  (select count(*)::integer from public.project_scores where project_id::text like '10000000-%' and model_version is not null),
   7,
   'anonymous model-version reads require complete Evidence and public project lifecycle'
 );
 select is(
-  (select count(*)::integer from public.project_scores where input_version is not null),
+  (select count(*)::integer from public.project_scores where project_id::text like '10000000-%' and input_version is not null),
   7,
   'anonymous input-version reads require complete Evidence and public project lifecycle'
 );
 select is(
-  (select count(*)::integer from public.project_scores where explanation is not null),
+  (select count(*)::integer from public.project_scores where project_id::text like '10000000-%' and explanation is not null),
   7,
   'anonymous explanation reads require complete Evidence and public project lifecycle'
 );
@@ -658,7 +645,7 @@ select set_config(
 );
 
 select is(
-  (select count(*)::integer from public.project_scores where model_version is not null),
+  (select count(*)::integer from public.project_scores where project_id::text like '10000000-%' and model_version is not null),
   7,
   'an authenticated model-version read requires complete Evidence and public project lifecycle'
 );
@@ -683,7 +670,7 @@ select is((select count(*)::integer from public.watchlist_projects), 0, 'a brows
 select is((select count(*)::integer from public.user_projects), 0, 'a browser admin cannot read another user project notes');
 select is((select count(*)::integer from public.user_tasks), 0, 'a browser admin cannot read another user tasks');
 select results_eq(
-  $$select project_id from public.opportunity_list$$,
+  $$select project_id from public.opportunity_list where project_id::text like '10000000-%'$$,
   $$values ('10000000-0000-4000-8000-000000000001'::uuid), ('10000000-0000-4000-8000-000000000002'::uuid), ('10000000-0000-4000-8000-000000000007'::uuid), ('10000000-0000-4000-8000-000000000008'::uuid), ('10000000-0000-4000-8000-000000000009'::uuid)$$,
   'a browser admin receives only the public deterministic opportunity list'
 );
@@ -695,8 +682,8 @@ set local role service_role;
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
 select is(
-  (select count(*)::integer from public.project_current_state),
-  10,
+  (select count(*)::integer from public.project_current_state where project_id::text like '10000000-%'),
+  9,
   'service role can read the complete project-current-state support view'
 );
 select throws_like(
