@@ -42,7 +42,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6A 迁移未应用到生产库** | **待应用** | 三个迁移 `20260820000100` / `20260820000200` / `20260820000300` 已在隔离测试栈全量验证（pgTAP 944/944），但**尚未应用到生产库 `airdrop-intelligence-os`**。⚠️ 应用后现有 6 个 Ethereum 真实 signals 与 12 个 demo 项目会立即从公开页面隐藏（无 Evidence 链接，设计如此：保留但隐藏，等对账）。上线顺序：应用迁移 → 手工登记 `schema_migrations`（§5 规程）→ 建登录角色（平铺语句 `create role promotion_service_login with login password '...' in role promotion_service;`）→ 跑 `reconcile-historical-evidence.ts` 恢复可验证历史 → demo fixtures 需手工为 12 个项目补虚构 Evidence（参考 `supabase/fixtures/demo-projects.sql` 的做法） |
 | `collection_schedule_admin_login` 角色 | **不存在** | 早期经 ssh 传 `DO $$` 块静默失败遗留。`apps/web/.env.local` 里的 `AIRDROP_QUEUE_ADMIN_DATABASE_URL` 指向它，**目前不可用**。需要时用平铺语句重建：`create role collection_schedule_admin_login with login password '...' in role collection_schedule_admin;`（注意：`collection_queue_worker_login` 已于 Phase 5 补建，模式可参考 §6.2） |
 | airdrops.io 数据接入方式 | **开发注入，非正式通道** | 采集器 INSERT 策略深度校验「official+verified」，第三方源被正确拒绝（产品设计）。当前用 `dev_fixture_admin`（bypassrls，仅 raw_items/discovered_items 两表 insert/select）+ `seed-nonofficial-feed.ts` 注入真实 feed。**正式的多源接入（含第三方源的审核接收流）尚未设计实现** |
-| worktree | `.worktrees/phase-2-source-collection` | Phase 2 时代的 worktree，其提交已全部在主分支历史中，确认后可清理。另 `.worktrees/phase-6a-canonical-governance` 为 Phase 6A 专用 worktree，其分支待合并回主分支后可清理 |
+| worktree | `.worktrees/phase-2-source-collection` | Phase 2 时代的 worktree，其提交已全部在主分支历史中，确认后可清理。另 `.worktrees/phase-6a-canonical-governance` 的分支已于 2026-08-21 fast-forward 合并回主线（`b67e7a3`），worktree 确认后可清理 |
 
 ### ❌ 未开始（按建议优先级）
 
@@ -286,7 +286,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 8. 建议的接手顺序
 
-1. **跑通现状**：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 打开 `/`、`/opportunities`、`/projects/ethereum`、`/projects/novanet` → 跑 `env -u NODE_OPTIONS pnpm verify` 确认 650 测试全绿（注意 Phase 6A 代码在 `codex/phase-6a-canonical-governance` 分支，先合并）
+1. **跑通现状**：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 打开 `/`、`/opportunities`、`/projects/ethereum`、`/projects/novanet` → 跑 `env -u NODE_OPTIONS pnpm verify` 确认 650 测试全绿（Phase 6A 已合并进主线，2026-08-21 验证）
 2. **读文档**：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含 Phase 6A 治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）
 3. **⭐ 优先：Phase 6A 上生产**（见 §2 缺口表的上线顺序）：合并分支 → 应用三个 `2026082*` 迁移到生产库并手工登记 → 平铺语句建 `promotion_service_login` → 为 12 个 demo 项目手工补虚构 Evidence → 跑 `reconcile-historical-evidence.ts` 恢复 Ethereum 真实 signals → 验证 `/opportunities` 与 `/projects/ethereum` 恢复渲染
 4. **第一个任务建议（三选一，见 §2 未开始清单）**：(a) 失败 AI run 的 review / dead-letter 审核界面（Phase 6B）——毒物防护已把失败输入 park 住，治理地基（决策表/命令/回执/outbox）已在 6A 就绪；(b) 教程生成 tutorials（价值链「执行」环，依赖已就绪的自动信号流；注意其前置「安全 incidents / 白名单链接」尚未开始）；(c) 详情页 score_factors 展示 + anon 读策略（把 Phase 4 的因子数据变成用户可见）。若上生产，还需部署 worker（带 AI env）并配置采集调度常态化
@@ -296,7 +296,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 9. 其他
 
-- Git 分支：主开发线 `codex/phase-0-1-foundation`（含 Phase 0–5）；⭐ **Phase 6A 在独立分支 `codex/phase-6a-canonical-governance`（worktree `.worktrees/phase-6a-canonical-governance`，基于 `fc2ea5b`）**，Task 1–8 全部完成，待合并回主线；`codex/phase-2-source-collection` 及其 worktree 可在确认后清理
+- Git 分支：主开发线 `codex/phase-0-1-foundation`（含 Phase 0–6A，HEAD `b67e7a3`）；Phase 6A 于独立分支 `codex/phase-6a-canonical-governance` 开发，2026-08-21 fast-forward 合并回主线（两分支指向同一提交，合并后主线 `pnpm verify` 全绿）；`codex/phase-2-source-collection` 及其 worktree、`.worktrees/phase-6a-canonical-governance` 均可在确认后清理
 - dev server 可能仍在 localhost:3000 运行（前一会话启动）
 - 历史决策细节（为什么这样做）：`docs/superpowers/specs/` 与 `docs/superpowers/plans/` 下的设计文档；Phase 6A 的逐任务 RED/GREEN 证据在 `docs/tasks/canonical-intelligence-governance-workbook.md`
 - DeepSeek 计费注意：130 次真实抽取消耗约 62 万 prompt tokens（每输入截取 12K 字符上限）；批量跑前评估成本
