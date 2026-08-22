@@ -4,7 +4,7 @@
 > 最近更新：2026-08-22（Codex 额度耗尽后由 WorkBuddy（傻妞）接手：disposable 凭据已按 runbook 安全推导并经 SSH 加密通道取回本地 `/tmp/airdrop-6b-test.env`（600、远程副本即删），16433 隧道已恢复且 `/auth/v1/health` 200，Task 7 focused integration 复验进行中；生产未访问；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–6 已通过任务评审，Task 7 实现与 fix round 1 由 WorkBuddy 接续提交在分支 `codex/phase-6b-failed-ai-review`（本 worktree），disposable focused integration 复验与 scoped re-review 执行中；当前分支 Node 22 `pnpm verify` 798 个非跳过测试全绿；disposable pgTAP 1031/1031、repository integration 40/40（fix round 1 前）；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准）；Phase 6B Task 1–8 全部 DONE（分支 `codex/phase-6b-failed-ai-review`，本 worktree），Task 9 受控生产检查点**止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`**：生产无 human reviewer、Auth 服务 503、无定期备份，三项前置未满足前不应用第 20 个迁移；当前分支 Node 22 `pnpm verify` 798 个非跳过测试全绿；disposable focused integration 6/6、full repository integration 40/40、pgTAP 1031/1031；**生产库仍只应用 Phase 6A 的 19 个迁移**，未访问或修改生产数据。
 
 > **2026-08-22 本轮接续结果（Codex → WorkBuddy 交接）**：Codex 完成 Task 1–7 实现与多轮评审，但 Task 7 fix round 1（partial Auth setup 精确清理缺口修复）因账户额度耗尽，其 disposable focused 复验与 scoped re-review 未获审批而搁置，代码与文档修改未提交。WorkBuddy 接手后：① 通读 HANDOVER、6B spec/plan/workbook/progress 与未提交 diff，确认修复最小且与报告一致；② 以容器名 `governance-test` 双重白名单脚本在远程 disposable 栈推导 4 个集成测试环境变量（脚本仅输出行数校验，值经 SSH 加密通道回传本地 `/tmp/airdrop-6b-test.env`，umask 077/chmod 600，远程副本当场删除）；③ 恢复 `16433 → 64321` 隧道并以 `/auth/v1/health` 200 确认目标为 disposable 栈；生产端口（54321/54322）无隧道、未访问。随后按序执行 focused integration 6/6 复验、提交 fix round 1、scoped re-review，并续作 Task 8/9。Phase 6A 生产落地、Evidence 补证/对账与 Web 验证保持不变，详见 §8.2。
 
@@ -63,7 +63,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 
 1. ~~**评分管线**~~ ✅ **2026-08-15 完成**：score-model-v1 确定性评分 + 因子分解 + recommendation 决策表；Ethereum 及 11 个 demo 项目全部评分，Ethereum 自动进入 `opportunity_list`。见 `docs/superpowers/specs/2026-08-15-score-pipeline-design.md`
 2. ~~**机会列表纳入真实项目**~~ ✅ **2026-08-15 完成**：Ethereum 评分后由读模型视图自动纳入（第 6 位）
-3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Task 1–6 已通过；Task 7 原始 reviewer 全流程、授权矩阵与并发竞争门禁已绿，partial Auth setup 清理缺口已本地修复并通过 Node 22 门禁，但仍待 disposable focused 复验与 scoped re-review；`listPendingInputs` 毒物防护把失败输入 park 住。**尚未实现**：Task 8 runbook/最终安全审查和 Task 9 受控生产检查点
+3. ~~**失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**~~ ✅ **2026-08-22 本地完成**：Task 1–8 全部 DONE，Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（见 §8.5）。分支 `codex/phase-6b-failed-ai-review` 待合并回主线；生产应用需先满足 §8.5 三项前置
 4. ~~**采集→抽取→评分的常态化编排**~~ ✅ **2026-08-15 完成（Phase 5）**：worker 进程内 AI 阶段编排循环（抽取 60s / 评分 300s 默认 tick，指数退避，错误隔离，opt-in 环境变量）。采集队列未动；人工 Promotion 门禁按产品设计保留。见 `docs/superpowers/specs/2026-08-15-orchestration-design.md`
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
@@ -330,7 +330,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 | 维度 | 状态 |
 |------|------|
-| 代码 | Phase 0–6A 已在主线；Phase 6B Task 1–7 全部 DONE（Task 7 含 fix round 1，由 WorkBuddy 验收后提交）；Task 8/9 进行中；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地 |
+| 代码 | Phase 0–6A 已在主线；Phase 6B Task 1–8 全部 DONE，Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（§8.5）；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地；分支 `codex/phase-6b-failed-ai-review` HEAD 以 `git log --oneline -1` 为准 |
 | 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 798 个非跳过测试全绿，exit 0；lint/typecheck/build/placeholder 全部通过。Task 7 fix round 1 后 disposable 复验：focused integration 6/6、fixture 5/5、full repository integration 40/40；011 focused 87/87、full pgTAP 1031/1031。 |
 | 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
 | 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康（auth/db/kong 均 healthy）；20 migrations reset exit 0，updated focused pgTAP 87/87、full 1031/1031；**fix round 1 后复验**：focused integration 6/6（4.05s）、full repository integration 40/40（74.19s），cleanup 经 marker 校验且仅删精确 fixture；`errorDetail` 与 revoked-role mutation 均命中具名回归。**只允许对它 reset**；生产未访问。 |
@@ -425,11 +425,27 @@ git branch -d codex/phase-6a-canonical-governance
 
 ### 8.4 下一阶段开发方向（Phase 6B 起，按建议优先级）
 
-1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1–7 全部 DONE（Task 7 由 WorkBuddy 完成 disposable focused 6/6 复验、full 40/40 与 scoped re-review 后验收提交）；下一步 Task 8：runbook 操作流、全分支 secret/unsafe-field 安全审查与完整仓库门禁；Task 9 受控生产检查点止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`；未部署、未访问生产。
+1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1–8 全部 DONE，Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（§8.5）。本地分支 `codex/phase-6b-failed-ai-review` 待合并回主线（合并流程另议）；生产应用在 §8.5 三项前置满足并获显式授权前保持冻结。
 2. **详情页 score_factors / Evidence 引用展示 + anon 读策略**——把 Phase 4 因子数据变成用户可见；注意展示需符合「Raw quote 不自动公开」的约束（经审核的公共读模型才能带引用文本）
 3. **教程生成 tutorials**——价值链「执行」环；其前置（安全 incidents / 白名单链接）尚未开始，需先排期
 4. 其余按 §2「未开始」清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）
-5. 若上生产部署：worker 常驻进程（带 AI env）+ 采集调度常态化 + `collection_schedule_admin_login` 补建（§2 缺口表）
+5. 若上生产部署：worker 常驻进程（带 AI env）+ 采集调度常态化 + `collection_schedule_admin_login` 补建（§2 缺口表）；另须先修 §8.5 发现的生产 Auth 服务 503 与备份姿态缺口
+
+### 8.5 ⛔ Phase 6B 生产受控检查点（2026-08-22，止于 PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED）
+
+只读预检（仅 SELECT/exists/health 探测，无任何写操作）结果：
+
+| 预检项 | 结果 | 结论 |
+|--------|------|------|
+| 生产迁移台账 | 19 行，最高 `20260820000300` | 6B 第 20 个迁移未应用，正确 |
+| `ai_run_review_decisions` 存在性 | 不存在 | 生产 schema 未被 6B 触碰 |
+| human reviewer 账号 | `auth.users` 仅 2 行，均为 `@example.invalid` 运营 fixture（`fixture-reviewer` 无激活角色；`ops-reviewer` 为 Phase 6A 治理审核人） | **缺 human reviewer**，禁止以运营 fixture 充当人类登录、禁止猜身份建号 |
+| 生产 Auth 可达性 | `/auth/v1/health` **503**（`docker ps` 无 `supabase_auth_airdrop-intelligence-os` 容器）；`/rest/v1/` 200 | 审核 UI 在生产无法登录；须先恢复/启动 Auth 服务 |
+| 备份/恢复姿态 | 无 cron 定期 DB 备份；仅有历史手工备份目录（task4/task5/task9-*-backup） | 上生产前须建立并演练预检备份流程 |
+
+**决定**：按 plan Task 9 Step 2 停在此检查点，**不执行**迁移应用、角色/账号创建、数据或配置变更。恢复 rollout（Step 3–5）的前置：① 项目所有者供给或指定 human reviewer（active reviewer-class 角色）；② 生产 Auth 服务恢复且 `/auth/v1/health` 返回 200；③ 建立并演练迁移前备份；④ 显式 rollout 授权。四者齐备后按 §8.2 同款远程规程（preflight → 事务原子应用 → 登记 → 校验 → 不打印凭据）执行，smoke 检查清单见 plan Task 9 Step 4。
+
+**附带发现（建议尽快处理，不阻塞 6B 本地状态）**：生产栈缺 Auth 容器属 Phase 6A 上生产后未被使用到的服务面（6A CLI 走数据库角色，不经 Auth HTTP），但任何基于浏览器会话的功能（6B 审核 UI、未来用户认证）都依赖它；建议在下一次生产变更前先排查 `supabase_auth` 容器为何未随栈启动（可能是 compose 配置或崩溃退出），并确认 Kong 路由。
 
 ---
 
