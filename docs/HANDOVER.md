@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B Task 1 已完成：失败 AI run 严格 contracts 已通过 focused RED → GREEN 与 contracts lint/typecheck；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-22（Phase 6B Task 2 数据库边界已实现但数据库执行权限被拒，状态为 `DONE_WITH_CONCERNS`；真实 RED/GREEN、敏感性变异和全库 pgTAP 尚未运行；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复；Phase 6B Task 2 的第 20 个 forward migration 仅在开发分支实现，尚未应用到任何数据库。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；Task 1 contracts 已在隔离 worktree 完成，focused contracts 测试 77/77、lint/typecheck 均通过，下一步是 Task 2 数据库边界。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts 已通过；Task 2 已新增追加式审核 schema、受保护读取 RPC 和事务性 decision command，但远端测试源码同步/执行被权限审查拒绝，数据库 acceptance 仍是进入 Task 3 真实集成前的硬门槛。
 
 ---
 
@@ -37,6 +37,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6A 正式情报治理**（2026-08-21 完成，分支 `codex/phase-6a-canonical-governance`） | 把 Evidence、人工审核、Promotion、审计、事务性 outbox 从 CLI 约定升级为**可执行的数据库边界**：`evidence` / `signal_evidence_links` / `candidate_review_decisions` / `promotion_commands` / `outbox_events` 五表 + 专用 `promotion_service` NOLOGIN 角色 + 受保护幂等命令 `execute_extraction_candidate_review`（审核人在册、期望版本、确定性 grounding、单事务原子写入）与 `reconcile_extraction_candidate_evidence`（历史对账）；撤销 `ai_stage_worker` 直接 INSERT signals 与旧 promote 函数执行权；公开 signal/score 读模型与评分输入全部改为 **Evidence 门禁**（无证据历史保留但隐藏，不删除）；`review-candidate.ts` 治理审核 CLI（approve/reject/needs-review，读 `AIRDROP_PROMOTION_DATABASE_URL` + `AIRDROP_PROMOTION_REVIEWER_USER_ID`）替代旧 promote-candidate（已 fail-closed）；`reconcile-historical-evidence.ts` 有界幂等对账 runner（批次 1-100、UUID 游标、确定性幂等键）；seed/demo fixtures 全部补显式虚构 Evidence；契约与纯函数 grounding 规则（Unicode 空白归一化 + 精确包含 + SHA-256）跨 TS/PG 一致（码点级长度、代理对拒绝）。详见 `docs/superpowers/specs/2026-08-20-canonical-intelligence-governance-design.md` | `a9f1490`…`768df85` + `b67e7a3`（共 19 提交，分支 `codex/phase-6a-canonical-governance`）；2026-08-21 fast-forward 合并回主线，合并后主线 verify 全绿 |
 | **Phase 6A 生产落地**（2026-08-22） | 三迁移原子应用并登记；生产治理登录/审核人就绪；12 组 demo Evidence 已补齐；7 个历史 promoted candidates 全部 deterministic-ground 成功并 linked；对账重跑为 0；匿名机会读模型 12 行，Ethereum 6 条真实 signals 恢复；页面验证通过 | 逐步运行证据见 §8.2 |
 | **Phase 6B Task 1 contracts**（2026-08-22） | `packages/contracts/src/review/failed-ai-run.ts` 提供严格失败运行状态、查询、无原始错误的安全投影、审核历史、命令/回执 schemas 与 inferred types；决策 reason compatibility、版本边界、备注长度/空白、base64url cursor 均有测试；`packages/contracts/src/index.ts` 已公开导出 | `docs/tasks/failed-ai-run-review-workbook.md` Task 1 execution log；focused contracts 6 files / 77 tests passed，lint/typecheck passed |
+| **Phase 6B Task 2 数据库边界（DONE_WITH_CONCERNS）**（2026-08-22） | 新增唯一 forward migration：`ai_run_review_decisions` / `ai_run_review_commands` 追加式历史表、reviewer-only 安全 list/detail RPC、`auth.uid()` 绑定且带版本/幂等并发控制的 decision RPC、同事务 outbox 事件；新增 pgTAP 覆盖权限、投影、冲突、回放、回滚和追加性 | disposable 拓扑项目名、64322 端口与健康容器已只读确认；执行器拒绝远端测试传输/执行，因此 focused RED/GREEN、3 项敏感性变异与全库 pgTAP 未运行。详见 `docs/tasks/failed-ai-run-review-workbook.md` Task 2 log。 |
 
 当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders，Node 22 验证）。测试通过 650（contracts 65 / domain 222 / database 134 / web 17 / worker 212）；隔离 Supabase 栈（远程 ECS `airdrop-intelligence-governance-test`，db 端口 64322，本地隧道 16432/16433）全量 pgTAP 10 文件 **944/944**，全量序列化集成 6 文件 **34/34 零跳过**（含 promotion 12 项真实治理边界用例）。
 
