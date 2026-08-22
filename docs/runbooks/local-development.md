@@ -158,6 +158,39 @@ npx tsx apps/worker/src/promotion/reconcile-historical-evidence.ts
 
 Optional controls are `AIRDROP_EVIDENCE_RECONCILE_LIMIT` (1-100, default 25) and `AIRDROP_EVIDENCE_RECONCILE_AFTER_ID` (UUID cursor for continuing after the printed cursor). Re-running with the same reviewer appends exact replays and creates no duplicate Evidence, links, decisions, or events. Ungroundable history is preserved and parked with a `historical_reconciliation_failed` needs-review decision; it is never deleted or overwritten.
 
+## Failed AI run review (Phase 6B)
+
+The review UI lets authenticated active reviewers inspect failed AI extraction runs (`provider_error`, `schema_invalid_after_repair`, `grounding_failed`) and append idempotent, version-checked `needs_investigation` or `dismiss` decisions with transactional outbox events. It never displays raw AI errors, model output, prompts, usage payloads, or source bodies, and it never retries or re-runs failed AI work; retry remains excluded from scope.
+
+The UI never creates accounts or roles. Provision a human reviewer Auth user and an active reviewer-class role through the same trusted administrative process used for governed promotion review — flat SQL statements only, never `DO $$ ... $$` blocks over SSH:
+
+```sql
+insert into auth.users (id, instance_id, aud, role, email, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+values ('<human-reviewer-uuid>', '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', '<human-reviewer-email>',
+  '{"provider":"email","providers":["email"]}', '{}', now(), now())
+on conflict (id) do nothing;
+insert into public.profiles (id) values ('<human-reviewer-uuid>') on conflict (id) do nothing;
+insert into public.user_roles (user_id, role, granted_at)
+values ('<human-reviewer-uuid>', 'reviewer', now());
+```
+
+Set the password through the trusted administrative channel and never store it in this repository or its environment files. Reviewer authorization is re-derived inside each review RPC from `auth.uid()` plus a current non-revoked grant of `reviewer`, `senior_reviewer`, `security_reviewer`, or `admin`; setting `user_roles.revoked_at` therefore takes effect immediately (denial `AR104`).
+
+Start the stack as usual (`pnpm db:start`, then `pnpm dev`) and open `http://127.0.0.1:3000/review/sign-in`. Sign in with the provisioned reviewer credentials. The browser holds only the public Supabase URL, anon key, and its own session; list lives at `/review/ai-runs`, detail/history/decision at `/review/ai-runs/<run-id>`.
+
+Focused tests:
+
+```bash
+pnpm --filter @airdrop/contracts test -- src/review/failed-ai-run.test.ts
+pnpm --filter @airdrop/database test -- src/tests/failed-ai-run-review-repository.test.ts src/tests/failed-ai-run-review-integration-fixture.test.ts
+pnpm --filter @airdrop/web test -- src/tests/failed-ai-run-review-handlers.test.ts src/tests/review-session.test.ts src/tests/review-api-client.test.ts src/tests/review-components.test.ts
+```
+
+Real repository integration for the review boundary additionally requires the four disposable-topology variables from "Database reset and tests" (`AIRDROP_DATABASE_TEST_URL`, `AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL`, `AIRDROP_ANON_SUPABASE_URL`, `AIRDROP_ANON_SUPABASE_KEY`) and must target only the disposable stack (remote tunnels `16432 -> 64322` and `16433 -> 64321`), never production.
+
+Migration safety: `20260822000100_failed_ai_run_review.sql` is forward-only and additive; it does not modify any of the 19 earlier migrations or any canonical intelligence table. It adds two append-only review tables, three fixed-search-path security-definer RPCs, append-only triggers, and least-privilege grants, and grants no direct review-table access to browser or worker roles. Review decisions never write signals, scores, evidence, or promotion rows.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
