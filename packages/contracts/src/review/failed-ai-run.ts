@@ -97,6 +97,30 @@ const boundedNoteSchema = z
   .refine(isPostgresText, 'note must be valid PostgreSQL UTF-8 text')
   .nullable();
 
+const investigationReasons = new Set([
+  'provider_instability',
+  'schema_regression',
+  'grounding_regression',
+  'source_data_problem',
+  'suspected_prompt_injection',
+  'other',
+]);
+
+const dismissalReasons = new Set([
+  'transient_failure',
+  'duplicate_or_superseded',
+  'expected_invalid_input',
+  'no_action_needed',
+  'other',
+]);
+
+const isDecisionReasonCompatible = (decision: string, reasonCode: string): boolean => {
+  const validReasons = decision === 'needs_investigation'
+    ? investigationReasons
+    : dismissalReasons;
+  return validReasons.has(reasonCode);
+};
+
 export const failedAiRunListItemSchema = z
   .strictObject({
     version: z.literal(1),
@@ -126,16 +150,26 @@ export const failedAiRunListItemSchema = z
     }
   });
 
-export const failedAiRunReviewDecisionRecordSchema = z.strictObject({
-  version: z.literal(1),
-  decisionId: uuidSchema,
-  reviewVersion: positiveVersionSchema,
-  decision: failedAiRunDecisionSchema,
-  reasonCode: failedAiRunReasonCodeSchema,
-  note: boundedNoteSchema,
-  reviewerUserId: uuidSchema,
-  createdAt: timestampSchema,
-});
+export const failedAiRunReviewDecisionRecordSchema = z
+  .strictObject({
+    version: z.literal(1),
+    decisionId: uuidSchema,
+    reviewVersion: positiveVersionSchema,
+    decision: failedAiRunDecisionSchema,
+    reasonCode: failedAiRunReasonCodeSchema,
+    note: boundedNoteSchema,
+    reviewerUserId: uuidSchema,
+    createdAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    if (!isDecisionReasonCompatible(value.decision, value.reasonCode)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['reasonCode'],
+        message: `reasonCode is not compatible with ${value.decision}`,
+      });
+    }
+  });
 
 const failedAiRunInputSchema = z.strictObject({
   kind: z.enum(['discovered_item', 'raw_item']),
@@ -150,23 +184,6 @@ export const failedAiRunDetailSchema = z.strictObject({
   decisions: z.array(failedAiRunReviewDecisionRecordSchema),
 });
 
-const investigationReasons = new Set([
-  'provider_instability',
-  'schema_regression',
-  'grounding_regression',
-  'source_data_problem',
-  'suspected_prompt_injection',
-  'other',
-]);
-
-const dismissalReasons = new Set([
-  'transient_failure',
-  'duplicate_or_superseded',
-  'expected_invalid_input',
-  'no_action_needed',
-  'other',
-]);
-
 export const failedAiRunDecisionCommandSchema = z
   .strictObject({
     version: z.literal(1),
@@ -176,10 +193,7 @@ export const failedAiRunDecisionCommandSchema = z
     note: boundedNoteSchema,
   })
   .superRefine((value, context) => {
-    const validReasons = value.decision === 'needs_investigation'
-      ? investigationReasons
-      : dismissalReasons;
-    if (!validReasons.has(value.reasonCode)) {
+    if (!isDecisionReasonCompatible(value.decision, value.reasonCode)) {
       context.addIssue({
         code: 'custom',
         path: ['reasonCode'],

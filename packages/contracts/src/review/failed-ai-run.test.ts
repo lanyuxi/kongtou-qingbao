@@ -191,6 +191,46 @@ describe('failed AI run review contracts', () => {
     })).toThrow();
   });
 
+  it('rejects every incompatible decision/reason pair in review history', () => {
+    const investigationReasons = [
+      'provider_instability',
+      'schema_regression',
+      'grounding_regression',
+      'source_data_problem',
+      'suspected_prompt_injection',
+    ];
+    const dismissalReasons = [
+      'transient_failure',
+      'duplicate_or_superseded',
+      'expected_invalid_input',
+      'no_action_needed',
+    ];
+    for (const reasonCode of dismissalReasons) {
+      expect(() => contracts.failedAiRunDetailSchema.parse({
+        version: 1,
+        run: validListItem,
+        input: { kind: 'raw_item', id: sourceId, collectedAt: null },
+        decisions: [{
+          ...validDecisionRecord,
+          decision: 'needs_investigation',
+          reasonCode,
+        }],
+      })).toThrow();
+    }
+    for (const reasonCode of investigationReasons) {
+      expect(() => contracts.failedAiRunDetailSchema.parse({
+        version: 1,
+        run: validListItem,
+        input: { kind: 'raw_item', id: sourceId, collectedAt: null },
+        decisions: [{
+          ...validDecisionRecord,
+          decision: 'dismiss',
+          reasonCode,
+        }],
+      })).toThrow();
+    }
+  });
+
   it('accepts an investigation command with a compatible reason and trims its note', () => {
     expect(contracts.failedAiRunDecisionCommandSchema.parse({
       version: 1,
