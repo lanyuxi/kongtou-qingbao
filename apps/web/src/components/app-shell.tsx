@@ -21,6 +21,18 @@ const primaryNav: readonly NavItem[] = [
 export function AppShell({ children }: { readonly children: ReactNode }) {
   const pathname = usePathname();
 
+  return <PublicShellBoundary pathname={pathname}>{children}</PublicShellBoundary>;
+}
+
+export function PublicShellBoundary({
+  pathname,
+  children,
+}: {
+  readonly pathname: string;
+  readonly children: ReactNode;
+}) {
+  if (pathname === '/review' || pathname.startsWith('/review/')) return children;
+
   return (
     <div className="shell">
       <aside className="sidebar">
