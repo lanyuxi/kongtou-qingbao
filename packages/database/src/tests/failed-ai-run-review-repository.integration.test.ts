@@ -9,6 +9,7 @@ import {
   createFailedAiRunReviewRepository,
   type FailedAiRunReviewRepository,
 } from '../review/failed-ai-run-review-repository.js';
+import { presentFixtureUserIds } from './failed-ai-run-review-integration-fixture.js';
 
 const integrationEnvironment = readIntegrationEnvironment();
 const describeIntegration = integrationEnvironment === null ? describe.skip : describe;
@@ -58,12 +59,12 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
     const reviewer = await signUpFixture(
       requireAuth(reviewerAuth), database, fixture.reviewerEmail, password,
     );
+    reviewerUserId = reviewer.userId;
+    reviewerAccessToken = reviewer.accessToken;
     const ordinary = await signUpFixture(
       requireAuth(ordinaryAuth), database, fixture.ordinaryEmail, password,
     );
-    reviewerUserId = reviewer.userId;
     ordinaryUserId = ordinary.userId;
-    reviewerAccessToken = reviewer.accessToken;
     ordinaryAccessToken = ordinary.accessToken;
 
     await seedFixtures(database, reviewerUserId, ordinaryUserId);
@@ -173,11 +174,53 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
     expect(outcomes.map((result) => result.replayed).sort()).toEqual([false, true]);
     expect(new Set(outcomes.map((result) => result.commandId))).toHaveLength(1);
     expect(new Set(outcomes.map((result) => result.decisionId))).toHaveLength(1);
-    await expect(historyCounts(requireOwner(owner), fixture.runIds[1])).resolves.toEqual({
-      decisions: 1,
-      receipts: 1,
-      outbox: 1,
+    const winner = outcomes.find((result) => !result.replayed);
+    if (winner === undefined) throw new Error('same_key_race_winner_missing');
+    const snapshot = await reviewHistorySnapshot(requireOwner(owner), fixture.runIds[1]);
+    expect(snapshot).toEqual({
+      decisions: [{
+        id: winner.decisionId,
+        ai_run_id: fixture.runIds[1],
+        review_version: 1,
+        reviewer_user_id: reviewerUserId,
+        decision: command.decision,
+        reason_code: command.reasonCode,
+        note: command.note,
+        created_at: expect.any(String),
+      }],
+      receipts: [{
+        id: winner.commandId,
+        reviewer_user_id: reviewerUserId,
+        ai_run_id: fixture.runIds[1],
+        idempotency_key: idempotencyKey,
+        expected_review_version: command.expectedReviewVersion,
+        decision: command.decision,
+        reason_code: command.reasonCode,
+        note: command.note,
+        resulting_review_version: winner.reviewVersion,
+        decision_id: winner.decisionId,
+        created_at: expect.any(String),
+      }],
+      outbox: [{
+        aggregate_type: 'ai_run',
+        aggregate_id: fixture.runIds[1],
+        aggregate_version: winner.reviewVersion,
+        event_type: 'intelligence.ai_run.reviewed.v1',
+        event_version: 1,
+        payload: {
+          version: 1,
+          runId: fixture.runIds[1],
+          reviewVersion: winner.reviewVersion,
+          decisionId: winner.decisionId,
+          decision: command.decision,
+          reasonCode: command.reasonCode,
+          occurredAt: expect.any(String),
+        },
+        occurred_at: expect.any(String),
+      }],
     });
+    expectExactSafeOutbox(snapshot);
+    expectMatchingHistoryTimestamps(snapshot);
   });
 
   it('lets exactly one independent client win different keys at the same expected version', async () => {
@@ -188,17 +231,19 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
       reasonCode: 'no_action_needed' as const,
       note: null,
     };
+    const firstIdempotencyKey = `different-key-a-${randomUUID()}`;
+    const secondIdempotencyKey = `different-key-b-${randomUUID()}`;
     const outcomes = await Promise.allSettled([
       requireRepository(first).decide({
         accessToken: reviewerAccessToken,
         runId: fixture.runIds[2],
-        idempotencyKey: `different-key-a-${randomUUID()}`,
+        idempotencyKey: firstIdempotencyKey,
         command,
       }),
       requireRepository(second).decide({
         accessToken: reviewerAccessToken,
         runId: fixture.runIds[2],
-        idempotencyKey: `different-key-b-${randomUUID()}`,
+        idempotencyKey: secondIdempotencyKey,
         command,
       }),
     ]);
@@ -212,11 +257,56 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
       code: 'review_version_conflict',
       message: 'review_version_conflict',
     });
-    await expect(historyCounts(requireOwner(owner), fixture.runIds[2])).resolves.toEqual({
-      decisions: 1,
-      receipts: 1,
-      outbox: 1,
+    const winningIndex = outcomes.findIndex((outcome) => outcome.status === 'fulfilled');
+    const winner = outcomes[winningIndex];
+    if (winner?.status !== 'fulfilled') throw new Error('different_key_race_winner_missing');
+    const winningIdempotencyKey = [firstIdempotencyKey, secondIdempotencyKey][winningIndex];
+    if (winningIdempotencyKey === undefined) throw new Error('winning_idempotency_key_missing');
+    const snapshot = await reviewHistorySnapshot(requireOwner(owner), fixture.runIds[2]);
+    expect(snapshot).toEqual({
+      decisions: [{
+        id: winner.value.decisionId,
+        ai_run_id: fixture.runIds[2],
+        review_version: 1,
+        reviewer_user_id: reviewerUserId,
+        decision: command.decision,
+        reason_code: command.reasonCode,
+        note: command.note,
+        created_at: expect.any(String),
+      }],
+      receipts: [{
+        id: winner.value.commandId,
+        reviewer_user_id: reviewerUserId,
+        ai_run_id: fixture.runIds[2],
+        idempotency_key: winningIdempotencyKey,
+        expected_review_version: command.expectedReviewVersion,
+        decision: command.decision,
+        reason_code: command.reasonCode,
+        note: command.note,
+        resulting_review_version: winner.value.reviewVersion,
+        decision_id: winner.value.decisionId,
+        created_at: expect.any(String),
+      }],
+      outbox: [{
+        aggregate_type: 'ai_run',
+        aggregate_id: fixture.runIds[2],
+        aggregate_version: winner.value.reviewVersion,
+        event_type: 'intelligence.ai_run.reviewed.v1',
+        event_version: 1,
+        payload: {
+          version: 1,
+          runId: fixture.runIds[2],
+          reviewVersion: winner.value.reviewVersion,
+          decisionId: winner.value.decisionId,
+          decision: command.decision,
+          reasonCode: command.reasonCode,
+          occurredAt: expect.any(String),
+        },
+        occurred_at: expect.any(String),
+      }],
     });
+    expectExactSafeOutbox(snapshot);
+    expectMatchingHistoryTimestamps(snapshot);
   });
 });
 
@@ -303,16 +393,72 @@ async function seedFixtures(
   }
 }
 
-async function historyCounts(sql: postgres.Sql, runId: string) {
-  const rows = await sql`
-    select
-      (select count(*)::integer from public.ai_run_review_decisions where ai_run_id = ${runId}::uuid) as decisions,
-      (select count(*)::integer from public.ai_run_review_commands where ai_run_id = ${runId}::uuid) as receipts,
-      (select count(*)::integer from public.outbox_events
-        where aggregate_id = ${runId}::uuid
-          and event_type = 'intelligence.ai_run.reviewed.v1') as outbox
+async function reviewHistorySnapshot(sql: postgres.Sql, runId: string) {
+  const decisions = await sql`
+    select id, ai_run_id, review_version, reviewer_user_id, decision, reason_code,
+      note, created_at::text
+    from public.ai_run_review_decisions
+    where ai_run_id = ${runId}::uuid
+    order by review_version, id
   `;
-  return rows[0];
+  const receipts = await sql`
+    select id, reviewer_user_id, ai_run_id, idempotency_key, expected_review_version,
+      decision, reason_code, note, resulting_review_version, decision_id, created_at::text
+    from public.ai_run_review_commands
+    where ai_run_id = ${runId}::uuid
+    order by resulting_review_version, id
+  `;
+  const outbox = await sql`
+    select aggregate_type, aggregate_id, aggregate_version, event_type, event_version,
+      payload, occurred_at::text
+    from public.outbox_events
+    where aggregate_id = ${runId}::uuid
+      and event_type = 'intelligence.ai_run.reviewed.v1'
+    order by aggregate_version, id
+  `;
+  return { decisions, receipts, outbox };
+}
+
+function expectExactSafeOutbox(
+  snapshot: Awaited<ReturnType<typeof reviewHistorySnapshot>>,
+): void {
+  const payload = snapshot.outbox[0]?.payload;
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+    throw new Error('review_outbox_payload_missing');
+  }
+  expect(Object.keys(payload).sort()).toEqual([
+    'decision',
+    'decisionId',
+    'occurredAt',
+    'reasonCode',
+    'reviewVersion',
+    'runId',
+    'version',
+  ]);
+  expect(JSON.stringify(payload)).not.toMatch(
+    /note|reviewer|token|password|error|output|usage|prompt|source|raw|url/i,
+  );
+}
+
+function expectMatchingHistoryTimestamps(
+  snapshot: Awaited<ReturnType<typeof reviewHistorySnapshot>>,
+): void {
+  const decisionCreatedAt = snapshot.decisions[0]?.created_at;
+  const receiptCreatedAt = snapshot.receipts[0]?.created_at;
+  const occurredAt = snapshot.outbox[0]?.occurred_at;
+  const payload = snapshot.outbox[0]?.payload;
+  if (typeof decisionCreatedAt !== 'string'
+    || typeof receiptCreatedAt !== 'string'
+    || typeof occurredAt !== 'string'
+    || typeof payload !== 'object'
+    || payload === null
+    || Array.isArray(payload)
+    || typeof payload.occurredAt !== 'string') {
+    throw new Error('review_history_timestamp_missing');
+  }
+  expect(decisionCreatedAt).toBe(receiptCreatedAt);
+  expect(receiptCreatedAt).toBe(occurredAt);
+  expect(Date.parse(occurredAt)).toBe(Date.parse(payload.occurredAt));
 }
 
 async function removeExactFixtures(
@@ -320,7 +466,7 @@ async function removeExactFixtures(
   reviewerUserId: string,
   ordinaryUserId: string,
 ): Promise<void> {
-  if (reviewerUserId === '' || ordinaryUserId === '') return;
+  const userIds = presentFixtureUserIds(reviewerUserId, ordinaryUserId);
   await sql.begin(async (transaction) => {
     await assertDisposableDatabase(transaction);
     await transaction`set local session_replication_role = replica`;
@@ -332,9 +478,11 @@ async function removeExactFixtures(
     await transaction`delete from public.project_sources where project_id = ${fixture.projectId}::uuid and source_id = ${fixture.sourceId}::uuid`;
     await transaction`delete from public.sources where id = ${fixture.sourceId}::uuid`;
     await transaction`delete from public.projects where id = ${fixture.projectId}::uuid`;
-    await transaction`delete from public.user_roles where user_id in (${reviewerUserId}::uuid, ${ordinaryUserId}::uuid)`;
-    await transaction`delete from public.profiles where id in (${reviewerUserId}::uuid, ${ordinaryUserId}::uuid)`;
-    await transaction`delete from auth.users where id in (${reviewerUserId}::uuid, ${ordinaryUserId}::uuid)`;
+    if (userIds.length > 0) {
+      await transaction`delete from public.user_roles where user_id in ${transaction(userIds)}`;
+      await transaction`delete from public.profiles where id in ${transaction(userIds)}`;
+      await transaction`delete from auth.users where id in ${transaction(userIds)}`;
+    }
   });
 }
 
