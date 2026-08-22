@@ -345,7 +345,7 @@ describe('failed AI run detail and immutable history', () => {
 
   it('hides JWT-shaped values independently in notes and allowed metadata', () => {
     const noteJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsYSJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
-    const metadataJwt = 'YWJjZGVmZ2hpamts.bW5vcHFyc3R1dnd4.eXoxMjM0NTY3ODkwQUJD';
+    const metadataJwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtZXRhZGF0YSJ9.c2U2k9JNfXACFEfpqp2f3VkSYTZGGs7w_8cqF27LTKs';
     const jwtDetail: FailedAiRunDetailDto = {
       ...detail,
       run: { ...detail.run, modelId: metadataJwt },
@@ -364,7 +364,59 @@ describe('failed AI run detail and immutable history', () => {
     const html = renderToStaticMarkup(createElement(FailedAiRunDetail, { detail: jwtDetail }));
     expect(html.match(/\[内容已隐藏\]/g)).toHaveLength(2);
     expect(html).not.toContain('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
-    expect(html).not.toContain('eXoxMjM0NTY3ODkwQUJD');
+    expect(html).not.toContain('c2U2k9JNfXACFEfpqp2f3VkSYTZGGs7w_8cqF27LTKs');
+  });
+
+  it('hides compact HS256 tokens with short payloads in notes and allowed metadata', () => {
+    const noteCompactToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.HE32Hsq4a1T8pbCEK2oPgxSj8mN8RCjzbW4JBxLSe9M';
+    const metadataCompactToken = 'eyJhbGciOiJIUzI1NiJ9.e30.nta2r-r8RmOdDMlgYc85vuxMW5nItE7vXnmjbfn7EsE';
+    const compactDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: { ...detail.run, modelId: metadataCompactToken },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: noteCompactToken,
+        reviewerUserId,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, {
+      detail: compactDetail,
+    }));
+    expect(html.match(/\[内容已隐藏\]/g)).toHaveLength(2);
+    expect(html).not.toContain('HE32Hsq4a1T8pbCEK2oPgxSj8mN8RCjzbW4JBxLSe9M');
+    expect(html).not.toContain('nta2r-r8RmOdDMlgYc85vuxMW5nItE7vXnmjbfn7EsE');
+  });
+
+  it('hides detached-payload and unsecured compact JWS values', () => {
+    const detachedCompactToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..jawNLi2mVwjSoe0VaIJ53k-Ty1-laT96ACJsE3PPyuQ';
+    const unsecuredCompactToken = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.e30.';
+    const emptySegmentDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: { ...detail.run, schemaVersion: unsecuredCompactToken },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: detachedCompactToken,
+        reviewerUserId,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, {
+      detail: emptySegmentDetail,
+    }));
+    expect(html.match(/\[内容已隐藏\]/g)).toHaveLength(2);
+    expect(html).not.toContain('jawNLi2mVwjSoe0VaIJ53k-Ty1-laT96ACJsE3PPyuQ');
+    expect(html).not.toContain('eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0');
   });
 
   it('hides short mixed-class machine tokens independently in notes and allowed metadata', () => {
@@ -399,6 +451,9 @@ describe('failed AI run detail and immutable history', () => {
       run: {
         ...detail.run,
         modelId: 'Claude-3-Opus-2026',
+        promptVersion: '1.2.3',
+        schemaVersion: 'release.candidate.stable',
+        pipelineVersion: 'releasecandidate.buildcandidate.stablecandidate',
         project: {
           id: 'a8000000-0000-4000-8000-000000000001',
           slug: 'project-release',
@@ -428,6 +483,9 @@ describe('failed AI run detail and immutable history', () => {
       inputId,
       'provider_error',
       'Claude-3-Opus-2026',
+      '1.2.3',
+      'release.candidate.stable',
+      'releasecandidate.buildcandidate.stablecandidate',
       'Project-Release-2026-Alpha',
       'Community research digest',
       'Checked the evidence and timing; manual follow-up is needed.',

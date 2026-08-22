@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B Task 6 fix round 2 已实现并待 scoped re-review；JWT/JWS 与 24–47 字符混合类机器 token 的独立遮蔽及安全近似值回归已补强；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-22（Phase 6B Task 6 fix round 3 已实现并待 scoped re-review；compact JWS/JWT 短/空 payload 或 signature 由可解码 protected header 结构识别，普通点分标识保持可见；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–5 已通过任务评审，Task 6 fix round 2 已实现并待 scoped re-review；当前分支 `pnpm verify` 794 个非跳过测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–5 已通过任务评审，Task 6 fix round 3 已实现并待 scoped re-review；当前分支 `pnpm verify` 796 个非跳过测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1–5 已通过；Task 6 fix round 2 在既有统一保守策略上增加 JWT/JWS 三段结构与 24–47 字符高混合度机器 token 检测，同时用 UUID、枚举、普通备注/名称/模型及自然标识符证明不过度遮蔽；Web 124/124、Node 22 全仓 794 个非跳过测试全绿；生产未访问。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1–5 已通过；Task 6 fix round 3 用 compact 三段结构及可解码、含非空 `alg` 的 protected header 识别短 `{}` payload、detached payload 与 unsecured 空 signature；语义版本、普通长点分标识、UUID/枚举继续可见；Web 126/126、Node 22 全仓 796 个非跳过测试全绿；生产未访问。
 
 ---
 
@@ -41,9 +41,9 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6B Task 3 repository（DONE）**（2026-08-22） | 服务器专用 `@airdrop/database/failed-ai-run-review` 以每请求 bearer 创建非持久 Supabase client；strict parse list/detail/decision，安全生成下一页 cursor，稳定映射 AR101–AR105 并清洗意外错误；browser export fail-closed | generated types 两次 SHA-256 均为 `058c11dac49a44065f7bb9b509c0ac000df67b38f6ab4a925b29676ed479078d`；真实 Auth focused 3/3、全 repository integration 37/37；两种 race 均逐字段绑定唯一 decision/receipt/outbox 与获胜 result/key，outbox 仅七个安全字段；partial Auth signup cleanup 四分支有单测。 |
 | **Phase 6B Task 4 authenticated BFF/routes（DONE）**（2026-08-22） | 新增失败 AI run list/detail/decision handlers 与三条 `/api/v1/review/ai-runs` routes；先用既有 `AuthenticatedUserVerifier` 验证，再提取并仅按请求传 bearer；fix round 1 补全 canonical error envelope、Authorization fail-closed、wrong-operation fallback 与逐映射 secrets exclusion | leak sensitivity mutation 触发 list/detail/decision 3 个具名失败，恢复后 focused 52/52、Web 69/69；lint/typecheck/build 全绿；Node 22.22.2 根 `pnpm verify` 739 tests、exit 0；独立评审已通过。 |
 | **Phase 6B Task 5 session/API clients（DONE）**（2026-08-22） | 新增 public-only Supabase browser client/auth port、无 token 副本的 reviewer session controller，以及 fresh token/idempotency key 的 strict BFF client；fix round 1 静态读取 public env；fix round 2 隔离 bundle；fix round 3 增加 session/API 运行时图覆盖 | runtime RED 同时报告 session/API markers 为 false；恢复后 isolated bundle 1/1、Web 98/98，public + `sign_in_failed` + `review_version_conflict` markers 存在，forbidden server markers/names 缺席，同级哨兵存活；Node 22.22.2 根 `pnpm verify` 768 tests、exit 0；独立评审已通过。 |
-| **Phase 6B Task 6 reviewer UI（REVIEW，fix round 2）**（2026-08-22） | `/review` 绕过公开 `AppShell`；在 fix round 1 的统一保守策略上增加 JWT/JWS 三段结构与 24–47 字符无空白、混合大小写/数字、高唯一字符率机器 token 检测；UUID、枚举及自然标识符保持可见 | focused 26/26、Web 124/124；分别移除 JWT 或短 token 分支均命中各自唯一具名失败；lint/typecheck/build 全绿；Node 22.22.2 根 `pnpm verify` 794 个非跳过测试、exit 0；未部署、未访问生产。 |
+| **Phase 6B Task 6 reviewer UI（REVIEW，fix round 3）**（2026-08-22） | `/review` 绕过公开 `AppShell`；compact JWS/JWT 不再要求每段至少 8 字符，而是要求三段 base64url 结构及 protected header 可解码为含非空 `alg` 的 JSON；覆盖 `e30`、detached payload 与空 signature | focused 28/28、Web 126/126；移除 compact predicate 同时命中两个唯一具名失败，长自然点分标识仍可见；lint/typecheck/build 全绿；Node 22.22.2 根 `pnpm verify` 796 个非跳过测试、exit 0；未部署、未访问生产。 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），794 个非跳过测试，exit 0。Task 6 focused 26/26、Web package 124/124；隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；strengthened repository integration 37/37。
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），796 个非跳过测试，exit 0。Task 6 focused 28/28、Web package 126/126；隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；strengthened repository integration 37/37。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -220,7 +220,7 @@ ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200 \
 pnpm dev                # web + worker 并行开发（web 在 localhost:3000）
                         # ⭐ 若 .env.local 同时含 AIRDROP_AI_STAGE_DATABASE_URL 与
                         #    AI_MODEL_API_KEY，worker 自动运行抽取/评分编排循环
-pnpm verify             # lint + typecheck + test(794 non-skipped) + build + placeholders
+pnpm verify             # lint + typecheck + test(796 non-skipped) + build + placeholders
 env -u NODE_OPTIONS pnpm verify   # ⚠️ 必须这样跑（见 §6 坑 1）
 
 # 手动评分（一次性，幂等：input_version 哈希）
@@ -320,14 +320,14 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 8. 当前状态与下一阶段关键操作
 
-> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后用 Node 22.22.2 / pnpm 11.16.0 执行 `pnpm verify`，确认 794 个非跳过测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
+> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后用 Node 22.22.2 / pnpm 11.16.0 执行 `pnpm verify`，确认 796 个非跳过测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
 
 ### 8.1 当前状态快照（2026-08-22 本轮复核）
 
 | 维度 | 状态 |
 |------|------|
 | 代码 | Phase 0–6A 已在主线；Phase 6B 当前开发分支 Task 1–5 已通过，Task 6 reviewer UI 已实现并进入评审；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地 |
-| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 794 个非跳过测试全绿，exit 0；lint/typecheck/build/placeholder 全部通过。Task 6 focused 26/26、Web 124/124；更新后的 011 focused 87/87、full pgTAP 1031/1031；strengthened repository focused integration 3/3、全套 37/37。 |
+| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 796 个非跳过测试全绿，exit 0；lint/typecheck/build/placeholder 全部通过。Task 6 focused 28/28、Web 126/126；更新后的 011 focused 87/87、full pgTAP 1031/1031；strengthened repository focused integration 3/3、全套 37/37。 |
 | 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
 | 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、匹配容器健康；20 migrations reset exit 0，updated focused 87/87、full 1031/1031；`errorDetail` mutation exit 1 命中 Failed test 31，恢复 migration SHA 后 reset exit 0、focused 87/87。**只允许对它 reset**；生产未访问。 |
 | 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
