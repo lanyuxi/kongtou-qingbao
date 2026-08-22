@@ -9,7 +9,7 @@
 | 1 | DONE | Strict failed-run review contracts | Focused Vitest ran 12 tests; 7 failed as expected because the requested exports were undefined (`TypeError: Cannot read properties of undefined (reading 'parse')`). | Focused Vitest: 6 files / 77 tests passed; contracts lint and typecheck passed. | `feat(contracts): add failed AI run review contracts` |
 | 2 | DONE | Append-only schema, protected reads, transactional command | With only 011 synchronized and the migration absent, all 7 initial object assertions failed before the suite terminated on absent tables. | Fix round 1 accepted: focused 011 Files=1 / Tests=87 / PASS; full pgTAP Files=11 / Tests=1031 / PASS; named `errorDetail` sensitivity RED then restored 87 PASS. Local `pnpm verify`: 663 tests, exit 0. | `27c4c4b`, `ede1971`, `de55a54` |
 | 3 | DONE | Generated types and bearer-scoped repository | Repository unit suite failed before collection because `../review/failed-ai-run-review-repository.js` did not exist; fix round helper RED failed because the partial-Auth cleanup helper was absent; first strengthened real race gate was 1 passed / 2 failed on bigint driver expectations. | Generated types were byte-identical across two remote generations; repository package tests 158 passed / 37 skipped; strengthened focused real integration 3/3 and full repository integration 37/37; exact race row/payload linkage, partial-user cleanup, lint, typecheck, Node 22 root verify, and diff checks passed. | `be0cdc3`, `374c033`, `110e6c0` |
-| 4 | READY | Authenticated review BFF and routes | — | — | — |
+| 4 | REVIEW | Authenticated review BFF and routes | Focused Web suite failed before collection because `../lib/failed-ai-run-review-handlers.js` did not exist; 17 existing Web tests remained green. | Focused handler 39/39; Web package 56/56; lint, typecheck, build, Node 22 root verify (726 tests), and diff checks passed. | `feat(web): add failed AI run review API` |
 | 5 | READY | Reviewer session and browser API clients | — | — | — |
 | 6 | READY | Sign-in, list, detail, history, and decision UI | — | — | — |
 | 7 | READY | End-to-end regression and authorization matrix | — | — | — |
@@ -89,3 +89,15 @@ Implementation notes: `@airdrop/database/failed-ai-run-review` is server-only an
 | Minimal fix | Expected table bigint values now use their exact string representation; JSON payload `reviewVersion` remains numeric. No production repository, migration, trigger, or generated type changed. |
 | Restored GREEN | After a fresh preflight/reset of only DB 64322/API 64321, focused integration passed 3/3 in 3.46s and full integration passed 37/37 with exit 0 in 83.57s. Production was untouched and credentials were not printed. |
 | Required runtime | Node 22.22.2 / pnpm 11.16.0 `pnpm verify` passed 687 tests; lint, typecheck, build, placeholders, and diff checks passed. |
+
+## Task 4 execution log
+
+| Phase | Command/check | Expected result | Actual result |
+| --- | --- | --- | --- |
+| RED | `pnpm --filter @airdrop/web test -- src/tests/failed-ai-run-review-handlers.test.ts` before adding handlers/routes | Fails because the handler module does not exist | Failed before collecting the new tests with `Cannot find module '../lib/failed-ai-run-review-handlers.js'`; 2 existing files / 17 tests passed. |
+| Focused GREEN | `pnpm --filter @airdrop/web exec vitest run src/tests/failed-ai-run-review-handlers.test.ts` | Auth, parsing, mapping, envelope, and sanitization behaviors pass | 1 file / 39 tests passed, exit 0. |
+| Web package GREEN | `pnpm --filter @airdrop/web test -- src/tests/failed-ai-run-review-handlers.test.ts` | New and existing Web tests pass together | 3 files / 56 tests passed, exit 0. |
+| Web static gates | Run Web lint, typecheck, and production build serially | No lint/type errors; Next recognizes all three routes | All three exited 0. Next 16 listed `/api/v1/review/ai-runs`, `/api/v1/review/ai-runs/[runId]`, and `/api/v1/review/ai-runs/[runId]/decisions` as dynamic routes. |
+| Root gate | Node 22.22.2 `pnpm verify` and `git diff --check` | Whole repository and patch hygiene pass | 726 tests passed; lint, typecheck, tests, build, placeholders, and diff check exited 0. |
+
+Implementation notes: all three handlers call the existing `AuthenticatedUserVerifier` before extracting the bearer token, then pass only that request-local token into the server-only review repository. Query, cursor, UUID, JSON command, and `Idempotency-Key` boundaries are strict. Shared envelopes use generated request IDs and literal `nextCursor` metadata. Only documented stable repository codes become bounded 400/403/404/409 responses; all other query/persistence failures become sanitized 500 responses. Route modules compose only public Supabase environment values, verifier, repository, UUID generation, and handlers; they contain no business logic, heavy work, service-role key, or browser credential.

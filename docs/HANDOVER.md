@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B Task 3 状态为 `DONE`；bearer-scoped repository、确定性 generated types、真实 Auth/普通用户拒绝与双独立客户端并发门禁均已在 disposable 测试栈闭环；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-22（Phase 6B Task 4 authenticated BFF/routes 已完成实现并进入独立评审；三条 API 均使用既有 verifier、request-local bearer、严格共享契约与清洗后的错误响应；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–3 已完成；当前分支 `pnpm verify` 687 测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–3 已完成，Task 4 实现待独立评审；当前分支 `pnpm verify` 726 测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts、Task 2 数据库边界、Task 3 repository/generated types 均已通过；Task 3 在 `airdrop-intelligence-governance-test` 完成真实 Auth 与双独立客户端并发 3/3、全 repository integration 37/37，生产未访问。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts、Task 2 数据库边界、Task 3 repository/generated types 均已通过；Task 4 已增加 authenticated list/detail/decision BFF 与三条薄 route，39 个 focused handler 测试和 Node 22 全仓门禁通过，等待独立评审；生产未访问。
 
 ---
 
@@ -39,8 +39,9 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6B Task 1 contracts**（2026-08-22） | `packages/contracts/src/review/failed-ai-run.ts` 提供严格失败运行状态、查询、无原始错误的安全投影、审核历史、命令/回执 schemas 与 inferred types；决策 reason compatibility、版本边界、备注长度/空白、base64url cursor 均有测试；`packages/contracts/src/index.ts` 已公开导出 | `docs/tasks/failed-ai-run-review-workbook.md` Task 1 execution log；focused contracts 6 files / 77 tests passed，lint/typecheck passed |
 | **Phase 6B Task 2 数据库边界（DONE）**（2026-08-22） | migration 保持不变；fix round 1 为普通 active `user` 拒绝、detail 精确/敏感键投影、command 精确结果签名、同时间 UUID 游标、101/102 limit 边界和三类非法 expected version 补强 pgTAP | disposable reset 应用 20 migrations exit 0；updated 011 Files=1 / Tests=87 / PASS；full pgTAP Files=11 / Tests=1031 / PASS；`errorDetail` mutation 命中具名 Failed test 31 并 exit 1，恢复 SHA 后 reset exit 0、focused 87 PASS；生产未访问。 |
 | **Phase 6B Task 3 repository（DONE）**（2026-08-22） | 服务器专用 `@airdrop/database/failed-ai-run-review` 以每请求 bearer 创建非持久 Supabase client；strict parse list/detail/decision，安全生成下一页 cursor，稳定映射 AR101–AR105 并清洗意外错误；browser export fail-closed | generated types 两次 SHA-256 均为 `058c11dac49a44065f7bb9b509c0ac000df67b38f6ab4a925b29676ed479078d`；真实 Auth focused 3/3、全 repository integration 37/37；两种 race 均逐字段绑定唯一 decision/receipt/outbox 与获胜 result/key，outbox 仅七个安全字段；partial Auth signup cleanup 四分支有单测。 |
+| **Phase 6B Task 4 authenticated BFF/routes（REVIEW）**（2026-08-22） | 新增失败 AI run list/detail/decision handlers 与三条 `/api/v1/review/ai-runs` routes；先用既有 `AuthenticatedUserVerifier` 验证，再提取并仅按请求传 bearer；严格解析 filter/cursor/limit、UUID、JSON command 与 `Idempotency-Key`；稳定错误映射为 bounded envelope，异常详情全部清洗 | focused handler 39/39；Web 56/56；lint/typecheck/build 全绿；Node 22.22.2 根 `pnpm verify` 726 tests、exit 0；Next 16 构建识别三条动态 route；未部署、未访问生产。 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），687 测试，exit 0。隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；strengthened repository integration 37/37，fixture cleanup 只在 marker 校验后的 disposable 数据库内按精确随机 ID 执行。
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），726 测试，exit 0。Web focused handler 39/39、Web package 56/56；隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；strengthened repository integration 37/37，fixture cleanup 只在 marker 校验后的 disposable 数据库内按精确随机 ID 执行。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -56,7 +57,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 
 1. ~~**评分管线**~~ ✅ **2026-08-15 完成**：score-model-v1 确定性评分 + 因子分解 + recommendation 决策表；Ethereum 及 11 个 demo 项目全部评分，Ethereum 自动进入 `opportunity_list`。见 `docs/superpowers/specs/2026-08-15-score-pipeline-design.md`
 2. ~~**机会列表纳入真实项目**~~ ✅ **2026-08-15 完成**：Ethereum 评分后由读模型视图自动纳入（第 6 位）
-3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Task 1 contracts、Task 2 数据库边界与 Task 3 bearer-scoped repository 已完成；`listPendingInputs` 毒物防护把失败输入 park 住（每输入至多一次尝试）。**尚未实现**：Task 4–7 的 API、审核界面和端到端集成
+3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Task 1 contracts、Task 2 数据库边界与 Task 3 bearer-scoped repository 已完成；Task 4 authenticated BFF/routes 已实现并待独立评审；`listPendingInputs` 毒物防护把失败输入 park 住（每输入至多一次尝试）。**尚未实现**：Task 5–7 的浏览器 session/API client、审核界面和端到端集成
 4. ~~**采集→抽取→评分的常态化编排**~~ ✅ **2026-08-15 完成（Phase 5）**：worker 进程内 AI 阶段编排循环（抽取 60s / 评分 300s 默认 tick，指数退避，错误隔离，opt-in 环境变量）。采集队列未动；人工 Promotion 门禁按产品设计保留。见 `docs/superpowers/specs/2026-08-15-orchestration-design.md`
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
@@ -418,7 +419,7 @@ git branch -d codex/phase-6a-canonical-governance
 
 ### 8.4 下一阶段开发方向（Phase 6B 起，按建议优先级）
 
-1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1 contracts、Task 2 数据库边界与 Task 3 repository/generated types 已完成；下一步进入 Task 4 authenticated BFF handlers/routes。Task 3 已用两个独立 client 闭环并发证明，并以 marker 校验后的 disposable-only exact cleanup 保持 `ai_runs` append-only trigger 不变；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策在等后续 API/UI 接手
+1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1–3 已完成；Task 4 authenticated BFF handlers/routes 已实现并进入独立评审，评审通过后下一步是 Task 5 reviewer session/browser API clients。Task 3 已用两个独立 client 闭环并发证明，并以 marker 校验后的 disposable-only exact cleanup 保持 `ai_runs` append-only trigger 不变；Task 4 未部署、未访问生产；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策仍在等后续 UI 接手
 2. **详情页 score_factors / Evidence 引用展示 + anon 读策略**——把 Phase 4 因子数据变成用户可见；注意展示需符合「Raw quote 不自动公开」的约束（经审核的公共读模型才能带引用文本）
 3. **教程生成 tutorials**——价值链「执行」环；其前置（安全 incidents / 白名单链接）尚未开始，需先排期
 4. 其余按 §2「未开始」清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）
