@@ -2,7 +2,8 @@ import type { FailedAiRunDetail as FailedAiRunDetailDto, FailedAiRunStatus } fro
 
 import type { ReviewApiClient } from '../../lib/review-api-client.js';
 import type { ReviewSessionController } from '../../lib/review-session.js';
-import { displaySafeText, formatReviewDate } from './failed-ai-run-list.js';
+import { formatReviewDate } from './failed-ai-run-list.js';
+import { displayReviewValue } from './safe-review-text.js';
 
 export type FailedAiRunDetailState =
   | { readonly status: 'loading' }
@@ -19,10 +20,9 @@ const failureExplanations: Record<FailedAiRunStatus, string> = {
 
 export function FailedAiRunDetail({ detail }: { readonly detail: FailedAiRunDetailDto }) {
   const { run, input } = detail;
-  const decisions = [...detail.decisions].sort((left, right) => {
-    const timeOrder = Date.parse(left.createdAt) - Date.parse(right.createdAt);
-    return timeOrder === 0 ? left.reviewVersion - right.reviewVersion : timeOrder;
-  });
+  const decisions = [...detail.decisions].sort(
+    (left, right) => left.reviewVersion - right.reviewVersion,
+  );
 
   return (
     <div className="review-detail">
@@ -36,9 +36,9 @@ export function FailedAiRunDetail({ detail }: { readonly detail: FailedAiRunDeta
         </div>
         <dl className="review-metadata">
           <Metadata label="Run ID" value={run.runId} />
-          <Metadata label="失败状态" value={run.status} />
+          <Metadata label="失败状态" value={run.status} boundedLiteral />
           <Metadata label="阶段" value={run.stage} />
-          <Metadata label="输入类型" value={run.inputKind} />
+          <Metadata label="输入类型" value={run.inputKind} boundedLiteral />
           <Metadata label="模型" value={run.modelId} />
           <Metadata label="Prompt 版本" value={run.promptVersion} />
           <Metadata label="Schema 版本" value={run.schemaVersion} />
@@ -52,7 +52,7 @@ export function FailedAiRunDetail({ detail }: { readonly detail: FailedAiRunDeta
       <section className="review-panel" aria-labelledby="review-input-heading">
         <h2 id="review-input-heading">输入引用</h2>
         <dl className="review-metadata">
-          <Metadata label="类型" value={input.kind} />
+          <Metadata label="类型" value={input.kind} boundedLiteral />
           <Metadata label="ID" value={input.id} />
           <Metadata label="采集时间" value={input.collectedAt === null ? '—' : formatReviewDate(input.collectedAt)} />
         </dl>
@@ -68,8 +68,8 @@ export function FailedAiRunDetail({ detail }: { readonly detail: FailedAiRunDeta
                   <time dateTime={record.createdAt}>{formatReviewDate(record.createdAt)}</time>
                 </div>
                 <p>{record.reasonCode}</p>
-                <p>{record.note === null ? '无备注' : displaySafeNote(record.note)}</p>
-                <p className="review-muted">Reviewer {record.reviewerUserId}</p>
+                <p>{record.note === null ? '无备注' : displayReviewValue(record.note)}</p>
+                <p className="review-muted">Reviewer {displayReviewValue(record.reviewerUserId)}</p>
               </li>
             ))}
           </ol>
@@ -105,13 +105,14 @@ export async function loadFailedAiRunDetail({
   return { status: 'failed' };
 }
 
-function Metadata({ label, value }: { readonly label: string; readonly value: string }) {
-  return <div><dt>{label}</dt><dd>{displaySafeText(value)}</dd></div>;
-}
-
-function displaySafeNote(value: string): string {
-  if (/https?:\/\/|password|secret|private[ _-]?key|mnemonic|seed[ _-]?phrase|authorization|bearer/iu.test(value)) {
-    return '[内容已隐藏]';
-  }
-  return value;
+function Metadata({
+  label,
+  value,
+  boundedLiteral = false,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly boundedLiteral?: boolean;
+}) {
+  return <div><dt>{label}</dt><dd>{boundedLiteral ? value : displayReviewValue(value)}</dd></div>;
 }

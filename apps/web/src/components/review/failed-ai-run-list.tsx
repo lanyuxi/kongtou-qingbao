@@ -10,6 +10,7 @@ import Link from 'next/link';
 
 import type { ReviewApiClient } from '../../lib/review-api-client.js';
 import type { ReviewSessionController } from '../../lib/review-session.js';
+import { displayReviewValue } from './safe-review-text.js';
 
 export type FailedAiRunListState =
   | { readonly status: 'loading' }
@@ -61,11 +62,9 @@ export function FailedAiRunList({
           <select
             id="review-state-filter"
             value={query.reviewState}
-            onChange={(event) => onQueryChange?.({
-              ...query,
+            onChange={(event) => onQueryChange?.(changeFailedAiRunFilters(query, {
               reviewState: event.currentTarget.value as ReviewStateFilter,
-              cursor: null,
-            })}
+            }))}
           >
             {reviewStateOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -73,11 +72,9 @@ export function FailedAiRunList({
           <select
             id="review-failure-filter"
             value={query.status}
-            onChange={(event) => onQueryChange?.({
-              ...query,
+            onChange={(event) => onQueryChange?.(changeFailedAiRunFilters(query, {
               status: event.currentTarget.value as StatusFilter,
-              cursor: null,
-            })}
+            }))}
           >
             {statusOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
@@ -145,10 +142,10 @@ function ListBody({ state }: { readonly state: FailedAiRunListState }) {
         <tbody>{state.items.map((item) => (
           <tr key={item.runId}>
             <td><Link className="review-link" href={`/review/ai-runs/${item.runId}`}>{item.status}</Link></td>
-            <td>{displaySafeText(item.stage)}</td>
-            <td>{displaySafeText(item.modelId)}</td>
-            <td>{item.project === null ? '—' : displaySafeText(item.project.name)} / {item.source === null ? '—' : displaySafeText(item.source.name)}</td>
-            <td>{displaySafeText(item.pipelineVersion)}</td>
+            <td>{displayReviewValue(item.stage)}</td>
+            <td>{displayReviewValue(item.modelId)}</td>
+            <td>{item.project === null ? '—' : displayReviewValue(item.project.name)} / {item.source === null ? '—' : displayReviewValue(item.source.name)}</td>
+            <td>{displayReviewValue(item.pipelineVersion)}</td>
             <td><time dateTime={item.createdAt}>{formatReviewDate(item.createdAt)}</time></td>
             <td>{item.reviewState}</td>
           </tr>
@@ -165,6 +162,16 @@ export function formatReviewDate(value: string): string {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())} UTC`;
 }
 
-export function displaySafeText(value: string): string {
-  return /https?:\/\//iu.test(value) ? '[已隐藏链接]' : value;
+export function changeFailedAiRunFilters(
+  query: FailedAiRunListQuery,
+  filters: Partial<Pick<FailedAiRunListQuery, 'reviewState' | 'status'>>,
+): FailedAiRunListQuery {
+  return { ...query, ...filters, cursor: null };
+}
+
+export function applyFailedAiRunCursor(
+  query: FailedAiRunListQuery,
+  cursor: string,
+): FailedAiRunListQuery {
+  return { ...query, cursor };
 }

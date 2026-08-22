@@ -4,9 +4,11 @@ import type {
   FailedAiRunDecision,
   FailedAiRunReasonCode,
 } from '@airdrop/contracts';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 import type { ReviewApiClient } from '../../lib/review-api-client.js';
+import type { PendingActionGate } from '../../lib/review-pending-action.js';
+import { createPendingActionGate } from '../../lib/review-pending-action.js';
 
 const investigationReasons = [
   'provider_instability',
@@ -29,6 +31,12 @@ export type DecisionSubmissionState = {
   readonly status: 'idle' | 'submitting' | 'saved' | 'conflict' | 'forbidden' | 'failed';
 };
 
+export interface FailedAiRunDecisionDraft {
+  readonly decision: FailedAiRunDecision;
+  readonly reasonCode: FailedAiRunReasonCode;
+  readonly note: string | null;
+}
+
 export function failedAiRunReasonsFor(
   decision: FailedAiRunDecision,
 ): readonly FailedAiRunReasonCode[] {
@@ -50,31 +58,33 @@ export function FailedAiRunDecisionForm({
   readonly onSessionExpired: () => void;
   readonly initialState?: DecisionSubmissionState;
 }) {
-  const [decision, setDecision] = useState<FailedAiRunDecision>('needs_investigation');
-  const [reasonCode, setReasonCode] = useState<FailedAiRunReasonCode>('provider_instability');
-  const [note, setNote] = useState('');
+  const [draft, setDraft] = useState<FailedAiRunDecisionDraft>({
+    decision: 'needs_investigation',
+    reasonCode: 'provider_instability',
+    note: null,
+  });
   const [state, setState] = useState<DecisionSubmissionState>(initialState);
+  const submissionGate = useRef(createPendingActionGate());
 
   function changeDecision(next: FailedAiRunDecision): void {
-    setDecision(next);
-    const firstReason = failedAiRunReasonsFor(next)[0];
-    if (firstReason !== undefined) setReasonCode(firstReason);
+    setDraft((current) => changeFailedAiRunDecision(current, next));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setState({ status: 'submitting' });
-    setState(await submitFailedAiRunDecision({
+    setState(await submitFailedAiRunDecisionOnce(submissionGate.current, {
       api,
       runId,
       displayedReviewVersion,
-      decision,
-      reasonCode,
-      note,
+      ...draft,
       refresh: onRefresh,
       sessionExpired: onSessionExpired,
     }));
   }
+
+  const disabled = state.status === 'submitting';
+  const note = draft.note ?? '';
 
   return (
     <form className="review-form" onSubmit={(event) => { void submit(event); }}>
@@ -84,7 +94,8 @@ export function FailedAiRunDecisionForm({
         <select
           id="review-decision"
           name="decision"
-          value={decision}
+          value={draft.decision}
+          disabled={disabled}
           onChange={(event) => changeDecision(event.currentTarget.value as FailedAiRunDecision)}
         >
           <option value="needs_investigation">需要调查</option>
@@ -96,10 +107,14 @@ export function FailedAiRunDecisionForm({
         <select
           id="review-reason"
           name="reasonCode"
-          value={reasonCode}
-          onChange={(event) => setReasonCode(event.currentTarget.value as FailedAiRunReasonCode)}
+          value={draft.reasonCode}
+          disabled={disabled}
+          onChange={(event) => setDraft((current) => ({
+            ...current,
+            reasonCode: event.currentTarget.value as FailedAiRunReasonCode,
+          }))}
         >
-          {failedAiRunReasonsFor(decision).map((reason) => (
+          {failedAiRunReasonsFor(draft.decision).map((reason) => (
             <option key={reason} value={reason}>{reason}</option>
           ))}
         </select>
@@ -109,17 +124,37 @@ export function FailedAiRunDecisionForm({
         <textarea
           id="review-note"
           name="note"
-          maxLength={1000}
+          disabled={disabled}
           value={note}
-          onChange={(event) => setNote(event.currentTarget.value)}
+          onChange={(event) => setDraft((current) => ({
+            ...current,
+            note: normalizeReviewNoteInput(event.currentTarget.value),
+          }))}
         />
+        <span className="review-note-count">{Array.from(note).length} / 1000</span>
       </div>
       <DecisionMessage state={state} />
-      <button className="review-button" type="submit" disabled={state.status === 'submitting'}>
+      <button className="review-button" type="submit" disabled={disabled}>
         {state.status === 'submitting' ? '正在提交…' : '提交决策'}
       </button>
     </form>
   );
+}
+
+export function changeFailedAiRunDecision(
+  draft: FailedAiRunDecisionDraft,
+  decision: FailedAiRunDecision,
+): FailedAiRunDecisionDraft {
+  const reasonCode = failedAiRunReasonsFor(decision)[0];
+  return {
+    ...draft,
+    decision,
+    reasonCode: reasonCode ?? 'other',
+  };
+}
+
+export function normalizeReviewNoteInput(value: string): string {
+  return Array.from(value).slice(0, 1000).join('');
 }
 
 export async function submitFailedAiRunDecision({
@@ -164,6 +199,18 @@ export async function submitFailedAiRunDecision({
   }
   if (result.state === 'forbidden') return { status: 'forbidden' };
   return { status: 'failed' };
+}
+
+export async function submitFailedAiRunDecisionOnce(
+  gate: PendingActionGate,
+  input: Parameters<typeof submitFailedAiRunDecision>[0],
+): Promise<DecisionSubmissionState> {
+  if (!gate.begin()) return { status: 'submitting' };
+  try {
+    return await submitFailedAiRunDecision(input);
+  } finally {
+    gate.finish();
+  }
 }
 
 function DecisionMessage({ state }: { readonly state: DecisionSubmissionState }) {

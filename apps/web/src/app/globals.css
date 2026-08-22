@@ -143,6 +143,12 @@ body {
   padding: 8px 10px;
 }
 
+.review-note-count {
+  color: #687687;
+  font-size: 12px;
+  text-align: right;
+}
+
 .review-filters select:focus-visible,
 .review-field input:focus-visible,
 .review-field select:focus-visible,
@@ -208,6 +214,13 @@ body {
 .review-message-error {
   background: #fbecec;
   color: #9e2f2f;
+}
+
+.review-sign-out-state {
+  width: min(1180px, calc(100% - 48px));
+  margin: 12px auto 0;
+  color: #566474;
+  text-align: right;
 }
 
 .review-table-wrap {

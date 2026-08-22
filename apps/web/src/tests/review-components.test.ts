@@ -11,8 +11,11 @@ import { describe, expect, it } from 'vitest';
 import { PublicShellBoundary } from '../components/app-shell.js';
 import {
   FailedAiRunDecisionForm,
+  changeFailedAiRunDecision,
   failedAiRunReasonsFor,
+  normalizeReviewNoteInput,
   submitFailedAiRunDecision,
+  submitFailedAiRunDecisionOnce,
 } from '../components/review/failed-ai-run-decision-form.js';
 import {
   FailedAiRunDetail,
@@ -20,19 +23,26 @@ import {
 } from '../components/review/failed-ai-run-detail.js';
 import {
   FailedAiRunList,
+  applyFailedAiRunCursor,
+  changeFailedAiRunFilters,
   loadFailedAiRunList,
 } from '../components/review/failed-ai-run-list.js';
 import {
   SignInForm,
   submitReviewSignIn,
 } from '../components/review/sign-in-form.js';
-import { ReviewShell, signOutAndRedirect } from '../app/review/review-shell.js';
+import {
+  ReviewShell,
+  runReviewSignOutOnce,
+  signOutAndRedirect,
+} from '../app/review/review-shell.js';
 import type {
   ReviewApiClient,
   ReviewApiFailure,
   ReviewApiSuccess,
 } from '../lib/review-api-client.js';
 import type { ReviewSessionController } from '../lib/review-session.js';
+import { createPendingActionGate } from '../lib/review-pending-action.js';
 
 const runId = 'a1000000-0000-4000-8000-000000000001';
 const inputId = 'a4000000-0000-4000-8000-000000000001';
@@ -135,6 +145,39 @@ describe('review shell and authentication', () => {
 
     expect(events).toEqual(['signed-out', '/review/sign-in']);
   });
+
+  it('hides sign-out before runtime readiness and disables repeat action while pending', async () => {
+    const unavailable = renderToStaticMarkup(createElement(ReviewShell, null, '审核内容'));
+    const pending = renderToStaticMarkup(createElement(ReviewShell, {
+      onSignOut: async () => undefined,
+      signOutPending: true,
+      children: '审核内容',
+    }));
+    expect(unavailable).not.toContain('退出登录');
+    expect(pending).toMatch(/<button[^>]*disabled=""[^>]*>正在退出…/);
+    expect(pending).toContain('正在安全退出…');
+
+    let releases: (() => void) | undefined;
+    const waiting = new Promise<void>((resolve) => { releases = resolve; });
+    let calls = 0;
+    const pendingTransitions: boolean[] = [];
+    const gate = createPendingActionGate();
+    const first = runReviewSignOutOnce(gate, async () => {
+      calls += 1;
+      await waiting;
+    }, (pendingState) => pendingTransitions.push(pendingState));
+    const second = await runReviewSignOutOnce(
+      gate,
+      async () => { calls += 1; },
+      (pendingState) => pendingTransitions.push(pendingState),
+    );
+    expect(second).toBe(false);
+    expect(calls).toBe(1);
+    expect(pendingTransitions).toEqual([true]);
+    releases?.();
+    await expect(first).resolves.toBe(true);
+    expect(pendingTransitions).toEqual([true, false]);
+  });
 });
 
 describe('failed AI run list', () => {
@@ -169,6 +212,26 @@ describe('failed AI run list', () => {
     ]) expect(html).toContain(option);
     expect(html).toContain('2026-08-22 00:00 UTC');
     expect(html).toContain('下一页');
+  });
+
+  it('resets the cursor on each filter change and applies only the selected next cursor', () => {
+    const current: FailedAiRunListQuery = {
+      reviewState: 'unreviewed',
+      status: 'provider_error',
+      cursor: 'old-cursor',
+      limit: 25,
+    };
+
+    expect(changeFailedAiRunFilters(current, { reviewState: 'dismissed' })).toEqual({
+      reviewState: 'dismissed', status: 'provider_error', cursor: null, limit: 25,
+    });
+    expect(changeFailedAiRunFilters(current, { status: 'grounding_failed' })).toEqual({
+      reviewState: 'unreviewed', status: 'grounding_failed', cursor: null, limit: 25,
+    });
+    expect(applyFailedAiRunCursor(current, 'selected-next-cursor')).toEqual({
+      reviewState: 'unreviewed', status: 'provider_error',
+      cursor: 'selected-next-cursor', limit: 25,
+    });
   });
 
   it('redirects an expired session and maps bounded API states without rendering data', async () => {
@@ -223,7 +286,64 @@ describe('failed AI run detail and immutable history', () => {
     expect(html).not.toMatch(/UNSAFE_|password|raw_text|error_detail|https?:\/\//i);
   });
 
-  it('uses stable failure explanations and renders history chronologically without controls', () => {
+  it('renders bounded raw_item enums without treating them as free-form raw payloads', () => {
+    const rawItemDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: { ...detail.run, inputKind: 'raw_item' },
+      input: { ...detail.input, kind: 'raw_item' },
+    };
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, {
+      detail: rawItemDetail,
+    }));
+    expect(html.match(/raw_item/g)).toHaveLength(2);
+  });
+
+  it('uses one conservative policy for secrets in notes and otherwise allowed string fields', () => {
+    const unsafeFragments = [
+      's3cr3t', 'db.internal', 'reviewer', 'top-secret-fragment',
+      'forbidden-output-fragment', 'forbidden-token-fragment', 'operator@example.test',
+      'forbidden-seed-fragment', 'reviewer-secret-fragment',
+      'machine-payload-fragment', 'opaque-secret-fragment',
+    ];
+    const unsafeDetail = {
+      ...detail,
+      run: {
+        ...detail.run,
+        stage: 'postgresql://reviewer:s3cr3t@db.internal/review',
+        modelId: 'api_key=top-secret-fragment',
+        promptVersion: '{"provider":"raw","output":"forbidden-output-fragment"}',
+        schemaVersion: 'seed=forbidden-seed-fragment',
+        pipelineVersion: 'Bearer forbidden-token-fragment',
+        project: {
+          id: 'a8000000-0000-4000-8000-000000000001',
+          slug: 'unsafe-project',
+          name: 'mailto:operator@example.test',
+        },
+        source: {
+          id: 'a8000000-0000-4000-8000-000000000002',
+          name: 'line one\nraw machine-payload-fragment',
+          sourceType: 'official',
+        },
+      },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: `data:text/plain,provider raw output ${'opaque-secret-fragment'.repeat(5)}`,
+        reviewerUserId: 'private_key=reviewer-secret-fragment',
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    } as FailedAiRunDetailDto;
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, { detail: unsafeDetail }));
+    expect(html).toContain('[内容已隐藏]');
+    for (const fragment of unsafeFragments) expect(html).not.toContain(fragment);
+    expect(html).not.toMatch(/postgresql:|mailto:|data:|api_key=|Bearer /i);
+  });
+
+  it('uses stable failure explanations and renders history by review version despite reversed or equal timestamps', () => {
     const withHistory: FailedAiRunDetailDto = {
       ...detail,
       decisions: [
@@ -235,7 +355,7 @@ describe('failed AI run detail and immutable history', () => {
           reasonCode: 'no_action_needed',
           note: 'second-note',
           reviewerUserId,
-          createdAt: '2026-08-22T02:00:00.000Z',
+          createdAt: '2026-08-22T00:00:00.000Z',
         },
         {
           version: 1,
@@ -245,7 +365,7 @@ describe('failed AI run detail and immutable history', () => {
           reasonCode: 'provider_instability',
           note: 'first-note',
           reviewerUserId,
-          createdAt: '2026-08-22T01:00:00.000Z',
+          createdAt: '2026-08-22T02:00:00.000Z',
         },
       ],
     };
@@ -254,6 +374,18 @@ describe('failed AI run detail and immutable history', () => {
     expect(html).toContain('AI 服务暂时未完成该阶段。');
     expect(html.indexOf('first-note')).toBeLessThan(html.indexOf('second-note'));
     expect(html).not.toMatch(/<input\b|<select\b|<textarea\b|contenteditable|<button\b/i);
+
+    const equalTimestamps = {
+      ...withHistory,
+      decisions: withHistory.decisions.map((record) => ({
+        ...record,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      })).reverse(),
+    };
+    const equalHtml = renderToStaticMarkup(createElement(FailedAiRunDetail, {
+      detail: equalTimestamps,
+    }));
+    expect(equalHtml.indexOf('first-note')).toBeLessThan(equalHtml.indexOf('second-note'));
   });
 
   it('redirects expired detail sessions and preserves bounded forbidden/not-found states', async () => {
@@ -306,6 +438,87 @@ describe('failed AI run decision submission', () => {
 
     expect(html).toMatch(/type="hidden"[^>]*name="expectedReviewVersion"[^>]*value="7"/);
     expect(html).not.toMatch(/type="(?:number|text)"[^>]*name="expectedReviewVersion"/);
+  });
+
+  it('switches to the first compatible reason and submits that draft with the displayed version', async () => {
+    const switched = changeFailedAiRunDecision({
+      decision: 'needs_investigation',
+      reasonCode: 'schema_regression',
+      note: null,
+    }, 'dismiss');
+    expect(switched).toEqual({
+      decision: 'dismiss',
+      reasonCode: 'transient_failure',
+      note: null,
+    });
+
+    const commands: FailedAiRunDecisionCommand[] = [];
+    await submitFailedAiRunDecision({
+      api: api({ decide: async (_id, command) => {
+        commands.push(command);
+        return okDecision(false);
+      } }),
+      runId,
+      displayedReviewVersion: 11,
+      ...switched,
+      refresh: async () => undefined,
+      sessionExpired: () => undefined,
+    });
+    expect(commands).toEqual([{
+      version: 1,
+      expectedReviewVersion: 11,
+      decision: 'dismiss',
+      reasonCode: 'transient_failure',
+      note: null,
+    }]);
+  });
+
+  it('disables all editable controls while submitting and prevents a duplicate command', async () => {
+    const html = renderToStaticMarkup(createElement(FailedAiRunDecisionForm, {
+      api: api(), runId, displayedReviewVersion: 4,
+      onRefresh: async () => undefined, onSessionExpired: () => undefined,
+      initialState: { status: 'submitting' },
+    }));
+    expect(html.match(/disabled=""/g)).toHaveLength(4);
+
+    let release: (() => void) | undefined;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    let calls = 0;
+    const gate = createPendingActionGate();
+    const input = {
+      api: api({ decide: async () => {
+        calls += 1;
+        await waiting;
+        return okDecision(false);
+      } }),
+      runId,
+      displayedReviewVersion: 4,
+      decision: 'dismiss' as const,
+      reasonCode: 'no_action_needed' as const,
+      note: null,
+      refresh: async () => undefined,
+      sessionExpired: () => undefined,
+    };
+    const first = submitFailedAiRunDecisionOnce(gate, input);
+    const second = await submitFailedAiRunDecisionOnce(gate, input);
+    expect(second).toEqual({ status: 'submitting' });
+    expect(calls).toBe(1);
+    release?.();
+    await expect(first).resolves.toEqual({ status: 'saved' });
+  });
+
+  it('normalizes optional notes by Unicode code points instead of UTF-16 units', () => {
+    const exactly = '🪂'.repeat(1000);
+    const normalized = normalizeReviewNoteInput(`${exactly}🪂`);
+    expect(Array.from(normalized)).toHaveLength(1000);
+    expect(normalized).toBe(exactly);
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDecisionForm, {
+      api: api(), runId, displayedReviewVersion: 4,
+      onRefresh: async () => undefined, onSessionExpired: () => undefined,
+    }));
+    expect(html).not.toMatch(/maxlength=/i);
+    expect(html).toContain('0 / 1000');
   });
 
   it.each([false, true])('refetches after an accepted decision (replayed=%s)', async (replayed) => {

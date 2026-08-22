@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 
 import { FailedAiRunDecisionForm } from '../../../../components/review/failed-ai-run-decision-form.js';
 import {
@@ -14,7 +14,12 @@ import {
   type ReviewBrowserRuntime,
   useReviewBrowserRuntime,
 } from '../../../../lib/review-browser-runtime.js';
-import { ReviewShell, signOutAndRedirect } from '../../review-shell.js';
+import { createPendingActionGate } from '../../../../lib/review-pending-action.js';
+import {
+  ReviewShell,
+  runReviewSignOutOnce,
+  signOutAndRedirect,
+} from '../../review-shell.js';
 
 export default function FailedAiRunDetailPage({
   params,
@@ -25,6 +30,8 @@ export default function FailedAiRunDetailPage({
   const router = useRouter();
   const runtime = useReviewBrowserRuntime();
   const [state, setState] = useState<FailedAiRunDetailState>({ status: 'loading' });
+  const [signOutPending, setSignOutPending] = useState(false);
+  const signOutGate = useRef(createPendingActionGate());
 
   const refresh = useCallback(async () => {
     if (runtime === null) return;
@@ -39,12 +46,15 @@ export default function FailedAiRunDetailPage({
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  async function signOut(): Promise<void> {
+    if (runtime === null) return;
+    await runReviewSignOutOnce(signOutGate.current, async () => {
+      await signOutAndRedirect(runtime.session, (path) => router.replace(path));
+    }, setSignOutPending);
+  }
+
   return (
-    <ReviewShell onSignOut={() => {
-      if (runtime !== null) {
-        void signOutAndRedirect(runtime.session, (path) => router.replace(path));
-      }
-    }}>
+    <ReviewShell {...(runtime === null ? {} : { onSignOut: signOut, signOutPending })}>
       <main>
         <p className="review-back"><Link className="review-link" href="/review/ai-runs">← 返回列表</Link></p>
         {runtime === null ? <p className="review-state">正在确认审核会话…</p> : (
