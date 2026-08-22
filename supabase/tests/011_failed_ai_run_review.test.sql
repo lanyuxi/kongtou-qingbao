@@ -140,6 +140,36 @@ from (values
 ) as expected(signature);
 
 select ok(
+  procedure_info.proretset
+    and procedure_info.prorettype = 'record'::regtype
+    and procedure_info.proargmodes = array[
+      'i', 'i', 'i', 'i', 't', 't', 't', 't', 't', 't', 't'
+    ]::"char"[]
+    and procedure_info.proallargtypes = array[
+      'uuid'::regtype,
+      'jsonb'::regtype,
+      'text'::regtype,
+      'timestamp with time zone'::regtype,
+      'integer'::regtype,
+      'uuid'::regtype,
+      'uuid'::regtype,
+      'uuid'::regtype,
+      'bigint'::regtype,
+      'text'::regtype,
+      'boolean'::regtype
+    ]::oid[]
+    and procedure_info.proargnames = array[
+      'p_ai_run_id', 'p_command_payload', 'p_idempotency_key', 'p_now',
+      'version', 'commandId', 'runId', 'decisionId', 'reviewVersion',
+      'reviewState', 'replayed'
+    ]::text[],
+  'failed AI run review command has the exact safe result signature without errorDetail'
+)
+from pg_catalog.pg_proc as procedure_info
+where procedure_info.oid =
+  'public.execute_failed_ai_run_review(uuid,jsonb,text,timestamp with time zone)'::regprocedure;
+
+select ok(
   coalesce(
     procedure_info.prosecdef
       and pg_catalog.pg_get_userbyid(procedure_info.proowner) = 'postgres'
@@ -196,7 +226,9 @@ values
   ('22000000-0000-4000-8000-000000000090', 'reviewer',
     '2026-08-22 00:00:00+00', null),
   ('22000000-0000-4000-8000-000000000091', 'reviewer',
-    '2026-08-21 00:00:00+00', '2026-08-21 01:00:00+00');
+    '2026-08-21 00:00:00+00', '2026-08-21 01:00:00+00'),
+  ('22000000-0000-4000-8000-000000000092', 'user',
+    '2026-08-22 00:00:00+00', null);
 
 insert into public.projects (id, slug, name, lifecycle, created_at, updated_at)
 values (
@@ -273,7 +305,7 @@ values
     '22000000-0000-4000-8000-000000000040', repeat('b', 64), 'safe-test-model',
     'prompt-v1', 'schema-v1', 'pipeline-v1', 'schema_invalid_after_repair', null,
     '{"secretUsage":998}', 'schema dump must remain private',
-    '2026-08-22 00:09:00+00'),
+    '2026-08-22 00:10:00+00'),
   ('22000000-0000-4000-8000-000000000053', 'extract.v1', 'raw_item',
     '22000000-0000-4000-8000-000000000032', repeat('c', 64), 'safe-test-model',
     'prompt-v1', 'schema-v1', 'pipeline-v1', 'grounding_failed', null,
@@ -384,11 +416,11 @@ reset role;
 select results_eq(
   $$ select "runId" from pg_temp.failed_run_list_result order by "createdAt" desc, "runId" desc $$,
   $$ values
-    ('22000000-0000-4000-8000-000000000051'::uuid),
     ('22000000-0000-4000-8000-000000000052'::uuid),
+    ('22000000-0000-4000-8000-000000000051'::uuid),
     ('22000000-0000-4000-8000-000000000053'::uuid)
   $$,
-  'list returns only the three reviewable failure statuses in stable descending order'
+  'list orders equal-created-at failures by UUID descending'
 );
 
 select results_eq(
@@ -444,22 +476,29 @@ select results_eq(
   $$
     select "runId"
     from public.list_failed_ai_runs(
-      'all', 'all', '2026-08-22 00:09:00+00',
+      'all', 'all', '2026-08-22 00:10:00+00',
       '22000000-0000-4000-8000-000000000052', 25
     )
   $$,
-  $$ values ('22000000-0000-4000-8000-000000000053'::uuid) $$,
-  'list cursor is strict on created_at descending then id descending'
+  $$ values
+    ('22000000-0000-4000-8000-000000000051'::uuid),
+    ('22000000-0000-4000-8000-000000000053'::uuid)
+  $$,
+  'list cursor continues equal-created-at rows by UUID descending before older rows'
 );
 select throws_ok(
   $$ select * from public.list_failed_ai_runs('all', 'succeeded', null, null, 25) $$,
   'AR105', 'invalid_review_command',
   'list rejects non-reviewable status filters'
 );
+select lives_ok(
+  $$ select * from public.list_failed_ai_runs('all', 'all', null, null, 101) $$,
+  'list accepts the repository limit-plus-one value of 101'
+);
 select throws_ok(
   $$ select * from public.list_failed_ai_runs('all', 'all', null, null, 102) $$,
   'AR105', 'invalid_review_command',
-  'list rejects unbounded limits while allowing the repository limit-plus-one contract'
+  'list rejects 102 as beyond the repository limit-plus-one contract'
 );
 select throws_ok(
   $$ select * from public.get_failed_ai_run('22000000-0000-4000-8000-000000000054') $$,
@@ -489,6 +528,45 @@ select * from public.get_failed_ai_run('22000000-0000-4000-8000-000000000051');
 insert into pg_temp.failed_run_detail_result
 select * from public.get_failed_ai_run('22000000-0000-4000-8000-000000000052');
 reset role;
+
+select results_eq(
+  $$
+    select key_name
+    from pg_temp.failed_run_detail_result as result
+    cross join lateral pg_catalog.jsonb_object_keys(result.run) as keys(key_name)
+    where result.run ->> 'runId' = '22000000-0000-4000-8000-000000000051'
+    order by key_name
+  $$,
+  $$
+    select expected.key_name
+    from (values
+      ('createdAt'::text), ('inputKind'), ('latestDecisionAt'), ('modelId'),
+      ('pipelineVersion'), ('project'), ('promptVersion'), ('reviewState'),
+      ('reviewVersion'), ('runId'), ('safeFailureCode'), ('schemaVersion'),
+      ('source'), ('stage'), ('status'), ('version')
+    ) as expected(key_name)
+    order by expected.key_name
+  $$,
+  'detail run projection has exactly the safe list-item keys'
+);
+
+select ok(
+  coalesce(
+    pg_catalog.bool_and(
+      not (result.run ?| array[
+        'prompt', 'output', 'errorDetail', 'error_detail',
+        'modelResponse', 'model_response',
+        'request', 'requestBody', 'request_body',
+        'response', 'responseBody', 'response_body',
+        'raw', 'rawText', 'raw_text'
+      ])
+      and result.run::text !~* 'secretUsage|provider failed|schema dump|grounding quote|secret provider body|unsafe discovered source body|https?://'
+    ),
+    false
+  ),
+  'detail run excludes prompt, output, errors, model responses, request/response, raw content, and URLs'
+)
+from pg_temp.failed_run_detail_result as result;
 
 select results_eq(
   $$
@@ -606,6 +684,42 @@ select throws_ok(
   'review command maps malformed scalar types to the stable validation code'
 );
 
+select throws_ok(
+  $$
+    select * from public.execute_failed_ai_run_review(
+      '22000000-0000-4000-8000-000000000052',
+      '{"version":1,"expectedReviewVersion":9223372036854775808,"decision":"dismiss","reasonCode":"transient_failure","note":null}'::jsonb,
+      'failed-run-overflow-version-command', '2026-08-22 00:24:46+00'
+    )
+  $$,
+  'AR105', 'invalid_review_command',
+  'review command rejects expectedReviewVersion above bigint range'
+);
+
+select throws_ok(
+  $$
+    select * from public.execute_failed_ai_run_review(
+      '22000000-0000-4000-8000-000000000052',
+      '{"version":1,"expectedReviewVersion":-1,"decision":"dismiss","reasonCode":"transient_failure","note":null}'::jsonb,
+      'failed-run-negative-version-command', '2026-08-22 00:24:47+00'
+    )
+  $$,
+  'AR105', 'invalid_review_command',
+  'review command rejects negative expectedReviewVersion'
+);
+
+select throws_ok(
+  $$
+    select * from public.execute_failed_ai_run_review(
+      '22000000-0000-4000-8000-000000000052',
+      '{"version":1,"expectedReviewVersion":1.5,"decision":"dismiss","reasonCode":"transient_failure","note":null}'::jsonb,
+      'failed-run-fractional-version-command', '2026-08-22 00:24:48+00'
+    )
+  $$,
+  'AR105', 'invalid_review_command',
+  'review command rejects fractional expectedReviewVersion'
+);
+
 insert into pg_temp.failed_run_command_result
 select 'dismiss', result.*
 from public.execute_failed_ai_run_review(
@@ -649,6 +763,8 @@ select is(
    where idempotency_key in (
      'failed-run-stale-command', 'failed-run-invalid-command',
      'failed-run-extra-key-command', 'failed-run-invalid-type-command',
+     'failed-run-overflow-version-command', 'failed-run-negative-version-command',
+     'failed-run-fractional-version-command',
      'ordinary-user-command',
      'revoked-reviewer-command'
    )),
