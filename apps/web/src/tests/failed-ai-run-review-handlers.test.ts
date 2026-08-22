@@ -90,17 +90,26 @@ describe('failed AI run review BFF handlers', () => {
 
       const response = await listHandler(auth, reviews)(listRequest({ authorization: null }));
 
-      expect(response.status).toBe(401);
-      expect(await response.json()).toEqual({
-        ok: false,
-        error: {
-          code: 'unauthorized',
-          message: 'Authentication is required.',
-          requestId,
-          details: null,
-        },
-      });
+      await expectExactError(response, 401, 'unauthorized', 'Authentication is required.');
       expect(auth.headers).toEqual([null]);
+      expect(reviews.calls).toEqual([]);
+    });
+
+    it.each([
+      ['missing', null],
+      ['malformed', 'Basic local-review-session-token'],
+      ['blank bearer', 'Bearer '],
+    ])('fails closed for a %s raw authorization header after verifier success', async (
+      _caseName,
+      authorization,
+    ) => {
+      const reviews = new RecordingReviewRepository();
+      const auth = new StaticAuth({ userId: reviewerUserId });
+
+      const response = await listHandler(auth, reviews)(listRequest({ authorization }));
+
+      await expectExactError(response, 401, 'unauthorized', 'Authentication is required.');
+      expect(auth.headers).toEqual([authorization === 'Bearer ' ? 'Bearer' : authorization]);
       expect(reviews.calls).toEqual([]);
     });
 
@@ -150,14 +159,14 @@ describe('failed AI run review BFF handlers', () => {
     });
 
     it.each([
-      ['an unknown query key', 'sort=createdAt', 'invalid_request'],
-      ['a duplicate filter', 'status=provider_error&status=grounding_failed', 'invalid_request'],
-      ['a non-integer limit', 'limit=1.5', 'invalid_request'],
-      ['a zero limit', 'limit=0', 'invalid_request'],
-      ['an over-limit value', 'limit=101', 'invalid_request'],
-      ['an unsupported status', 'status=succeeded', 'invalid_request'],
-      ['a malformed cursor', 'cursor=not-a-cursor', 'invalid_cursor'],
-    ])('rejects %s before repository access', async (_caseName, query, code) => {
+      ['an unknown query key', 'sort=createdAt', 'invalid_request', 'The request is invalid.'],
+      ['a duplicate filter', 'status=provider_error&status=grounding_failed', 'invalid_request', 'The request is invalid.'],
+      ['a non-integer limit', 'limit=1.5', 'invalid_request', 'The request is invalid.'],
+      ['a zero limit', 'limit=0', 'invalid_request', 'The request is invalid.'],
+      ['an over-limit value', 'limit=101', 'invalid_request', 'The request is invalid.'],
+      ['an unsupported status', 'status=succeeded', 'invalid_request', 'The request is invalid.'],
+      ['a malformed cursor', 'cursor=not-a-cursor', 'invalid_cursor', 'The cursor is invalid.'],
+    ])('rejects %s before repository access', async (_caseName, query, code, message) => {
       const reviews = new RecordingReviewRepository();
 
       const response = await listHandler(
@@ -165,21 +174,43 @@ describe('failed AI run review BFF handlers', () => {
         reviews,
       )(listRequest({ query }));
 
-      await expectError(response, 400, code);
+      await expectExactError(response, 400, code, message);
       expect(reviews.calls).toEqual([]);
     });
 
     it.each([
-      ['reviewer_required', 403, 'reviewer_required'],
-      ['review_query_failed', 500, 'review_query_failed'],
-    ])('maps %s to a bounded response', async (repositoryCode, status, responseCode) => {
+      ['reviewer_required', 403, 'reviewer_required', 'Reviewer access is required.'],
+      ['review_query_failed', 500, 'review_query_failed', 'Failed AI runs could not be loaded.'],
+    ])('maps %s to a bounded response', async (
+      repositoryCode,
+      status,
+      responseCode,
+      message,
+    ) => {
       const response = await listHandler(
         new StaticAuth({ userId: reviewerUserId }),
         new RejectingReviewRepository('list', repositoryCode),
       )(listRequest());
 
-      await expectError(response, status, responseCode);
+      await expectExactError(response, status, responseCode, message);
     });
+
+    it.each(['review_persistence_failed', 'unknown_review_code'])(
+      'sanitizes wrong-operation or unknown list code %s to the query fallback',
+      async (repositoryCode) => {
+        const response = await listHandler(
+          new StaticAuth({ userId: reviewerUserId }),
+          new RejectingReviewRepository('list', repositoryCode),
+        )(listRequest());
+
+        await expectExactError(
+          response,
+          500,
+          'review_query_failed',
+          'Failed AI runs could not be loaded.',
+        );
+      },
+    );
 
     it('sanitizes verifier and unexpected list failures', async () => {
       const secret = sensitiveText();
@@ -192,12 +223,39 @@ describe('failed AI run review BFF handlers', () => {
         new RejectingReviewRepository('list', undefined, secret),
       )(listRequest());
 
-      await expectSanitizedError(verifierResponse, 500, 'review_query_failed');
-      await expectSanitizedError(repositoryResponse, 500, 'review_query_failed');
+      await expectExactError(
+        verifierResponse,
+        500,
+        'review_query_failed',
+        'Failed AI runs could not be loaded.',
+      );
+      await expectExactError(
+        repositoryResponse,
+        500,
+        'review_query_failed',
+        'Failed AI runs could not be loaded.',
+      );
     });
   });
 
   describe('GET /api/v1/review/ai-runs/:runId', () => {
+    it.each([
+      ['missing', null],
+      ['malformed', 'Basic local-review-session-token'],
+    ])('fails closed for a %s raw authorization header after verifier success', async (
+      _caseName,
+      authorization,
+    ) => {
+      const reviews = new RecordingReviewRepository();
+      const response = await detailHandler(
+        new StaticAuth({ userId: reviewerUserId }),
+        reviews,
+      )(detailRequest(runId, authorization), routeContext(runId));
+
+      await expectExactError(response, 401, 'unauthorized', 'Authentication is required.');
+      expect(reviews.calls).toEqual([]);
+    });
+
     it.each(['not-a-uuid', 'a1000000-0000-0000-8000-000000000001'])(
       'rejects invalid run UUID %s before repository access',
       async (requestedRunId) => {
@@ -207,7 +265,7 @@ describe('failed AI run review BFF handlers', () => {
           reviews,
         )(detailRequest(requestedRunId), routeContext(requestedRunId));
 
-        await expectError(response, 400, 'invalid_request');
+        await expectExactError(response, 400, 'invalid_request', 'The request is invalid.');
         expect(reviews.calls).toEqual([]);
       },
     );
@@ -232,17 +290,34 @@ describe('failed AI run review BFF handlers', () => {
     });
 
     it.each([
-      ['reviewer_required', 403, 'reviewer_required'],
-      ['review_run_not_found', 404, 'review_run_not_found'],
-      ['review_query_failed', 500, 'review_query_failed'],
-    ])('maps %s to HTTP %s', async (repositoryCode, status, responseCode) => {
+      ['reviewer_required', 403, 'reviewer_required', 'Reviewer access is required.'],
+      ['review_run_not_found', 404, 'review_run_not_found', 'The failed AI run was not found.'],
+      ['review_query_failed', 500, 'review_query_failed', 'Failed AI runs could not be loaded.'],
+    ])('maps %s to HTTP %s', async (repositoryCode, status, responseCode, message) => {
       const response = await detailHandler(
         new StaticAuth({ userId: reviewerUserId }),
         new RejectingReviewRepository('get', repositoryCode),
       )(detailRequest(), routeContext(runId));
 
-      await expectError(response, status, responseCode);
+      await expectExactError(response, status, responseCode, message);
     });
+
+    it.each(['review_persistence_failed', 'unknown_review_code'])(
+      'sanitizes wrong-operation or unknown detail code %s to the query fallback',
+      async (repositoryCode) => {
+        const response = await detailHandler(
+          new StaticAuth({ userId: reviewerUserId }),
+          new RejectingReviewRepository('get', repositoryCode),
+        )(detailRequest(), routeContext(runId));
+
+        await expectExactError(
+          response,
+          500,
+          'review_query_failed',
+          'Failed AI runs could not be loaded.',
+        );
+      },
+    );
 
     it('sanitizes unexpected detail failures', async () => {
       const response = await detailHandler(
@@ -250,7 +325,12 @@ describe('failed AI run review BFF handlers', () => {
         new RejectingReviewRepository('get', undefined, sensitiveText()),
       )(detailRequest(), routeContext(runId));
 
-      await expectSanitizedError(response, 500, 'review_query_failed');
+      await expectExactError(
+        response,
+        500,
+        'review_query_failed',
+        'Failed AI runs could not be loaded.',
+      );
     });
   });
 
@@ -262,7 +342,27 @@ describe('failed AI run review BFF handlers', () => {
         routeContext(runId),
       );
 
-      await expectError(response, 401, 'unauthorized');
+      await expectExactError(response, 401, 'unauthorized', 'Authentication is required.');
+      expect(reviews.calls).toEqual([]);
+    });
+
+    it.each([
+      ['missing', null],
+      ['malformed', 'Basic local-review-session-token'],
+    ])('fails closed for a %s raw authorization header after verifier success', async (
+      _caseName,
+      authorization,
+    ) => {
+      const reviews = new RecordingReviewRepository();
+      const response = await decisionHandler(
+        new StaticAuth({ userId: reviewerUserId }),
+        reviews,
+      )(
+        decisionRequest({ authorization }),
+        routeContext(runId),
+      );
+
+      await expectExactError(response, 401, 'unauthorized', 'Authentication is required.');
       expect(reviews.calls).toEqual([]);
     });
 
@@ -278,7 +378,7 @@ describe('failed AI run review BFF handlers', () => {
         reviews,
       )(decisionRequest({ idempotencyKey }), routeContext(runId));
 
-      await expectError(response, 400, 'invalid_request');
+      await expectExactError(response, 400, 'invalid_request', 'The request is invalid.');
       expect(reviews.calls).toEqual([]);
     });
 
@@ -304,7 +404,7 @@ describe('failed AI run review BFF handlers', () => {
         routeContext(requestedRunId),
       );
 
-      await expectError(response, 400, 'invalid_request');
+      await expectExactError(response, 400, 'invalid_request', 'The request is invalid.');
       expect(reviews.calls).toEqual([]);
     });
 
@@ -329,20 +429,47 @@ describe('failed AI run review BFF handlers', () => {
     });
 
     it.each([
-      ['reviewer_required', 403, 'reviewer_required'],
-      ['review_run_not_found', 404, 'review_run_not_found'],
-      ['review_version_conflict', 409, 'review_version_conflict'],
-      ['review_idempotency_conflict', 409, 'review_idempotency_conflict'],
-      ['invalid_review_command', 400, 'invalid_request'],
-      ['review_persistence_failed', 500, 'review_persistence_failed'],
-    ])('maps %s to HTTP %s', async (repositoryCode, status, responseCode) => {
+      ['reviewer_required', 403, 'reviewer_required', 'Reviewer access is required.'],
+      ['review_run_not_found', 404, 'review_run_not_found', 'The failed AI run was not found.'],
+      ['review_version_conflict', 409, 'review_version_conflict', 'The review has changed.'],
+      [
+        'review_idempotency_conflict',
+        409,
+        'review_idempotency_conflict',
+        'The idempotency key conflicts with a prior review command.',
+      ],
+      ['invalid_review_command', 400, 'invalid_request', 'The request is invalid.'],
+      [
+        'review_persistence_failed',
+        500,
+        'review_persistence_failed',
+        'The review decision could not be persisted.',
+      ],
+    ])('maps %s to HTTP %s', async (repositoryCode, status, responseCode, message) => {
       const response = await decisionHandler(
         new StaticAuth({ userId: reviewerUserId }),
         new RejectingReviewRepository('decide', repositoryCode),
       )(decisionRequest(), routeContext(runId));
 
-      await expectError(response, status, responseCode);
+      await expectExactError(response, status, responseCode, message);
     });
+
+    it.each(['review_query_failed', 'unknown_review_code'])(
+      'sanitizes wrong-operation or unknown decision code %s to the persistence fallback',
+      async (repositoryCode) => {
+        const response = await decisionHandler(
+          new StaticAuth({ userId: reviewerUserId }),
+          new RejectingReviewRepository('decide', repositoryCode),
+        )(decisionRequest(), routeContext(runId));
+
+        await expectExactError(
+          response,
+          500,
+          'review_persistence_failed',
+          'The review decision could not be persisted.',
+        );
+      },
+    );
 
     it('sanitizes verifier and unexpected persistence failures', async () => {
       const secret = sensitiveText();
@@ -355,8 +482,18 @@ describe('failed AI run review BFF handlers', () => {
         new RejectingReviewRepository('decide', undefined, secret),
       )(decisionRequest(), routeContext(runId));
 
-      await expectSanitizedError(verifierResponse, 500, 'review_persistence_failed');
-      await expectSanitizedError(repositoryResponse, 500, 'review_persistence_failed');
+      await expectExactError(
+        verifierResponse,
+        500,
+        'review_persistence_failed',
+        'The review decision could not be persisted.',
+      );
+      await expectExactError(
+        repositoryResponse,
+        500,
+        'review_persistence_failed',
+        'The review decision could not be persisted.',
+      );
     });
   });
 });
@@ -379,9 +516,12 @@ function listRequest(options: { authorization?: string | null; query?: string } 
   return new Request(`http://local/api/v1/review/ai-runs${suffix}`, { headers });
 }
 
-function detailRequest(requestedRunId = runId): Request {
+function detailRequest(
+  requestedRunId = runId,
+  authorization: string | null = `Bearer ${accessToken}`,
+): Request {
   return new Request(`http://local/api/v1/review/ai-runs/${requestedRunId}`, {
-    headers: authorizationHeaders(),
+    headers: authorizationHeaders(authorization),
   });
 }
 
@@ -416,16 +556,19 @@ function routeContext(requestedRunId: string) {
   return { params: Promise.resolve({ runId: requestedRunId }) };
 }
 
-async function expectError(response: Response, status: number, code: string): Promise<void> {
+async function expectExactError(
+  response: Response,
+  status: number,
+  code: string,
+  message: string,
+): Promise<void> {
   const body = await response.json() as unknown;
   expect(response.status).toBe(status);
-  expect(body).toMatchObject({ ok: false, error: { code, requestId } });
-}
-
-async function expectSanitizedError(response: Response, status: number, code: string): Promise<void> {
-  const body = await response.json() as unknown;
-  expect(response.status).toBe(status);
-  expect(body).toMatchObject({ ok: false, error: { code, requestId, details: null } });
+  expect(body).toEqual({
+    ok: false,
+    error: { code, message, requestId, details: null },
+  });
+  expect(body).not.toHaveProperty('meta');
   expect(JSON.stringify(body)).not.toMatch(
     /local-review-session-token|postgres|database-password|source-body|raw-output|error-detail/i,
   );
@@ -521,6 +664,15 @@ class RejectingReviewRepository implements FailedAiRunReviewRepository {
   private reject(operation: 'list' | 'get' | 'decide'): never {
     if (operation !== this.operation) throw new Error('wrong test operation');
     if (this.code === undefined) throw new Error(this.message);
-    throw { code: this.code, message: this.message, database: 'postgres://database-password' };
+    throw {
+      code: this.code,
+      message: sensitiveText(),
+      token: 'local-review-session-token',
+      database: 'postgres://database-password',
+      password: 'database-password',
+      sourceBody: 'source-body',
+      rawOutput: 'raw-output',
+      errorDetail: 'error-detail',
+    };
   }
 }
