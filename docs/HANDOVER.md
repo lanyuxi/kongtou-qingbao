@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B 详细设计已确认并固化：失败 AI run 使用真实 Supabase reviewer 会话、追加式审核决定、幂等/版本门禁与事务 outbox；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-22（Phase 6B Task 1 已完成：失败 AI run 严格 contracts 已通过 focused RED → GREEN 与 contracts lint/typecheck；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；Task 1 contracts 已在隔离 worktree 完成，focused contracts 测试 77/77、lint/typecheck 均通过，下一步是 Task 2 数据库边界。
 
 ---
 
@@ -36,6 +36,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 5 常态化编排**（2026-08-15） | worker 进程内新增 AI 阶段编排循环（不动已硬化的采集 durable queue）：`packages/domain/src/orchestration/backoff.ts`（指数退避纯函数，7 单测）；`listPendingInputs` 毒物防护对齐——排除**一切**已有 run 的输入（schema 唯一键使失败重试必然重复 `on conflict do nothing`，故语义改为每输入至多一次尝试，失败输入成为事实 dead-letter，待 review 流接手）；`apps/worker/src/orchestration/`（ports + ai-stage-orchestrator 双定时循环 + create-ai-stage-runtime 组合根，13 个单测）；`index.ts` opt-in 集成——设 `AIRDROP_AI_STAGE_DATABASE_URL` + `AI_MODEL_API_KEY` 即启用（tick 可用 `AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS` / `AIRDROP_ORCHESTRATION_SCORING_TICK_MS` 覆盖），缺席则单行 `ai_stage_orchestration_disabled` 日志后纯采集模式；远程库补建 `collection_queue_worker_login` 登录角色；真实库端到端验证：注入 discovered_item → extraction tick 自动拾取并真实调用 DeepSeek 产出候选 → 人工 promote → scoring tick 自动检测 input_version 变化重算（novanet 83.2/20/31 → 74.8/40/27，三轴独立语义正确），页面正确渲染 | `97983ad` |
 | **Phase 6A 正式情报治理**（2026-08-21 完成，分支 `codex/phase-6a-canonical-governance`） | 把 Evidence、人工审核、Promotion、审计、事务性 outbox 从 CLI 约定升级为**可执行的数据库边界**：`evidence` / `signal_evidence_links` / `candidate_review_decisions` / `promotion_commands` / `outbox_events` 五表 + 专用 `promotion_service` NOLOGIN 角色 + 受保护幂等命令 `execute_extraction_candidate_review`（审核人在册、期望版本、确定性 grounding、单事务原子写入）与 `reconcile_extraction_candidate_evidence`（历史对账）；撤销 `ai_stage_worker` 直接 INSERT signals 与旧 promote 函数执行权；公开 signal/score 读模型与评分输入全部改为 **Evidence 门禁**（无证据历史保留但隐藏，不删除）；`review-candidate.ts` 治理审核 CLI（approve/reject/needs-review，读 `AIRDROP_PROMOTION_DATABASE_URL` + `AIRDROP_PROMOTION_REVIEWER_USER_ID`）替代旧 promote-candidate（已 fail-closed）；`reconcile-historical-evidence.ts` 有界幂等对账 runner（批次 1-100、UUID 游标、确定性幂等键）；seed/demo fixtures 全部补显式虚构 Evidence；契约与纯函数 grounding 规则（Unicode 空白归一化 + 精确包含 + SHA-256）跨 TS/PG 一致（码点级长度、代理对拒绝）。详见 `docs/superpowers/specs/2026-08-20-canonical-intelligence-governance-design.md` | `a9f1490`…`768df85` + `b67e7a3`（共 19 提交，分支 `codex/phase-6a-canonical-governance`）；2026-08-21 fast-forward 合并回主线，合并后主线 verify 全绿 |
 | **Phase 6A 生产落地**（2026-08-22） | 三迁移原子应用并登记；生产治理登录/审核人就绪；12 组 demo Evidence 已补齐；7 个历史 promoted candidates 全部 deterministic-ground 成功并 linked；对账重跑为 0；匿名机会读模型 12 行，Ethereum 6 条真实 signals 恢复；页面验证通过 | 逐步运行证据见 §8.2 |
+| **Phase 6B Task 1 contracts**（2026-08-22） | `packages/contracts/src/review/failed-ai-run.ts` 提供严格失败运行状态、查询、无原始错误的安全投影、审核历史、命令/回执 schemas 与 inferred types；决策 reason compatibility、版本边界、备注长度/空白、base64url cursor 均有测试；`packages/contracts/src/index.ts` 已公开导出 | `docs/tasks/failed-ai-run-review-workbook.md` Task 1 execution log；focused contracts 6 files / 77 tests passed，lint/typecheck passed |
 
 当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders，Node 22 验证）。测试通过 650（contracts 65 / domain 222 / database 134 / web 17 / worker 212）；隔离 Supabase 栈（远程 ECS `airdrop-intelligence-governance-test`，db 端口 64322，本地隧道 16432/16433）全量 pgTAP 10 文件 **944/944**，全量序列化集成 6 文件 **34/34 零跳过**（含 promotion 12 项真实治理边界用例）。
 
@@ -69,7 +70,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 
 - **产品/UI 产出**：`apps/web` 已有 Overview、Opportunities、Project Detail 三个公开页面，另有 health 与采集调度管理 API；页面只消费数据库读模型，不承载采集、AI、评分等重任务。
 - **后台能力产出**：`apps/worker` 已覆盖官方源采集、durable queue、AI 抽取、人工治理审核、历史 Evidence 对账、确定性评分和常态化抽取/评分编排。
-- **共享边界产出**：`packages/contracts` 提供严格契约；`packages/domain` 提供网络/内容安全、队列策略、Evidence grounding、评分与退避纯规则；`packages/database` 提供浏览器隔离的 repository、事务与 server-only 入口。
+- **共享边界产出**：`packages/contracts` 提供严格契约（含 Phase 6B failed AI run review）；`packages/domain` 提供网络/内容安全、队列策略、Evidence grounding、评分与退避纯规则；`packages/database` 提供浏览器隔离的 repository、事务与 server-only 入口。
 - **数据库产出**：19 个 forward-only 迁移、10 个 pgTAP 文件、2 个 fixture 与本地 seed；Phase 6A 的 3 个迁移文件已存在，并与治理契约、repository、CLI、测试和生成类型一一对应。
 - **文档产出**：除本手册外共有 README、2 份架构说明、1 份本地运行手册、9 份阶段设计/计划和 4 份任务工作簿。`docs/superpowers/plans/` 内的复选框是历史执行模板，未逐项回填，**不得据其未勾选状态判断阶段未完成**；完成状态与 RED/GREEN 证据以 `docs/tasks/*workbook.md`、Git 提交和当前验证命令为准。
 - **未发现新的未完成标记**：排除历史计划文本与本手册说明后，源码、迁移和测试中未发现常见的待办、修复或待定型开发占位。
@@ -413,7 +414,7 @@ git branch -d codex/phase-6a-canonical-governance
 
 ### 8.4 下一阶段开发方向（Phase 6B 起，按建议优先级）
 
-1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——治理地基（决策表/受保护命令/幂等回执/outbox）已在 6A 就绪；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策都在等这个界面
+1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1 contracts 已完成；治理地基（决策表/受保护命令/幂等回执/outbox）已在 6A 就绪，下一步是 Task 2 数据库边界；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策都在等这个界面
 2. **详情页 score_factors / Evidence 引用展示 + anon 读策略**——把 Phase 4 因子数据变成用户可见；注意展示需符合「Raw quote 不自动公开」的约束（经审核的公共读模型才能带引用文本）
 3. **教程生成 tutorials**——价值链「执行」环；其前置（安全 incidents / 白名单链接）尚未开始，需先排期
 4. 其余按 §2「未开始」清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）

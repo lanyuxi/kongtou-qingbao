@@ -99,3 +99,27 @@ export type {
   EvidenceLocatorV1,
   GovernanceOutboxEventV1,
 } from './intelligence/governance.js';
+export {
+  failedAiRunDecisionCommandSchema,
+  failedAiRunDecisionResultSchema,
+  failedAiRunDecisionSchema,
+  failedAiRunDetailSchema,
+  failedAiRunListItemSchema,
+  failedAiRunListQuerySchema,
+  failedAiRunReasonCodeSchema,
+  failedAiRunReviewDecisionRecordSchema,
+  failedAiRunReviewStateSchema,
+  failedAiRunStatusSchema,
+} from './review/failed-ai-run.js';
+export type {
+  FailedAiRunDecision,
+  FailedAiRunDecisionCommand,
+  FailedAiRunDecisionResult,
+  FailedAiRunDetail,
+  FailedAiRunListItem,
+  FailedAiRunListQuery,
+  FailedAiRunReasonCode,
+  FailedAiRunReviewDecisionRecord,
+  FailedAiRunReviewState,
+  FailedAiRunStatus,
+} from './review/failed-ai-run.js';
