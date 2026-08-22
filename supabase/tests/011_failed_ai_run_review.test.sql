@@ -2,11 +2,26 @@ begin;
 
 select no_plan();
 
-select has_table('public', 'ai_run_review_decisions');
-select has_table('public', 'ai_run_review_commands');
-select has_function('public', 'list_failed_ai_runs');
-select has_function('public', 'get_failed_ai_run');
-select has_function('public', 'execute_failed_ai_run_review');
+select has_table(
+  'public', 'ai_run_review_decisions',
+  'failed AI run review decisions table exists'
+);
+select has_table(
+  'public', 'ai_run_review_commands',
+  'failed AI run review command receipts table exists'
+);
+select has_function(
+  'public', 'list_failed_ai_runs',
+  'protected failed AI run list function exists'
+);
+select has_function(
+  'public', 'get_failed_ai_run',
+  'protected failed AI run detail function exists'
+);
+select has_function(
+  'public', 'execute_failed_ai_run_review',
+  'transactional failed AI run review command exists'
+);
 
 select columns_are(
   'public',
@@ -278,8 +293,8 @@ select set_config('request.jwt.claim.role', 'anon', true);
 set local role anon;
 select throws_ok(
   $$ select * from public.list_failed_ai_runs('all', 'all', null, null, 25) $$,
-  'AR104', 'reviewer_required',
-  'anonymous sessions cannot list failed AI runs'
+  '42501', 'permission denied for function list_failed_ai_runs',
+  'anonymous sessions have no failed AI run list execution grant'
 );
 reset role;
 

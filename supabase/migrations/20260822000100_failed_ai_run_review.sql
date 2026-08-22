@@ -265,7 +265,7 @@ begin
     end,
     run_record.created_at,
     review_projection.review_state,
-    pg_catalog.coalesce(latest_decision.review_version, 0::bigint),
+    coalesce(latest_decision.review_version, 0::bigint),
     latest_decision.created_at
   from public.ai_runs as run_record
   left join public.raw_items as raw_input
@@ -275,9 +275,9 @@ begin
     on run_record.input_kind = 'discovered_item'
     and discovered_input.id = run_record.input_id
   left join public.projects as project_record
-    on project_record.id = pg_catalog.coalesce(raw_input.project_id, discovered_input.project_id)
+    on project_record.id = coalesce(raw_input.project_id, discovered_input.project_id)
   left join public.sources as source_record
-    on source_record.id = pg_catalog.coalesce(raw_input.source_id, discovered_input.source_id)
+    on source_record.id = coalesce(raw_input.source_id, discovered_input.source_id)
   left join lateral (
     select decision_record.review_version, decision_record.decision,
       decision_record.created_at
@@ -396,9 +396,9 @@ begin
     on run_record.input_kind = 'discovered_item'
     and discovered_input.id = run_record.input_id
   left join public.projects as project_record
-    on project_record.id = pg_catalog.coalesce(raw_input.project_id, discovered_input.project_id)
+    on project_record.id = coalesce(raw_input.project_id, discovered_input.project_id)
   left join public.sources as source_record
-    on source_record.id = pg_catalog.coalesce(raw_input.source_id, discovered_input.source_id);
+    on source_record.id = coalesce(raw_input.source_id, discovered_input.source_id);
 
   select *
   into latest_decision_record
@@ -426,7 +426,7 @@ begin
       when latest_decision_record.decision = 'needs_investigation' then 'needs_investigation'
       else 'dismissed'
     end,
-    'reviewVersion', pg_catalog.coalesce(latest_decision_record.review_version, 0::bigint),
+    'reviewVersion', coalesce(latest_decision_record.review_version, 0::bigint),
     'latestDecisionAt', latest_decision_record.created_at
   );
 
@@ -436,7 +436,7 @@ begin
     'collectedAt', collected_at_projection
   );
 
-  select pg_catalog.coalesce(
+  select coalesce(
     pg_catalog.jsonb_agg(
       pg_catalog.jsonb_build_object(
         'version', 1,
@@ -522,7 +522,7 @@ begin
   end if;
 
   if (
-    select pg_catalog.coalesce(
+    select coalesce(
       pg_catalog.array_agg(payload_key order by payload_key collate "C"),
       '{}'::text[]
     )
@@ -633,7 +633,7 @@ begin
       raise exception 'review_run_not_found' using errcode = 'AR103';
   end;
 
-  select pg_catalog.coalesce(pg_catalog.max(decision_record.review_version), 0::bigint)
+  select coalesce(pg_catalog.max(decision_record.review_version), 0::bigint)
   into current_review_version
   from public.ai_run_review_decisions as decision_record
   where decision_record.ai_run_id = run_record.id;
