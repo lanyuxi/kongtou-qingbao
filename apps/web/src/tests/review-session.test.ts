@@ -4,7 +4,11 @@ import {
   createReviewSessionController,
   type ReviewAuthPort,
 } from '../lib/review-session.js';
-import { createReviewBrowserAuthPort } from '../lib/supabase-browser.js';
+import type { PublicEnvironmentSource } from '../lib/env.js';
+import {
+  createReviewBrowserAuthPort,
+  createReviewBrowserSupabaseClient,
+} from '../lib/supabase-browser.js';
 
 describe('review session controller', () => {
   it('returns a bounded sign-in failure without provider text', async () => {
@@ -77,6 +81,27 @@ describe('review session controller', () => {
 });
 
 describe('review browser Supabase auth port', () => {
+  it('passes only public Supabase values through the injectable client factory', () => {
+    const options: Array<{ url: string; anonKey: string }> = [];
+    const createClient = ((input: { url: string; anonKey: string }) => {
+      options.push(input);
+      return { auth: {} };
+    }) as never;
+    const environment: PublicEnvironmentSource & Record<string, string | undefined> = {
+      NEXT_PUBLIC_SUPABASE_URL: 'https://public-review.example.test',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-review-anon-key',
+      SUPABASE_SERVICE_ROLE_KEY: 'must-not-be-forwarded',
+      AIRDROP_DATABASE_URL: 'postgresql://must-not-be-forwarded',
+    };
+
+    createReviewBrowserSupabaseClient(environment, createClient);
+
+    expect(options).toEqual([{
+      url: 'https://public-review.example.test',
+      anonKey: 'public-review-anon-key',
+    }]);
+  });
+
   it('reads each token from the Supabase session and forwards credentials only to sign-in', async () => {
     const signIns: Array<{ email: string; password: string }> = [];
     let sessionToken = 'first-session-token';

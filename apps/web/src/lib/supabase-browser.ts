@@ -1,6 +1,6 @@
 import { createBrowserSupabaseClient } from '@airdrop/database';
 
-import { parsePublicEnvironment } from './env.js';
+import { parsePublicEnvironment, type PublicEnvironmentSource } from './env.js';
 import type { ReviewAuthPort } from './review-session.js';
 
 interface ReviewSupabaseAuth {
@@ -16,10 +16,15 @@ interface ReviewSupabaseAuth {
 }
 
 export function createReviewBrowserSupabaseClient(
-  environment: NodeJS.ProcessEnv = process.env,
+  environment?: PublicEnvironmentSource,
+  createClient: typeof createBrowserSupabaseClient = createBrowserSupabaseClient,
 ) {
-  const parsed = parsePublicEnvironment(environment);
-  return createBrowserSupabaseClient({
+  const source = environment ?? {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  };
+  const parsed = parsePublicEnvironment(source);
+  return createClient({
     url: parsed.supabaseUrl,
     anonKey: parsed.supabaseAnonKey,
   });
