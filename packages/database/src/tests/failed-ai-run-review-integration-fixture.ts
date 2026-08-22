@@ -1,6 +1,12 @@
-export function presentFixtureUserIds(
-  reviewerUserId: string,
-  ordinaryUserId: string,
-): readonly string[] {
-  return [...new Set([reviewerUserId, ordinaryUserId].filter((userId) => userId !== ''))];
+export function presentFixtureUserIds(...userIds: readonly string[]): readonly string[] {
+  return [...new Set(userIds.filter((userId) => userId !== ''))];
+}
+
+export async function completeRegisteredFixtureUser<T>(
+  userId: string,
+  registerUserId: (createdUserId: string) => void,
+  completeSignup: () => Promise<T>,
+): Promise<T> {
+  registerUserId(userId);
+  return completeSignup();
 }

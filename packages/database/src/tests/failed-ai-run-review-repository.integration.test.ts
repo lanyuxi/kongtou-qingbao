@@ -10,6 +10,10 @@ import {
   createFailedAiRunReviewRepository,
   type FailedAiRunReviewRepository,
 } from '../review/failed-ai-run-review-repository.js';
+import {
+  completeRegisteredFixtureUser,
+  presentFixtureUserIds,
+} from './failed-ai-run-review-integration-fixture.js';
 
 const integrationEnvironment = readIntegrationEnvironment();
 const describeIntegration = integrationEnvironment === null ? describe.skip : describe;
@@ -64,6 +68,7 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
   let reviewerAccessToken = '';
   let ordinaryAccessToken = '';
   let revokedAccessToken = '';
+  const createdUserIds = new Set<string>();
   let first: FailedAiRunReviewRepository | null = null;
   let second: FailedAiRunReviewRepository | null = null;
 
@@ -74,16 +79,19 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
 
     const reviewer = await signUpFixture(
       requireAuth(reviewerAuth), database, fixture.reviewerEmail, password,
+      (userId) => createdUserIds.add(userId),
     );
     reviewerUserId = reviewer.userId;
     reviewerAccessToken = reviewer.accessToken;
     const ordinary = await signUpFixture(
       requireAuth(ordinaryAuth), database, fixture.ordinaryEmail, password,
+      (userId) => createdUserIds.add(userId),
     );
     ordinaryUserId = ordinary.userId;
     ordinaryAccessToken = ordinary.accessToken;
     const revoked = await signUpFixture(
       requireAuth(revokedAuth), database, fixture.revokedEmail, password,
+      (userId) => createdUserIds.add(userId),
     );
     revokedUserId = revoked.userId;
     revokedAccessToken = revoked.accessToken;
@@ -105,7 +113,7 @@ describeIntegration('FailedAiRunReviewRepository PostgREST integration', () => {
     revokedAccessToken = '';
     if (owner === null) return;
     try {
-      await removeExactFixtures(owner, reviewerUserId, ordinaryUserId, revokedUserId);
+      await removeExactFixtures(owner, presentFixtureUserIds(...createdUserIds));
     } finally {
       await owner.end({ timeout: 5 });
     }
@@ -538,24 +546,28 @@ async function signUpFixture(
   owner: postgres.Sql,
   email: string,
   fixturePassword: string,
+  registerUserId: (userId: string) => void,
 ): Promise<{ readonly userId: string; readonly accessToken: string }> {
   const signUp = await client.auth.signUp({ email, password: fixturePassword });
   if (signUp.error !== null || signUp.data.user === null) {
     throw new Error('review_auth_fixture_signup_failed');
   }
-  let session = signUp.data.session;
-  if (session === null) {
-    await owner`
-      update auth.users set email_confirmed_at = now(), updated_at = now()
-      where id = ${signUp.data.user.id}::uuid
-    `;
-    const signIn = await client.auth.signInWithPassword({ email, password: fixturePassword });
-    if (signIn.error !== null || signIn.data.session === null) {
-      throw new Error('review_auth_fixture_signin_failed');
+  const userId = signUp.data.user.id;
+  return completeRegisteredFixtureUser(userId, registerUserId, async () => {
+    let session = signUp.data.session;
+    if (session === null) {
+      await owner`
+        update auth.users set email_confirmed_at = now(), updated_at = now()
+        where id = ${userId}::uuid
+      `;
+      const signIn = await client.auth.signInWithPassword({ email, password: fixturePassword });
+      if (signIn.error !== null || signIn.data.session === null) {
+        throw new Error('review_auth_fixture_signin_failed');
+      }
+      session = signIn.data.session;
     }
-    session = signIn.data.session;
-  }
-  return { userId: signUp.data.user.id, accessToken: session.access_token };
+    return { userId, accessToken: session.access_token };
+  });
 }
 
 async function seedFixtures(
@@ -854,13 +866,8 @@ function deniedRolePrivileges(roleName: string) {
 
 async function removeExactFixtures(
   sql: postgres.Sql,
-  reviewerUserId: string,
-  ordinaryUserId: string,
-  revokedUserId: string,
+  userIds: readonly string[],
 ): Promise<void> {
-  const userIds = [...new Set(
-    [reviewerUserId, ordinaryUserId, revokedUserId].filter((userId) => userId !== ''),
-  )];
   await sql.begin(async (transaction) => {
     await assertDisposableDatabase(transaction);
     await transaction`set local session_replication_role = replica`;
