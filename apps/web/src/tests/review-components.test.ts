@@ -343,6 +343,97 @@ describe('failed AI run detail and immutable history', () => {
     expect(html).not.toMatch(/postgresql:|mailto:|data:|api_key=|Bearer /i);
   });
 
+  it('hides JWT-shaped values independently in notes and allowed metadata', () => {
+    const noteJwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsYSJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+    const metadataJwt = 'YWJjZGVmZ2hpamts.bW5vcHFyc3R1dnd4.eXoxMjM0NTY3ODkwQUJD';
+    const jwtDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: { ...detail.run, modelId: metadataJwt },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: noteJwt,
+        reviewerUserId,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, { detail: jwtDetail }));
+    expect(html.match(/\[内容已隐藏\]/g)).toHaveLength(2);
+    expect(html).not.toContain('SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+    expect(html).not.toContain('eXoxMjM0NTY3ODkwQUJD');
+  });
+
+  it('hides short mixed-class machine tokens independently in notes and allowed metadata', () => {
+    const noteMachineToken = 'A7fK2_mQ9xL4pR8vT3nW6cY1';
+    const metadataMachineToken = 'Q9vT3-xL7mN2pR8cW4yK6aD1zF5';
+    const machineTokenDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: { ...detail.run, pipelineVersion: metadataMachineToken },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: noteMachineToken,
+        reviewerUserId,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, {
+      detail: machineTokenDetail,
+    }));
+    expect(html.match(/\[内容已隐藏\]/g)).toHaveLength(2);
+    expect(html).not.toContain('A7fK2_mQ9xL4pR8vT3nW6cY1');
+    expect(html).not.toContain('Q9vT3-xL7mN2pR8cW4yK6aD1zF5');
+  });
+
+  it('keeps UUIDs, bounded enums, ordinary text, and natural identifiers visible', () => {
+    const safeDetail: FailedAiRunDetailDto = {
+      ...detail,
+      run: {
+        ...detail.run,
+        modelId: 'Claude-3-Opus-2026',
+        project: {
+          id: 'a8000000-0000-4000-8000-000000000001',
+          slug: 'project-release',
+          name: 'Project-Release-2026-Alpha',
+        },
+        source: {
+          id: 'a8000000-0000-4000-8000-000000000002',
+          name: 'Community research digest',
+          sourceType: 'official',
+        },
+      },
+      decisions: [{
+        version: 1,
+        decisionId,
+        reviewVersion: 1,
+        decision: 'needs_investigation',
+        reasonCode: 'other',
+        note: 'Checked the evidence and timing; manual follow-up is needed.',
+        reviewerUserId,
+        createdAt: '2026-08-22T01:00:00.000Z',
+      }],
+    };
+
+    const html = renderToStaticMarkup(createElement(FailedAiRunDetail, { detail: safeDetail }));
+    for (const value of [
+      runId,
+      inputId,
+      'provider_error',
+      'Claude-3-Opus-2026',
+      'Project-Release-2026-Alpha',
+      'Community research digest',
+      'Checked the evidence and timing; manual follow-up is needed.',
+    ]) expect(html).toContain(value);
+  });
+
   it('uses stable failure explanations and renders history by review version despite reversed or equal timestamps', () => {
     const withHistory: FailedAiRunDetailDto = {
       ...detail,
