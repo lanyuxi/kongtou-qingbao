@@ -6,7 +6,7 @@
 >
 > **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计已获确认并写入 `docs/superpowers/specs/2026-08-22-failed-ai-run-review-design.md`；下一步是编写可执行计划后进入 TDD 开发。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN。
 
 ---
 

@@ -149,7 +149,27 @@ type FailedAiRunListItem = {
 
 ### 5.4 Detail and decision history
 
-The detail projection adds the run `inputId`, the bounded input reference, and all review decisions ordered by `review_version asc`. It does not add raw content.
+The list result and detail projection use these exact shapes:
+
+```ts
+type FailedAiRunListResult = {
+  version: 1;
+  items: FailedAiRunListItem[];
+};
+
+type FailedAiRunDetail = {
+  version: 1;
+  run: FailedAiRunListItem;
+  input: {
+    kind: 'discovered_item' | 'raw_item';
+    id: string;
+    collectedAt: string | null;
+  };
+  decisions: FailedAiRunReviewDecisionRecord[];
+};
+```
+
+The detail projection adds the bounded input reference and all review decisions ordered by `review_version asc`. It does not add raw content. `collectedAt` is the Raw Item collection time when the input resolves to a Raw Item and otherwise `null`; it is not inferred from publication time.
 
 ```ts
 type FailedAiRunReviewDecisionRecord = {
