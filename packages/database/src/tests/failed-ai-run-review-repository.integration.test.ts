@@ -565,10 +565,11 @@ async function seedFixtures(
   revokedUserId: string,
 ): Promise<void> {
   await sql`
-    insert into public.user_roles (user_id, role, revoked_at) values
-      (${reviewerUserId}::uuid, 'reviewer', null),
-      (${ordinaryUserId}::uuid, 'user', null),
-      (${revokedUserId}::uuid, 'reviewer', now())
+    insert into public.user_roles (user_id, role, granted_at, revoked_at) values
+      (${reviewerUserId}::uuid, 'reviewer', now() - interval '2 hours', null),
+      (${ordinaryUserId}::uuid, 'user', now() - interval '2 hours', null),
+      (${revokedUserId}::uuid, 'reviewer',
+        now() - interval '2 hours', now() - interval '1 hour')
   `;
   await sql`
     insert into public.projects (id, slug, name, lifecycle)
