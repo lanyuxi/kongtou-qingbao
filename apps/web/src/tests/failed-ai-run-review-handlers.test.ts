@@ -332,6 +332,20 @@ describe('failed AI run review BFF handlers', () => {
         'Failed AI runs could not be loaded.',
       );
     });
+
+    it('sanitizes a malformed repository detail instead of returning raw failure content', async () => {
+      const response = await detailHandler(
+        new StaticAuth({ userId: reviewerUserId }),
+        new MalformedDetailReviewRepository(),
+      )(detailRequest(), routeContext(runId));
+
+      await expectExactError(
+        response,
+        500,
+        'review_query_failed',
+        'Failed AI runs could not be loaded.',
+      );
+    });
   });
 
   describe('POST /api/v1/review/ai-runs/:runId/decisions', () => {
@@ -674,5 +688,25 @@ class RejectingReviewRepository implements FailedAiRunReviewRepository {
       rawOutput: 'raw-output',
       errorDetail: 'error-detail',
     };
+  }
+}
+
+class MalformedDetailReviewRepository implements FailedAiRunReviewRepository {
+  async list(): Promise<FailedAiRunListResult> {
+    throw new Error('wrong test operation');
+  }
+
+  async get(): Promise<FailedAiRunDetail> {
+    return {
+      ...detail,
+      error_detail: 'provider raw error-detail',
+      token: 'local-review-session-token',
+      password: 'database-password',
+      sourceText: 'source-body',
+    } as unknown as FailedAiRunDetail;
+  }
+
+  async decide(): Promise<FailedAiRunDecisionResult> {
+    throw new Error('wrong test operation');
   }
 }
