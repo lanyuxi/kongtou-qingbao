@@ -2,6 +2,7 @@
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
 > 最近更新：2026-08-22（Phase 6B 详细设计已确认并固化：失败 AI run 使用真实 Supabase reviewer 会话、追加式审核决定、幂等/版本门禁与事务 outbox；Phase 6A 生产证据见 §8.2）
+> **2026-08-22 续**：Phase 6B 在独立分支 `codex/phase-6b-failed-ai-review`（worktree `.worktrees/phase-6b-failed-ai-review`）开发；Codex 额度耗尽后由 WorkBuddy（傻妞）接手，继续完成 Task 7 复验/提交与 Task 8/9。**6B 的实时状态以 worktree 内 `docs/HANDOVER.md` 为准**，本主线手册在 6B 合并前保持 Phase 0–6A 快照。
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复。
@@ -51,7 +52,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 
 1. ~~**评分管线**~~ ✅ **2026-08-15 完成**：score-model-v1 确定性评分 + 因子分解 + recommendation 决策表；Ethereum 及 11 个 demo 项目全部评分，Ethereum 自动进入 `opportunity_list`。见 `docs/superpowers/specs/2026-08-15-score-pipeline-design.md`
 2. ~~**机会列表纳入真实项目**~~ ✅ **2026-08-15 完成**：Ethereum 评分后由读模型视图自动纳入（第 6 位）
-3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Phase 6A 已建立治理地基（审核决策表、受保护命令、幂等回执、outbox 事件），`listPendingInputs` 毒物防护把失败输入 park 住（每输入至多一次尝试）。**尚未实现**：失败 AI run 的 review API 与审核界面（Phase 6B 范围）。对账 runner 会把不可 ground 的历史 park 成 `needs_review` 决策，这些记录同样等 6B 的界面接手
+3. ~~**失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**~~ ✅ **2026-08-22 本地完成**：在分支 `codex/phase-6b-failed-ai-review`（worktree `.worktrees/phase-6b-failed-ai-review`）完成 Task 1–8（严格契约、追加式审核 schema 与受保护 RPC、bearer-scoped repository、认证 BFF、会话/API client、审核 UI、E2E 授权矩阵、runbook 与安全审查），Task 9 受控生产检查点止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`。本地门禁：Node 22 `pnpm verify` 798 非跳过全绿、disposable focused integration 6/6、full 40/40、pgTAP 1031/1031。**待办**：分支合并回主线；生产应用前置（human reviewer 供给、生产 Auth 服务恢复——当前 503、迁移前备份、显式授权），详见 worktree 手册 §8.5
 4. ~~**采集→抽取→评分的常态化编排**~~ ✅ **2026-08-15 完成（Phase 5）**：worker 进程内 AI 阶段编排循环（抽取 60s / 评分 300s 默认 tick，指数退避，错误隔离，opt-in 环境变量）。采集队列未动；人工 Promotion 门禁按产品设计保留。见 `docs/superpowers/specs/2026-08-15-orchestration-design.md`
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
