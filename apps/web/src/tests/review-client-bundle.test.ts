@@ -19,11 +19,13 @@ const repositoryRoot = join(webRoot, '../..');
 const nextBin = join(webRoot, 'node_modules/next/dist/bin/next');
 const publicUrlMarker = 'https://public-review-bundle-marker.example.test';
 const publicAnonMarker = 'public-review-anon-bundle-marker';
+const sessionRuntimeMarker = 'sign_in_failed';
+const apiRuntimeMarker = 'review_version_conflict';
 const forbiddenServiceMarker = 'forbidden-service-role-bundle-marker';
 const forbiddenDatabaseMarker = 'postgresql://forbidden-database-bundle-marker';
 
 describe('review browser client production bundle', () => {
-  it('builds only public Supabase values and preserves a pre-existing sibling', () => {
+  it('bundles the review runtime with only public Supabase values and preserves a sibling', () => {
     const parent = mkdtempSync(join(tmpdir(), 'airdrop-review-client-bundle-'));
     const fixtureRoot = join(parent, 'owned-next-project');
     const sentinel = join(parent, 'pre-existing-sibling.txt');
@@ -58,6 +60,10 @@ describe('review browser client production bundle', () => {
       expect(build?.status, `${build?.stdout ?? ''}\n${build?.stderr ?? ''}`).toBe(0);
       expect(bundle?.includes(publicUrlMarker)).toBe(true);
       expect(bundle?.includes(publicAnonMarker)).toBe(true);
+      expect({
+        sessionRuntime: bundle?.includes(sessionRuntimeMarker),
+        apiRuntime: bundle?.includes(apiRuntimeMarker),
+      }).toEqual({ sessionRuntime: true, apiRuntime: true });
       expect(bundle?.includes(forbiddenServiceMarker)).toBe(false);
       expect(bundle?.includes(forbiddenDatabaseMarker)).toBe(false);
       expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL/);
@@ -79,10 +85,21 @@ function createFixture(fixtureRoot: string): void {
   for (const packageName of ['next', 'react', 'react-dom', 'zod']) {
     symlinkSync(join(webRoot, 'node_modules', packageName), join(nodeModules, packageName), 'dir');
   }
+  mkdirSync(join(nodeModules, '@airdrop'));
+  symlinkSync(
+    join(webRoot, 'node_modules/@airdrop/contracts'),
+    join(nodeModules, '@airdrop/contracts'),
+    'dir',
+  );
   symlinkSync(join(repositoryRoot, 'node_modules/typescript'), join(nodeModules, 'typescript'), 'dir');
   symlinkSync(join(webRoot, 'node_modules/@types'), join(nodeModules, '@types'), 'dir');
 
-  for (const file of ['env.ts', 'review-session.ts', 'supabase-browser.ts']) {
+  for (const file of [
+    'env.ts',
+    'review-api-client.ts',
+    'review-session.ts',
+    'supabase-browser.ts',
+  ]) {
     copyFileSync(join(webRoot, 'src/lib', file), join(lib, file));
   }
 
@@ -91,6 +108,7 @@ import type { NextConfig } from 'next';
 import { join } from 'node:path';
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@airdrop/contracts'],
   webpack(config) {
     config.resolve.extensionAlias = { '.js': ['.ts', '.tsx', '.js'] };
     config.resolve.alias['@airdrop/database'] = join(process.cwd(), 'src/stubs/database.ts');
@@ -105,7 +123,9 @@ export function createBrowserSupabaseClient(input: { url: string; anonKey: strin
   return {
     auth: {
       async signInWithPassword() { return { data: { session: null }, error: null }; },
-      async getSession() { return { data: { session: null }, error: null }; },
+      async getSession() {
+        return { data: { session: { access_token: 'fixture-access-token' } }, error: null };
+      },
       async signOut() { return { error: null }; },
     },
     input,
@@ -157,11 +177,41 @@ export default function Page() {
 'use client';
 
 import { useEffect } from 'react';
-import { createReviewBrowserSupabaseClient } from '../lib/supabase-browser';
+import { createReviewApiClient } from '../lib/review-api-client';
+import { createReviewSessionController } from '../lib/review-session';
+import {
+  createReviewBrowserAuthPort,
+  createReviewBrowserSupabaseClient,
+} from '../lib/supabase-browser';
 
 export function ReviewClientBundleSmoke() {
   useEffect(() => {
-    createReviewBrowserSupabaseClient();
+    const browserClient = createReviewBrowserSupabaseClient();
+    const session = createReviewSessionController(createReviewBrowserAuthPort(browserClient.auth));
+    const api = createReviewApiClient({
+      session,
+      fetch: async () => Response.json({
+        ok: false,
+        error: {
+          code: 'review_idempotency_conflict',
+          message: 'Fixture conflict.',
+          requestId: 'a1000000-0000-4000-8000-000000000001',
+          details: null,
+        },
+      }, { status: 409 }),
+      ids: { generate: () => 'fixture-idempotency-key' },
+    });
+
+    void session.signIn('reviewer@example.test', 'fixture-password').then((result) => {
+      document.body.dataset.sessionResult = result.ok ? 'ok' : result.code;
+    });
+    void api.get('a2000000-0000-4000-8000-000000000001').then((result) => {
+      document.body.dataset.apiResult = result.ok
+        ? 'ok'
+        : result.state === 'conflict'
+          ? result.code
+          : result.state;
+    });
   }, []);
   return null;
 }
