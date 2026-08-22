@@ -4,7 +4,7 @@
 > 最近更新：2026-08-22（Phase 6B Task 3 状态为 `DONE`；bearer-scoped repository、确定性 generated types、真实 Auth/普通用户拒绝与双独立客户端并发门禁均已在 disposable 测试栈闭环；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–3 已完成；当前分支 `pnpm verify` 683 测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–3 已完成；当前分支 `pnpm verify` 687 测试全绿，disposable pgTAP 1031/1031、repository integration 37/37；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 未访问或修改生产库。
 
 > **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts、Task 2 数据库边界、Task 3 repository/generated types 均已通过；Task 3 在 `airdrop-intelligence-governance-test` 完成真实 Auth 与双独立客户端并发 3/3、全 repository integration 37/37，生产未访问。
 
@@ -38,9 +38,9 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6A 生产落地**（2026-08-22） | 三迁移原子应用并登记；生产治理登录/审核人就绪；12 组 demo Evidence 已补齐；7 个历史 promoted candidates 全部 deterministic-ground 成功并 linked；对账重跑为 0；匿名机会读模型 12 行，Ethereum 6 条真实 signals 恢复；页面验证通过 | 逐步运行证据见 §8.2 |
 | **Phase 6B Task 1 contracts**（2026-08-22） | `packages/contracts/src/review/failed-ai-run.ts` 提供严格失败运行状态、查询、无原始错误的安全投影、审核历史、命令/回执 schemas 与 inferred types；决策 reason compatibility、版本边界、备注长度/空白、base64url cursor 均有测试；`packages/contracts/src/index.ts` 已公开导出 | `docs/tasks/failed-ai-run-review-workbook.md` Task 1 execution log；focused contracts 6 files / 77 tests passed，lint/typecheck passed |
 | **Phase 6B Task 2 数据库边界（DONE）**（2026-08-22） | migration 保持不变；fix round 1 为普通 active `user` 拒绝、detail 精确/敏感键投影、command 精确结果签名、同时间 UUID 游标、101/102 limit 边界和三类非法 expected version 补强 pgTAP | disposable reset 应用 20 migrations exit 0；updated 011 Files=1 / Tests=87 / PASS；full pgTAP Files=11 / Tests=1031 / PASS；`errorDetail` mutation 命中具名 Failed test 31 并 exit 1，恢复 SHA 后 reset exit 0、focused 87 PASS；生产未访问。 |
-| **Phase 6B Task 3 repository（DONE）**（2026-08-22） | 服务器专用 `@airdrop/database/failed-ai-run-review` 以每请求 bearer 创建非持久 Supabase client；strict parse list/detail/decision，安全生成下一页 cursor，稳定映射 AR101–AR105 并清洗意外错误；browser export fail-closed | generated types 两次 SHA-256 均为 `058c11dac49a44065f7bb9b509c0ac000df67b38f6ab4a925b29676ed479078d`；真实 Auth focused 3/3、全 repository integration 37/37；同 key 得一写一 replay，不同 key/同 version 得一成功一冲突，均只有一组 decision/receipt/outbox。 |
+| **Phase 6B Task 3 repository（DONE）**（2026-08-22） | 服务器专用 `@airdrop/database/failed-ai-run-review` 以每请求 bearer 创建非持久 Supabase client；strict parse list/detail/decision，安全生成下一页 cursor，稳定映射 AR101–AR105 并清洗意外错误；browser export fail-closed | generated types 两次 SHA-256 均为 `058c11dac49a44065f7bb9b509c0ac000df67b38f6ab4a925b29676ed479078d`；真实 Auth focused 3/3、全 repository integration 37/37；两种 race 均逐字段绑定唯一 decision/receipt/outbox 与获胜 result/key，outbox 仅七个安全字段；partial Auth signup cleanup 四分支有单测。 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），683 测试，exit 0。隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；repository integration 37/37，fixture cleanup 只在 marker 校验后的 disposable 数据库内按精确随机 ID 执行。
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），687 测试，exit 0。隔离 Supabase 栈更新后的 011 SHA-256 为 `e9158648ea970d930a1fd9cd240d67d4d6e380b41c00d0c32754563368cda7e1`，focused 87/87、full pgTAP 1031/1031；strengthened repository integration 37/37，fixture cleanup 只在 marker 校验后的 disposable 数据库内按精确随机 ID 执行。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -48,8 +48,8 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 |----|------|------|
 | `collection_schedule_admin_login` 角色 | **不存在** | 早期经 ssh 传 `DO $$` 块静默失败遗留。`apps/web/.env.local` 里的 `AIRDROP_QUEUE_ADMIN_DATABASE_URL` 指向它，**目前不可用**。需要时用平铺语句重建：`create role collection_schedule_admin_login with login password '...' in role collection_schedule_admin;`（注意：`collection_queue_worker_login` 已于 Phase 5 补建，模式可参考 §6.2） |
 | airdrops.io 数据接入方式 | **开发注入，非正式通道** | 采集器 INSERT 策略深度校验「official+verified」，第三方源被正确拒绝（产品设计）。当前用 `dev_fixture_admin`（bypassrls，仅 raw_items/discovered_items 两表 insert/select）+ `seed-nonofficial-feed.ts` 注入真实 feed。**正式的多源接入（含第三方源的审核接收流）尚未设计实现** |
-| Phase 6B integration fixture cleanup | **Task 3 已闭环** | 新 repository fixture 使用随机精确 ID，cleanup 前强制核对 disposable marker，并仅在该测试事务内以 replica 语义移除精确 fixture；生产 `ai_runs` append-only trigger 未改动。Task 7 继续沿用同一隔离原则。 |
-| Failed-run decision concurrency proof | **Task 3 已闭环** | 两个独立 repository/client session 实测：同 reviewer+同 key 仅一写一 replay；同 run+不同 key/同 expected version 仅一成功，另一方 `review_version_conflict`；两种场景都恰好一组 decision/receipt/outbox。 |
+| Phase 6B integration fixture cleanup | **Task 3 已闭环** | 新 repository fixture 使用随机精确 ID，cleanup 前强制核对 disposable marker，并仅在该测试事务内以 replica 语义移除精确 fixture；reviewer-only、ordinary-only、both、neither 四种 Auth setup 状态均会独立清理已创建用户；生产 `ai_runs` append-only trigger 未改动。Task 7 继续沿用同一隔离原则。 |
+| Failed-run decision concurrency proof | **Task 3 已闭环** | 两个独立 repository/client session 实测：同 reviewer+同 key 仅一写一 replay；同 run+不同 key/同 expected version 仅一成功，另一方 `review_version_conflict`。两种场景逐字段绑定唯一 decision/receipt/outbox、获胜 command/decision IDs 与 idempotency key；outbox payload 精确七个安全字段。 |
 | worktree 清理 | **待清理（确认后执行，见 §8.3）** | `.worktrees/phase-2-source-collection`（提交已在主线历史）与 `.worktrees/phase-6a-canonical-governance`（分支已于 2026-08-21 合并回主线）均可清理：`git worktree remove <path>` + `git branch -d <branch>`。⚠️ phase-6a worktree 里若有未跟踪的个人文件，先自查再删 |
 
 ### ❌ 未开始（按建议优先级）
@@ -217,7 +217,7 @@ ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200 \
 pnpm dev                # web + worker 并行开发（web 在 localhost:3000）
                         # ⭐ 若 .env.local 同时含 AIRDROP_AI_STAGE_DATABASE_URL 与
                         #    AI_MODEL_API_KEY，worker 自动运行抽取/评分编排循环
-pnpm verify             # lint + typecheck + test(683) + build + placeholders
+pnpm verify             # lint + typecheck + test(687) + build + placeholders
 env -u NODE_OPTIONS pnpm verify   # ⚠️ 必须这样跑（见 §6 坑 1）
 
 # 手动评分（一次性，幂等：input_version 哈希）
@@ -317,14 +317,14 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 8. 当前状态与下一阶段关键操作
 
-> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后 `env -u NODE_OPTIONS pnpm verify` 确认 683 测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
+> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后 `env -u NODE_OPTIONS pnpm verify` 确认 687 测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
 
 ### 8.1 当前状态快照（2026-08-22 本轮复核）
 
 | 维度 | 状态 |
 |------|------|
 | 代码 | Phase 0–6A 已在主线；Phase 6B 当前开发分支已完成 Task 1 contracts、Task 2 数据库边界与 Task 3 bearer-scoped repository/generated types；仓库**无 remote**，纯本地 |
-| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 683 全绿，exit 0；lint/typecheck/build/placeholder 全部通过。更新后的 011 focused 87/87、full pgTAP 1031/1031；repository focused integration 3/3、全套 37/37；双独立客户端 concurrency 与 disposable-only exact cleanup 已闭环。 |
+| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 687 全绿，exit 0；lint/typecheck/build/placeholder 全部通过。更新后的 011 focused 87/87、full pgTAP 1031/1031；strengthened repository focused integration 3/3、全套 37/37；双独立客户端 exact side-effect linkage 与 partial Auth disposable-only cleanup 已闭环。 |
 | 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
 | 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、匹配容器健康；20 migrations reset exit 0，updated focused 87/87、full 1031/1031；`errorDetail` mutation exit 1 命中 Failed test 31，恢复 migration SHA 后 reset exit 0、focused 87/87。**只允许对它 reset**；生产未访问。 |
 | 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
