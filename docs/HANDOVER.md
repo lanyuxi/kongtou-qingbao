@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B Task 2 数据库边界已实现但数据库执行权限被拒，状态为 `DONE_WITH_CONCERNS`；真实 RED/GREEN、敏感性变异和全库 pgTAP 尚未运行；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-22（Phase 6B Task 2 数据库边界状态为 `DONE`；真实 RED、focused 80/80、三项敏感性变异和全库 pgTAP 1024/1024 均已在 disposable 测试栈闭环；Phase 6A 生产证据见 §8.2）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复；Phase 6B Task 2 的第 20 个 forward migration 仅在开发分支实现，尚未应用到任何数据库。
+> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），Phase 6B Task 1–2 已完成；当前分支 `pnpm verify` 663 测试全绿；**生产库仍只应用 Phase 6A 的 19 个迁移并完成 Evidence 补证/对账**，第 20 个 forward migration 仅在 disposable 测试栈验证，未访问或修改生产库。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts 已通过；Task 2 已新增追加式审核 schema、受保护读取 RPC 和事务性 decision command，但远端测试源码同步/执行被权限审查拒绝，数据库 acceptance 仍是进入 Task 3 真实集成前的硬门槛。
+> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B Task 1 contracts 与 Task 2 数据库边界均已通过；Task 2 在 `airdrop-intelligence-governance-test` 完成真实 RED、focused 80/80、三项敏感性变异、恢复后 80/80 和全库 11 文件 / 1024 测试。
 
 ---
 
@@ -37,9 +37,9 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6A 正式情报治理**（2026-08-21 完成，分支 `codex/phase-6a-canonical-governance`） | 把 Evidence、人工审核、Promotion、审计、事务性 outbox 从 CLI 约定升级为**可执行的数据库边界**：`evidence` / `signal_evidence_links` / `candidate_review_decisions` / `promotion_commands` / `outbox_events` 五表 + 专用 `promotion_service` NOLOGIN 角色 + 受保护幂等命令 `execute_extraction_candidate_review`（审核人在册、期望版本、确定性 grounding、单事务原子写入）与 `reconcile_extraction_candidate_evidence`（历史对账）；撤销 `ai_stage_worker` 直接 INSERT signals 与旧 promote 函数执行权；公开 signal/score 读模型与评分输入全部改为 **Evidence 门禁**（无证据历史保留但隐藏，不删除）；`review-candidate.ts` 治理审核 CLI（approve/reject/needs-review，读 `AIRDROP_PROMOTION_DATABASE_URL` + `AIRDROP_PROMOTION_REVIEWER_USER_ID`）替代旧 promote-candidate（已 fail-closed）；`reconcile-historical-evidence.ts` 有界幂等对账 runner（批次 1-100、UUID 游标、确定性幂等键）；seed/demo fixtures 全部补显式虚构 Evidence；契约与纯函数 grounding 规则（Unicode 空白归一化 + 精确包含 + SHA-256）跨 TS/PG 一致（码点级长度、代理对拒绝）。详见 `docs/superpowers/specs/2026-08-20-canonical-intelligence-governance-design.md` | `a9f1490`…`768df85` + `b67e7a3`（共 19 提交，分支 `codex/phase-6a-canonical-governance`）；2026-08-21 fast-forward 合并回主线，合并后主线 verify 全绿 |
 | **Phase 6A 生产落地**（2026-08-22） | 三迁移原子应用并登记；生产治理登录/审核人就绪；12 组 demo Evidence 已补齐；7 个历史 promoted candidates 全部 deterministic-ground 成功并 linked；对账重跑为 0；匿名机会读模型 12 行，Ethereum 6 条真实 signals 恢复；页面验证通过 | 逐步运行证据见 §8.2 |
 | **Phase 6B Task 1 contracts**（2026-08-22） | `packages/contracts/src/review/failed-ai-run.ts` 提供严格失败运行状态、查询、无原始错误的安全投影、审核历史、命令/回执 schemas 与 inferred types；决策 reason compatibility、版本边界、备注长度/空白、base64url cursor 均有测试；`packages/contracts/src/index.ts` 已公开导出 | `docs/tasks/failed-ai-run-review-workbook.md` Task 1 execution log；focused contracts 6 files / 77 tests passed，lint/typecheck passed |
-| **Phase 6B Task 2 数据库边界（DONE_WITH_CONCERNS）**（2026-08-22） | 新增唯一 forward migration：`ai_run_review_decisions` / `ai_run_review_commands` 追加式历史表、reviewer-only 安全 list/detail RPC、`auth.uid()` 绑定且带版本/幂等并发控制的 decision RPC、同事务 outbox 事件；新增 pgTAP 覆盖权限、投影、冲突、回放、回滚和追加性 | disposable 拓扑项目名、64322 端口与健康容器已只读确认；执行器拒绝远端测试传输/执行，因此 focused RED/GREEN、3 项敏感性变异与全库 pgTAP 未运行。详见 `docs/tasks/failed-ai-run-review-workbook.md` Task 2 log。 |
+| **Phase 6B Task 2 数据库边界（DONE）**（2026-08-22） | 新增唯一 forward migration：`ai_run_review_decisions` / `ai_run_review_commands` 追加式历史表、reviewer-only 安全 list/detail RPC、`auth.uid()` 绑定且带版本/幂等并发控制的 decision RPC、同事务 outbox 事件；新增 pgTAP 覆盖权限、投影、冲突、回放、回滚和追加性 | disposable 项目 `airdrop-intelligence-governance-test`（API 64321 / DB 64322，容器健康）完成真实 RED、编译修正 `ede1971`、focused 80/80、三项敏感性变异、恢复后 80/80，以及全库 11 文件 / 1024 测试 PASS；生产未访问。详见 Task 2 workbook/report。 |
 
-当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders，Node 22 验证）。测试通过 650（contracts 65 / domain 222 / database 134 / web 17 / worker 212）；隔离 Supabase 栈（远程 ECS `airdrop-intelligence-governance-test`，db 端口 64322，本地隧道 16432/16433）全量 pgTAP 10 文件 **944/944**，全量序列化集成 6 文件 **34/34 零跳过**（含 promotion 12 项真实治理边界用例）。
+当前测试基线：**`pnpm verify` 全绿**（lint / typecheck / test / build / placeholders）。测试通过 663，exit 0；本轮使用 Node 24，保留与仓库要求 Node 22 不一致的 engine warning。隔离 Supabase 栈（`airdrop-intelligence-governance-test`，API 64321 / DB 64322）全量 pgTAP 11 文件 **1024/1024**；Phase 6A 的序列化集成历史基线为 6 文件 **34/34 零跳过**，但 Task 2 append-only trigger 合入后尚未重跑，fixture cleanup 适配见下方缺口。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -47,13 +47,14 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 |----|------|------|
 | `collection_schedule_admin_login` 角色 | **不存在** | 早期经 ssh 传 `DO $$` 块静默失败遗留。`apps/web/.env.local` 里的 `AIRDROP_QUEUE_ADMIN_DATABASE_URL` 指向它，**目前不可用**。需要时用平铺语句重建：`create role collection_schedule_admin_login with login password '...' in role collection_schedule_admin;`（注意：`collection_queue_worker_login` 已于 Phase 5 补建，模式可参考 §6.2） |
 | airdrops.io 数据接入方式 | **开发注入，非正式通道** | 采集器 INSERT 策略深度校验「official+verified」，第三方源被正确拒绝（产品设计）。当前用 `dev_fixture_admin`（bypassrls，仅 raw_items/discovered_items 两表 insert/select）+ `seed-nonofficial-feed.ts` 注入真实 feed。**正式的多源接入（含第三方源的审核接收流）尚未设计实现** |
+| Phase 6B integration fixture cleanup | **Task 3/7 后续** | Task 2 新增的 `ai_runs` append-only trigger 会拒绝既有 integration fixture 的 DELETE cleanup。后续 repository/E2E 集成必须改用事务 rollback 或 disposable reset；不得弱化 trigger。 |
 | worktree 清理 | **待清理（确认后执行，见 §8.3）** | `.worktrees/phase-2-source-collection`（提交已在主线历史）与 `.worktrees/phase-6a-canonical-governance`（分支已于 2026-08-21 合并回主线）均可清理：`git worktree remove <path>` + `git branch -d <branch>`。⚠️ phase-6a worktree 里若有未跟踪的个人文件，先自查再删 |
 
 ### ❌ 未开始（按建议优先级）
 
 1. ~~**评分管线**~~ ✅ **2026-08-15 完成**：score-model-v1 确定性评分 + 因子分解 + recommendation 决策表；Ethereum 及 11 个 demo 项目全部评分，Ethereum 自动进入 `opportunity_list`。见 `docs/superpowers/specs/2026-08-15-score-pipeline-design.md`
 2. ~~**机会列表纳入真实项目**~~ ✅ **2026-08-15 完成**：Ethereum 评分后由读模型视图自动纳入（第 6 位）
-3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Phase 6A 已建立治理地基（审核决策表、受保护命令、幂等回执、outbox 事件），`listPendingInputs` 毒物防护把失败输入 park 住（每输入至多一次尝试）。**尚未实现**：失败 AI run 的 review API 与审核界面（Phase 6B 范围）。对账 runner 会把不可 ground 的历史 park 成 `needs_review` 决策，这些记录同样等 6B 的界面接手
+3. **失败 AI run 的交互式 review / dead-letter 界面（Phase 6B）**：Task 1 contracts 与 Task 2 数据库边界已完成；`listPendingInputs` 毒物防护把失败输入 park 住（每输入至多一次尝试）。**尚未实现**：Task 3–7 的 repository、API、审核界面和端到端集成；其中 integration fixture cleanup 必须适配新的 `ai_runs` append-only trigger
 4. ~~**采集→抽取→评分的常态化编排**~~ ✅ **2026-08-15 完成（Phase 5）**：worker 进程内 AI 阶段编排循环（抽取 60s / 评分 300s 默认 tick，指数退避，错误隔离，opt-in 环境变量）。采集队列未动；人工 Promotion 门禁按产品设计保留。见 `docs/superpowers/specs/2026-08-15-orchestration-design.md`
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
@@ -72,7 +73,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 - **产品/UI 产出**：`apps/web` 已有 Overview、Opportunities、Project Detail 三个公开页面，另有 health 与采集调度管理 API；页面只消费数据库读模型，不承载采集、AI、评分等重任务。
 - **后台能力产出**：`apps/worker` 已覆盖官方源采集、durable queue、AI 抽取、人工治理审核、历史 Evidence 对账、确定性评分和常态化抽取/评分编排。
 - **共享边界产出**：`packages/contracts` 提供严格契约（含 Phase 6B failed AI run review）；`packages/domain` 提供网络/内容安全、队列策略、Evidence grounding、评分与退避纯规则；`packages/database` 提供浏览器隔离的 repository、事务与 server-only 入口。
-- **数据库产出**：19 个 forward-only 迁移、10 个 pgTAP 文件、2 个 fixture 与本地 seed；Phase 6A 的 3 个迁移文件已存在，并与治理契约、repository、CLI、测试和生成类型一一对应。
+- **数据库产出**：20 个 forward-only 迁移、11 个 pgTAP 文件、2 个 fixture 与本地 seed；生产仍为已应用 19 个迁移，第 20 个 Phase 6B migration 仅在 disposable 测试栈完成验收。
 - **文档产出**：除本手册外共有 README、2 份架构说明、1 份本地运行手册、9 份阶段设计/计划和 4 份任务工作簿。`docs/superpowers/plans/` 内的复选框是历史执行模板，未逐项回填，**不得据其未勾选状态判断阶段未完成**；完成状态与 RED/GREEN 证据以 `docs/tasks/*workbook.md`、Git 提交和当前验证命令为准。
 - **未发现新的未完成标记**：排除历史计划文本与本手册说明后，源码、迁移和测试中未发现常见的待办、修复或待定型开发占位。
 
@@ -103,8 +104,8 @@ packages/
   database/                 # repository、迁移产物、outbox；src/generated/ 为生成类型
     src/promotion/          #   ⭐ Phase 6A 治理仓库（server-only 导出，browser 入口 fail-closed）
 supabase/
-  migrations/               # 19 个 forward-only 迁移（勿改已应用者；
-                           #   生产库已于 2026-08-22 应用全部 19 个，见 §8.2）
+  migrations/               # 20 个 forward-only 迁移（勿改已应用者；
+                           #   生产库应用前 19 个，第 20 个仅 disposable 验证）
   fixtures/                 #   demo-projects.sql（12 个虚构中文项目 + 显式虚构 Evidence，幂等可重放）
                            #   real-sources.sql（Ethereum + EF 博客 + airdrops.io）
 scripts/                    # check-placeholders、verify-env
@@ -214,7 +215,7 @@ ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200 \
 pnpm dev                # web + worker 并行开发（web 在 localhost:3000）
                         # ⭐ 若 .env.local 同时含 AIRDROP_AI_STAGE_DATABASE_URL 与
                         #    AI_MODEL_API_KEY，worker 自动运行抽取/评分编排循环
-pnpm verify             # lint + typecheck + test(650) + build + placeholders
+pnpm verify             # lint + typecheck + test(663) + build + placeholders
 env -u NODE_OPTIONS pnpm verify   # ⚠️ 必须这样跑（见 §6 坑 1）
 
 # 手动评分（一次性，幂等：input_version 哈希）
@@ -314,16 +315,16 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ## 8. 当前状态与下一阶段关键操作
 
-> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后 `env -u NODE_OPTIONS pnpm verify` 确认 650 测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
+> 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后 `env -u NODE_OPTIONS pnpm verify` 确认 663 测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
 
 ### 8.1 当前状态快照（2026-08-22 本轮复核）
 
 | 维度 | 状态 |
 |------|------|
-| 代码 | Phase 0–6A 全部合并在主线 `codex/phase-0-1-foundation`；本轮 HEAD `a2ff8f1`；仓库**无 remote**，纯本地 |
-| 测试 | 本轮 `pnpm verify` 650 全绿（contracts 65 / domain 222 / database 134 / web 17 / worker 212），lint/typecheck/build/placeholder 全部通过；本轮 bundled runtime 为 Node 24.19，出现预期 engine 警告。Phase 6A workbook 另有 Node 22 全绿及隔离栈 pgTAP 944/944、集成 34/34 零跳过证据，本轮未重跑破坏性的隔离库 reset/DB 套件 |
+| 代码 | Phase 0–6A 已在主线；Phase 6B 当前开发分支已完成 Task 1 contracts 与 Task 2 数据库边界（实现 `27c4c4b`，SQL/pgTAP 修正 `ede1971`）；仓库**无 remote**，纯本地 |
+| 测试 | 本轮 `pnpm verify` 663 全绿，exit 0；lint/typecheck/build/placeholder 全部通过；bundled runtime 为 Node 24，保留 engine warning。Task 2 disposable 栈 focused 011 为 80/80，全库 pgTAP 11 文件 / 1024 测试 PASS。Phase 6A 集成历史基线为 34/34；Task 2 trigger 合入后待 Task 3/7 调整 fixture cleanup 再重跑。 |
 | 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
-| 隔离测试栈 `airdrop-intelligence-governance-test` | 沿用 2026-08-21 交接记录：db 64322 / Kong 64321、19 个迁移已全量验证，长期保留用于 pgTAP/集成测试（**只允许对它 reset**）；本轮未执行 reset 或重跑数据库套件 |
+| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、匹配容器健康；20 个迁移 reset 成功，Task 2 focused 80/80、全库 pgTAP 1024/1024；三项敏感性变异均按预期转 RED 后恢复。**只允许对它 reset**；生产未访问。 |
 | 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）
@@ -415,7 +416,7 @@ git branch -d codex/phase-6a-canonical-governance
 
 ### 8.4 下一阶段开发方向（Phase 6B 起，按建议优先级）
 
-1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1 contracts 已完成；治理地基（决策表/受保护命令/幂等回执/outbox）已在 6A 就绪，下一步是 Task 2 数据库边界；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策都在等这个界面
+1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——Task 1 contracts 与 Task 2 数据库边界已完成；下一步是 Task 3 repository/generated types，并在 Task 3/7 把既有 `ai_runs` integration fixture cleanup 改为 rollback 或 disposable-reset 语义；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策都在等后续 API/UI 接手
 2. **详情页 score_factors / Evidence 引用展示 + anon 读策略**——把 Phase 4 因子数据变成用户可见；注意展示需符合「Raw quote 不自动公开」的约束（经审核的公共读模型才能带引用文本）
 3. **教程生成 tutorials**——价值链「执行」环；其前置（安全 incidents / 白名单链接）尚未开始，需先排期
 4. 其余按 §2「未开始」清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）
