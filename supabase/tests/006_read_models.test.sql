@@ -51,6 +51,8 @@ select results_eq(
       ('discovered_items'::text, 'discovered_items_insert_collection_worker'::text),
       ('discovered_items'::text, 'discovered_items_select_ai_stage_worker'::text),
       ('discovered_items'::text, 'discovered_items_select_collection_worker'::text),
+      ('evidence'::text, 'evidence_select_anon'::text),
+      ('evidence'::text, 'evidence_select_authenticated'::text),
       ('extraction_candidates'::text, 'extraction_candidates_ai_stage_worker_insert'::text),
       ('extraction_candidates'::text, 'extraction_candidates_ai_stage_worker_read'::text),
       ('profiles'::text, 'profiles_select_authenticated'::text),
@@ -71,8 +73,14 @@ select results_eq(
       ('raw_items'::text, 'raw_items_select_collection_worker'::text),
       ('score_factors'::text, 'score_factors_ai_stage_worker_insert'::text),
       ('score_factors'::text, 'score_factors_ai_stage_worker_read'::text),
+      ('score_factors'::text, 'score_factors_select_anon'::text),
+      ('score_factors'::text, 'score_factors_select_authenticated'::text),
       ('score_signal_links'::text, 'score_signal_links_ai_stage_worker_insert'::text),
       ('score_signal_links'::text, 'score_signal_links_ai_stage_worker_read'::text),
+      ('score_signal_links'::text, 'score_signal_links_select_anon'::text),
+      ('score_signal_links'::text, 'score_signal_links_select_authenticated'::text),
+      ('signal_evidence_links'::text, 'signal_evidence_links_select_anon'::text),
+      ('signal_evidence_links'::text, 'signal_evidence_links_select_authenticated'::text),
       ('signals'::text, 'signals_ai_stage_worker_read'::text),
       ('signals'::text, 'signals_select_anon'::text),
       ('signals'::text, 'signals_select_authenticated'::text),
@@ -202,7 +210,8 @@ select columns_are(
     'official_website_url',
     'score_model_version',
     'score_input_version',
-    'score_explanation'
+    'score_explanation',
+    'project_score_id'
   ],
   'project_current_state has the exact project-detail state columns'
 );

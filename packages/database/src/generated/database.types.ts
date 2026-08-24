@@ -253,11 +253,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "candidate_review_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
             foreignKeyName: "candidate_review_decisions_reviewer_user_id_fkey"
             columns: ["reviewer_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_review_decisions_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
           },
           {
             foreignKeyName: "candidate_review_decisions_signal_id_fkey"
@@ -384,6 +398,13 @@ export type Database = {
             foreignKeyName: "collection_attempts_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -499,6 +520,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
           },
           {
             foreignKeyName: "discovered_items_source_id_fkey"
@@ -736,6 +764,13 @@ export type Database = {
             foreignKeyName: "evidence_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "evidence_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -837,8 +872,22 @@ export type Database = {
             foreignKeyName: "extraction_candidates_signal_fkey"
             columns: ["signal_id"]
             isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
             referencedRelation: "signals"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
           },
           {
             foreignKeyName: "extraction_candidates_source_fkey"
@@ -1039,6 +1088,13 @@ export type Database = {
             foreignKeyName: "project_sources_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "project_sources_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -1156,11 +1212,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "promotion_commands_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
             foreignKeyName: "promotion_commands_reviewer_user_id_fkey"
             columns: ["reviewer_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_commands_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
           },
           {
             foreignKeyName: "promotion_commands_signal_id_fkey"
@@ -1220,6 +1290,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_events_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
           },
           {
             foreignKeyName: "promotion_events_signal_fkey"
@@ -1309,6 +1386,13 @@ export type Database = {
             foreignKeyName: "raw_items_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "raw_items_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -1350,6 +1434,13 @@ export type Database = {
             foreignKeyName: "score_factors_project_score_fkey"
             columns: ["project_score_id"]
             isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_score_id"]
+          },
+          {
+            foreignKeyName: "score_factors_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
             referencedRelation: "project_scores"
             referencedColumns: ["id"]
           },
@@ -1376,8 +1467,22 @@ export type Database = {
             foreignKeyName: "score_signal_links_project_score_fkey"
             columns: ["project_score_id"]
             isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_score_id"]
+          },
+          {
+            foreignKeyName: "score_signal_links_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
             referencedRelation: "project_scores"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_signal_links_signal_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
           },
           {
             foreignKeyName: "score_signal_links_signal_fkey"
@@ -1411,6 +1516,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "evidence"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signal_evidence_links_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "signal_evidence_links_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["signal_id"]
           },
           {
             foreignKeyName: "signal_evidence_links_signal_id_fkey"
@@ -1970,6 +2089,112 @@ export type Database = {
         }
         Relationships: []
       }
+      project_current_score_evidence_citations: {
+        Row: {
+          citation_text: string | null
+          evidence_id: string | null
+          evidence_source_field: string | null
+          evidence_verified_at: string | null
+          project_id: string | null
+          project_score_id: string | null
+          signal_id: string | null
+          signal_published_at: string | null
+          signal_title: string | null
+          signal_verification:
+            | Database["public"]["Enums"]["signal_verification"]
+            | null
+          source_id: string | null
+          source_is_official: boolean | null
+          source_name: string | null
+          source_relation_verified_at: string | null
+          source_type: Database["public"]["Enums"]["source_type"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_signal_links_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_score_id"]
+          },
+          {
+            foreignKeyName: "score_signal_links_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_scores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_current_score_factors: {
+        Row: {
+          axis: string | null
+          contribution: number | null
+          detail: string | null
+          factor_code: string | null
+          input_value: number | null
+          project_id: string | null
+          project_score_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "score_factors_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_score_id"]
+          },
+          {
+            foreignKeyName: "score_factors_project_score_fkey"
+            columns: ["project_score_id"]
+            isOneToOne: false
+            referencedRelation: "project_scores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_current_state: {
         Row: {
           latest_published_signal_at: string | null
@@ -1979,6 +2204,7 @@ export type Database = {
           opportunity_score: number | null
           primary_chain: string | null
           project_id: string | null
+          project_score_id: string | null
           project_updated_at: string | null
           project_version: number | null
           recommendation: Database["public"]["Enums"]["recommendation"] | null
@@ -2094,6 +2320,18 @@ export type Database = {
         Returns: {
           completed_job_id: string
         }[]
+      }
+      current_project_score_is_public: {
+        Args: { p_project_score_id: string }
+        Returns: boolean
+      }
+      current_score_citation_path_is_public: {
+        Args: {
+          p_evidence_id: string
+          p_project_score_id: string
+          p_signal_id: string
+        }
+        Returns: boolean
       }
       dead_letter_collection_job: {
         Args: {
