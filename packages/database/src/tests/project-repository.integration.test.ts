@@ -170,7 +170,22 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
     if (database === null) {
       return;
     }
-    await database.end({ timeout: 5 });
+    try {
+      await database.begin(async (transaction) => {
+        await assertDisposableDatabase(transaction);
+        await transaction`
+          delete from public.project_sources
+          where source_id = ${fixtureSourceId}::uuid
+            and project_id in (
+              ${fixtureProjectIds[0]}::uuid,
+              ${fixtureProjectIds[1]}::uuid,
+              ${fixtureProjectIds[2]}::uuid
+            )
+        `;
+      });
+    } finally {
+      await database.end({ timeout: 5 });
+    }
   });
 
   it('returns only scored active or rumored fixtures in deterministic order', async () => {

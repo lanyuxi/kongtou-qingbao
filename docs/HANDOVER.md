@@ -548,6 +548,18 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-24 Project score Evidence Task 4（complete local gate）**：最终源码/测试/文档树上 fresh `pnpm verify` exit 0；lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests，46 个 environment-gated skips。Task 4 最终 tracked diff 仅 `project-repository.integration.test.ts`、workbook 与 HANDOVER；production repository/migration/generated types/dependencies 均零改动，sensitivity mutation 不在 diff。完整执行报告见 gitignored SDD ledger `task-4-report.md`；实现代理未自审，交由 controller 做独立复审。
 
+**2026-08-24 Project score Evidence Task 4（independent-review fix diagnosis）**：独立审查对 `97d5f46` 报告 1 Important + 1 Minor。代码复核确认 Important 成立：Task 4 teardown 只关闭连接，两个随机 active `project_sources` 在 focused 结束后仍同时满足 active project + active source + official + verified，durable queue 的全局 reconcile 因而读取跨测试残留；此前未清理状态下 full integration 38/44、其中 5 个 durable-queue 断言因 7 eligible rows 失败，是该隔离缺陷的具名 RED。最小 fix 只在 `afterAll` 内复验 disposable marker 后按 Task 4 随机 source/project IDs 精确删除三条可变 `project_sources`；append-only Evidence、signal/evidence links、score history 均不得逐行删除。workbook Task 4 Commit 已由 subject 更正为精确 `97d5f46`。
+
+**2026-08-24 Project score Evidence Task 4（review-fix ordered GREEN）**：在未执行任何中间 reset 的同一 disposable 状态上，先运行完整 focused `project-repository.integration.test.ts`，1 file / 7 tests、exit 0；紧接着运行 `durable-queue-repository.integration.test.ts`，1 file / 9 tests、exit 0。teardown 的固定 marker 复验和精确 Task 4 relation DELETE 均成功，原先 7 eligible rows 导致的 queue 污染未复现；下一步继续不 reset 地连续运行 full integration 两次，验证重复与文件顺序独立。
+
+**2026-08-24 Project score Evidence Task 4（review-fix full timing investigation）**：仍未 reset 地在上述 focused→queue 后运行首轮 full integration，project/queue 等 6 个文件通过，整体 43/44；唯一失败是未修改的 promotion 具名用例 `denies direct canonical and governance DML after SET ROLE but approves through the protected command` 超过其 5 秒 test timeout。立即仅重放该具名 promotion 用例，1 passed / 11 skipped、exit 0（总测试阶段 12.76s，含 hooks），未改任何无关代码。该证据不指向 Task 4 relation cleanup；继续在同一未 reset 状态上 fresh 重跑 full integration，要求完整 GREEN。
+
+**2026-08-24 Project score Evidence Task 4（review-fix repeated full GREEN）**：同一数据库状态全程无 reset；promotion focused 复现通过后，fresh full integration 7 files / 44 tests、exit 0、105.43s，随后立即连续第二轮 full integration 再次 7 files / 44 tests、exit 0、106.62s。由此同时证明 focused project→durable queue 顺序和 full suite 重复运行均不再依赖外部 reset；Task 4 append-only history 保留，但其唯一会影响 collection eligibility 的三条随机可变 relation 每轮均被精确 teardown。下一步运行 unit/lint/typecheck 和生产零 diff 门禁。
+
+**2026-08-24 Project score Evidence Task 4（review-fix package gates + final cleanup）**：指定 runtime 下 database unit 174 passed / 44 environment-gated skipped，lint 与 typecheck 均 exit 0。随后单个 fail-closed SSH 脚本在 reset 前精确验证 `/root/airdrop-governance-test`、project ID、DB/Kong 容器、64322/64321、固定 paused marker、21 migration files、seed SHA `f1ceaddc...7e55` 与 Task 2 migration SHA `8c0a2e3...ea60`；仅 disposable reset exit 0，reset 后 marker 精确且 `repository-test` score count 0。未逐行删除 append-only history，生产项目与 54321/54322 未访问；下一步仅更新报告、运行 fresh 全仓门禁和生产零 diff 后提交最小 fix。
+
+**2026-08-24 Project score Evidence Task 4（review-fix complete local gate）**：fresh `pnpm verify` exit 0；lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests，46 skips。tracked fix scope 精确为 `project-repository.integration.test.ts`、workbook 与 HANDOVER；production repository、migration、generated types 零 diff。Important 已由 marker-guarded test-owned relation teardown、focused→queue GREEN 和无 reset 连续两轮 full 44/44 闭环，Minor workbook Commit 已更正为 `97d5f46`；现在提交独立最小 fix。
+
 ---
 
 ## 9. 其他

@@ -9,7 +9,7 @@
 | 1 | DONE | Strict public projection contracts | `28c2fef` |
 | 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
 | 3 | DONE | Strict repository reads | `1a5e26e` |
-| 4 | DONE | Anonymous integration coverage | `test(database): cover public score evidence reads` |
+| 4 | DONE | Anonymous integration coverage | `97d5f46` |
 | 5 | READY | Detail loader and safe presentation | — |
 | 6 | READY | Full gate and documentation | — |
 
@@ -135,3 +135,16 @@ execution documentation. It adds no production code, dependency, migration,
 generated-type, score math, recommendation, or browser grant. The only
 production mutation was the required disposable score-ID-filter sensitivity
 check; it was fully restored before GREEN and is absent from the commit.
+
+### Task 4 independent-review fix loop
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Review RED | Independent review of `97d5f46` plus the recorded dirty-state full integration | 1 Important + 1 Minor. The Task 4 `afterAll` closed its connection without disabling its random active/official/verified `project_sources`; durable queue reconciliation then found 7 eligible rows and five named queue tests failed. This is the fixture-isolation RED. |
+| Minimal isolation fix | In `afterAll`, recheck the fixed disposable marker inside a transaction, then delete only the three `project_sources` matching the Task 4 random source ID and random project IDs | Test-only mutable-relation cleanup. It cannot match non-test relations and does not delete append-only Evidence, signal/Evidence links, score links, factors, or score history. Connection close remains in `finally`. |
+| Ordered GREEN without reset | Run focused project integration, then immediately durable-queue integration | No intermediate reset. Project passed 7/7 and durable queue passed 9/9; the prior cross-test eligible-row pollution did not recur. |
+| Full timing investigation | Run full integration in the same state, then focus the sole failure | First run was 43/44: only an unchanged promotion test exceeded its 5-second timeout; project/queue passed. Immediate named promotion replay passed 1/1 (11 skipped), so no unrelated change was made. |
+| Repeated full GREEN without reset | Fresh full integration rerun, immediately followed by a second full integration run | No reset between runs. Both passed 7 files / 44 tests: 105.43s, then 106.62s. The suite is order- and repeat-independent from Task 4 collection eligibility. |
+| Package gates | Required runtime unit command, database lint, and database typecheck | Unit 174 passed / 44 environment-gated skipped; lint and typecheck both exit 0. |
+| Final append-only cleanup | One fail-closed SSH command verifies exact disposable workdir/project/containers/64322/64321/marker, 21 files, and both artifact SHAs before reset; recheck marker and repository-test score count afterward | Exit 0. Only `airdrop-intelligence-governance-test` was reset; marker exact and repository-test score count 0. Production and 54321/54322 were untouched. |
+| Final repository gate | Fresh required-runtime `pnpm verify`, followed by tracked/production diff checks | Exit 0: lint/typecheck/build/placeholders green; contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests, 46 skips. Production repositories, migrations, and generated types have zero diff; tracked fix scope is one integration test plus workbook/HANDOVER. |
