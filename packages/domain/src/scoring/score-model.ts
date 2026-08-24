@@ -1,5 +1,6 @@
 import type {
   Recommendation,
+  ScoringAxis as ScoringAxisContract,
   ScoringProvenance as ScoringProvenanceContract,
   SignalVerification,
 } from '@airdrop/contracts';
@@ -50,7 +51,7 @@ export const scoringThresholds = {
 } as const;
 
 export type ScoringProvenance = ScoringProvenanceContract;
-export type ScoringAxis = 'opportunity' | 'risk' | 'confidence';
+export type ScoringAxis = ScoringAxisContract;
 
 export interface ScoringSignalInput {
   readonly signalId: string;

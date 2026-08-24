@@ -56,6 +56,16 @@ export type {
   TaskStatus,
 } from './enums.js';
 export {
+  publicProjectEvidenceCitationRowSchema,
+  publicProjectScoreFactorRowSchema,
+  scoringAxisSchema,
+} from './read-models/project-score-evidence.js';
+export type {
+  PublicProjectEvidenceCitationRow,
+  PublicProjectScoreFactorRow,
+  ScoringAxis,
+} from './read-models/project-score-evidence.js';
+export {
   claimedCollectionJobSchema,
   collectionJobTriggerSchema,
   durableJobEventTypeSchema,

@@ -492,6 +492,10 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-24 产品确认、规范与计划**：项目所有者已确认采用“经 Promotion 审核的 10–500 字原文摘录 + 安全来源元数据 + `verified_at`，首版不提供外链”的推荐方案，并已审核通过 `docs/superpowers/specs/2026-08-24-project-score-evidence-detail-design.md`。详细实施计划已写入 `docs/superpowers/plans/2026-08-24-project-score-evidence-detail.md`，拆为 contracts、数据库读边界、repository、真实匿名集成、Web 展示、全门禁六个 RED → GREEN 任务；下一步是在隔离 worktree 中按所选执行方式实施。
 
+**2026-08-24 执行基线**：已按用户选择启用 subagent-driven execution，在 `.worktrees/project-score-evidence-detail` / `codex/project-score-evidence-detail` 建立隔离环境；Node 22.22.2 / pnpm 11.16.0 基线 `pnpm verify` exit 0（798 non-skipped，42 skipped，lint/typecheck/build/placeholders 全绿）。受限网络无法访问 registry，依赖经明确授权从既有 pnpm v11 用户缓存离线重链接，lockfile 与依赖版本未变化。Task 1 当时尚未开始。
+
+**2026-08-24 Project score Evidence Task 1（contracts）**：已完成严格 public projection contracts：新增 `scoringAxisSchema` / `ScoringAxis`、`PublicProjectScoreFactorRow`、`PublicProjectEvidenceCitationRow` 及严格 snake_case row schemas；复用 source/signal 枚举，拒绝额外或不安全字段，并要求登记为官方的来源具备 relation verification time。domain scoring model 现在重导出 contracts 的 `ScoringAxis`，评分算法未改。TDD RED 为缺失 exports（新 29 项失败、既有 78 项通过）；GREEN：contracts 107/107、domain 222/222，两个 typecheck 均 exit 0。无 application/database 行为、迁移或生产访问变更；详见 `docs/tasks/project-score-evidence-detail-workbook.md`。
+
 ---
 
 ## 9. 其他
