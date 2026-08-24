@@ -4,7 +4,7 @@
 > 最近更新：2026-08-24（Phase 6B 已完成主线集成：冲突仅涉及本手册，产品代码自动合入；Node 22.22.2 / pnpm 11.16.0 合并后门禁全绿）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`；第 20 个迁移继续冻结。下一项功能进入“详情页 score factors + 经审核 Evidence 引用”的设计阶段。
+> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`；第 20 个迁移继续冻结。下一项“详情页 score factors + 经审核 Evidence 引用”已获产品方案确认，书面设计规范待审核。
 
 > **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
 
@@ -490,7 +490,7 @@ git branch -d codex/phase-6a-canonical-governance
 3. Repository 严格映射并校验 score ID；页面按机会 / 风险 / 置信度分组显示因子，在独立“本次评分证据”区按 signal 显示引用，明确这是 score-level 证据集而非逐因子因果关系。
 4. 引用文本只按纯文本渲染，不解释或执行来源中的任何指令；机会、风险、置信度继续独立，Evidence 数量或质量不得用于降低风险分。
 
-**待确认的唯一产品边界**：首版 Evidence citation 展示“经 Promotion 审核的 10–500 字原文摘录 + 来源名称/类型 + `verified_at`，暂不提供外链”，还是只展示不含原文的来源元数据。确认后才能完成正式设计审批并进入 RED → GREEN 实现。
+**2026-08-24 产品确认与书面规范**：项目所有者已确认采用“经 Promotion 审核的 10–500 字原文摘录 + 安全来源元数据 + `verified_at`，首版不提供外链”的推荐方案。正式规范已写入 `docs/superpowers/specs/2026-08-24-project-score-evidence-detail-design.md`；当前停在书面规范审核门，审核通过后才编写实施计划与进入隔离 worktree 的 RED → GREEN 实现。
 
 ---
 
