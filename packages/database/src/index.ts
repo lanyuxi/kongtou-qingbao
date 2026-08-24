@@ -11,6 +11,12 @@ export {
   type RecordExtractionRunInput,
 } from './ai/extraction-repository.js';
 export {
+  ProjectEvidenceCitationQueryError,
+  ProjectScoreFactorQueryError,
+  type ProjectEvidenceCitation,
+  type ProjectScoreFactor,
+} from './repositories/project-score-evidence.js';
+export {
   createProjectRepository,
   OpportunityListQueryError,
   ProjectLookupQueryError,

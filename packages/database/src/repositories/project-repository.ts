@@ -1,6 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import type { Database } from '../generated/database.types.js';
+import {
+  listCurrentScoreEvidenceCitations as queryCurrentScoreEvidenceCitations,
+  listCurrentScoreFactors as queryCurrentScoreFactors,
+  type ProjectEvidenceCitation,
+  type ProjectScoreFactor,
+} from './project-score-evidence.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -12,6 +18,7 @@ export type ProjectLifecycle = Database['public']['Enums']['project_lifecycle'];
 export type SignalVerification = Database['public']['Enums']['signal_verification'];
 
 export interface ProjectScore {
+  readonly id: string;
   readonly modelVersion: string;
   readonly inputVersion: string;
   readonly opportunityScore: number;
@@ -67,6 +74,14 @@ export interface ProjectRepository {
   }): Promise<OpportunityListItem[]>;
   getProjectBySlug(slug: string): Promise<ProjectDetail | null>;
   listProjectSignals(projectId: string, limit: number): Promise<ProjectSignal[]>;
+  listCurrentScoreFactors(
+    projectId: string,
+    projectScoreId: string,
+  ): Promise<ProjectScoreFactor[]>;
+  listCurrentScoreEvidenceCitations(
+    projectId: string,
+    projectScoreId: string,
+  ): Promise<ProjectEvidenceCitation[]>;
 }
 
 export function createProjectRepository(client: SupabaseClient<Database>): ProjectRepository {
@@ -103,7 +118,7 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
       const response = await client
         .from('project_current_state')
         .select(
-          'project_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at',
+          'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at',
         )
         .eq('slug', slug)
         .maybeSingle();
@@ -130,6 +145,7 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
           row.opportunity_score === null || row.score_calculated_at === null
             ? null
             : {
+                id: requiredString(row.project_score_id, 'project_score_id'),
                 modelVersion: requiredString(row.score_model_version, 'score_model_version'),
                 inputVersion: requiredString(row.score_input_version, 'score_input_version'),
                 opportunityScore: requiredNumber(row.opportunity_score, 'opportunity_score'),
@@ -162,6 +178,14 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
       }
 
       return (response.data ?? []).map(mapProjectSignalRow);
+    },
+
+    listCurrentScoreFactors(projectId, projectScoreId) {
+      return queryCurrentScoreFactors(client, projectId, projectScoreId);
+    },
+
+    listCurrentScoreEvidenceCitations(projectId, projectScoreId) {
+      return queryCurrentScoreEvidenceCitations(client, projectId, projectScoreId);
     },
   };
 }

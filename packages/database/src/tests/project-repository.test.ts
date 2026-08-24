@@ -121,6 +121,7 @@ describe('ProjectRepository.listOpportunities', () => {
 
 const projectDetailRow = {
   project_id: '20000000-0000-4000-8000-000000000001',
+  project_score_id: '20000000-0000-4000-8000-000000000002',
   slug: 'demo-project',
   name: 'Demo Project',
   summary: 'A demo project.',
@@ -174,6 +175,7 @@ describe('ProjectRepository.getProjectBySlug', () => {
       officialWebsiteUrl: 'https://demo.example.dev',
       updatedAt: '2026-08-10T00:00:00.000Z',
       latestScore: {
+        id: '20000000-0000-4000-8000-000000000002',
         modelVersion: 'seed-fixture-v1',
         inputVersion: 'seed-2026-08-14',
         opportunityScore: 84,

@@ -7,8 +7,8 @@
 | Task | Status | Scope | Commit |
 | --- | --- | --- | --- |
 | 1 | DONE | Strict public projection contracts | `28c2fef` |
-| 2 | DONE | Minimum-privilege database read boundary | `feat(db): expose safe score evidence detail` |
-| 3 | READY | Strict repository reads | — |
+| 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
+| 3 | DONE | Strict repository reads | Pending |
 | 4 | READY | Anonymous integration coverage | — |
 | 5 | READY | Detail loader and safe presentation | — |
 | 6 | READY | Full gate and documentation | — |
@@ -74,3 +74,25 @@ Task 2 completed from a genuine implementation RED through focused and full
 GREEN. Only the marker-verified disposable
 `airdrop-intelligence-governance-test` on DB 64322 / API 64321 was reset or
 queried. Production and the forbidden default ports 54321/54322 were untouched.
+
+## Task 3 — strict repository reads
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Preflight | Linked-worktree/base/status inspection plus Task 3 brief/design review | Confirmed `.worktrees/project-score-evidence-detail` on `codex/project-score-evidence-detail` at exact base `e106c8afed5d878693b429b45a424ea078932bdd`. The pre-existing uncommitted `docs/HANDOVER.md` Task 2 independent-review record was preserved. |
+| Repository baseline | Required Node 22.22.2 / pnpm 11.16.0: `pnpm --filter @airdrop/database test -- project-repository.test.ts` | Exit 0 before Task 3 test or implementation changes: 9 files / 159 tests passed; 7 integration files / 40 tests skipped by the existing environment gate. |
+| RED 1 | Required runtime: `pnpm --filter @airdrop/database test -- project-score-evidence.test.ts` after adding only Task 3 tests | Exit 1 as expected. The new suite failed collection with the named missing helper `../repositories/project-score-evidence.js`; the existing project lookup test independently failed because `latestScore.id` was absent (expected `20000000-0000-4000-8000-000000000002`). The remaining 158 existing tests passed; 40 integration tests remained environment-gated. |
+| RED 2 | Same required test command after adding only the focused helper implementation, before repository delegation | Exit 1 as expected: all 14 new tests failed by the named missing repository APIs (`listCurrentScoreFactors is not a function` / `listCurrentScoreEvidenceCitations is not a function`), and the project lookup test still failed on missing `latestScore.id`. The remaining 158 tests passed; 40 integration tests remained environment-gated. |
+| Focused GREEN | Required runtime: `pnpm --filter @airdrop/database test -- project-score-evidence.test.ts project-repository.test.ts` | Exit 0: 10 files / 173 tests passed; 7 integration files / 40 tests skipped by the existing environment gate. Both new reads, strict parsing, deterministic sorting, exact safe selections, dual immutable filters, safe error wrapping, and `latestScore.id` mapping are green. |
+| Database lint | Required runtime: `pnpm --filter @airdrop/database lint` | Exit 0. |
+| Database typecheck | Required runtime: `pnpm --filter @airdrop/database typecheck` | Exit 0. |
+| Static safety review | Forbidden-field `rg` over the production helper plus exact projection/filter inspection and `git diff --check` | Forbidden terms (`url`, raw body/item, candidate, review, hash, provider, audit, outbox, credential/password/secret) had zero matches (`rg` exit 1 as expected); only the exact 7-column factor and 15-column citation projections are selected; both reads apply `project_id` then `project_score_id`; `git diff --check` exit 0. |
+| Full repository gate | Required runtime: `pnpm verify` | Exit 0: lint, typecheck, build, and placeholders passed; contracts 107 + domain 222 + database 173 + worker 212 + web 127 = 841 non-skipped tests passed, with 42 existing environment-gated skips. |
+| Final-gate timing investigation | A second documentation-final `pnpm verify`, `git diff --name-only`, then `pnpm --filter @airdrop/worker exec vitest run src/tests/health.test.ts` | The second full run reached tests with contracts/domain/database green, then the unchanged worker repeated-SIGTERM case exceeded its existing 1-second `stopping` bound; exit 1. No worker file is in the diff. Immediate focused reproduction passed 1 file / 8 tests, exit 0, confirming the same load-sensitive timing behavior already recorded in Task 2; no unrelated fix was made. A fresh full rerun is required before commit. |
+| Final fresh full rerun | Required runtime: `pnpm verify`, after the focused worker reproduction and with no worker change | Exit 0: lint/typecheck/build/placeholders green; contracts 107 + domain 222 + database 173 + worker 212 + web 127 = 841 non-skipped tests passed, with 42 existing environment-gated skips. This is the final full-suite evidence for the Task 3 commit. |
+
+Task 3 adds no score calculation, recommendation, RLS, migration, generated-type,
+dependency, production, or remote-environment change. Both public reads are bound
+to one project and one immutable current score ID, expose only the dedicated safe
+view projections, reject any non-contract row before mapping, and return inert
+Evidence citation metadata without URL or governance payloads.
