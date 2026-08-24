@@ -9,7 +9,7 @@
 | 1 | DONE | Strict public projection contracts | `28c2fef` |
 | 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
 | 3 | DONE | Strict repository reads | `1a5e26e` |
-| 4 | READY | Anonymous integration coverage | — |
+| 4 | DONE | Anonymous integration coverage | `test(database): cover public score evidence reads` |
 | 5 | READY | Detail loader and safe presentation | — |
 | 6 | READY | Full gate and documentation | — |
 
@@ -112,3 +112,26 @@ Evidence citation metadata without URL or governance payloads.
 The review fix changes no production code. It closes both sensitivity gaps with
 one named invariant test and a strict fake, while preserving the original Task 3
 repository behavior and scope.
+
+## Task 4 — anonymous integration coverage
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Preflight and baseline | Confirm linked worktree/HEAD, preserve controller-owned HANDOVER changes, inspect Task 4 brief, and run required-runtime `pnpm --filter @airdrop/database test -- project-score-evidence.test.ts` | Worktree is `.worktrees/project-score-evidence-detail` on `codex/project-score-evidence-detail`, HEAD `23c30d7ea3f1645bef5844fe1729b9b8f42941e5`; only the controller's `docs/HANDOVER.md` review record was initially modified. Baseline passed 174 tests with 40 environment-gated skips, exit 0. Task 3 Commit was already the exact `1a5e26e`, so no stale `Pending` value remained to change. |
+| Disposable topology guard | Read-only SSH inspection of only `/root/airdrop-governance-test`; verify exact project ID, DB/Kong container names, DB/API host ports, and fixed paused marker; inspect existing local tunnel command; validate local integration URL shapes and re-query the marker through the tunnel | Passed: project `airdrop-intelligence-governance-test`; container `supabase_db_airdrop-intelligence-governance-test`; DB 64322 / API 64321; marker exact. Existing `16432` listener is exactly `16432 -> 64322`; a new exact `16433 -> 64321` listener was started. Disposable env file is mode 0600 and its URLs validated as loopback `16432/16433` without printing values; local marker query passed. Production project/container and forbidden 54321/54322 were not accessed. |
+| Test-first fixture and initial run | Replace fixed repository fixture identities with randomized test-owned UUIDs; add active current/historical scores, one factor per axis, rumored current factor, two distinct active Evidence rows, score/signal/Evidence links, exact safe-key assertions, and URL plus fixed-marker guards; run full `test:integration` | The production contract already exists from Tasks 2–3, so the first real run was legitimately GREEN rather than an absent-feature RED: 7 files / 44 tests passed, exit 0, 105.36s. Per the sensitivity ledger, this is not recorded as RED; the required temporary score-ID-filter mutation follows. |
+| Score-ID filter sensitivity RED | First require zero production-helper diff, temporarily remove only the factor query's `.eq('project_score_id', projectScoreId)`, then run only the named historical-snapshot integration assertion | Exit 1 as required: `denies factors and citations for an active historical score ID` received the three active current factors instead of `[]`; 1 failed / 6 skipped. The mutation was immediately restored with `apply_patch`, and the production helper again has zero diff from HEAD. |
+| Restored focused GREEN | Run the complete project PostgREST integration file, then the brief's `pnpm --filter @airdrop/database test -- project-score-evidence.test.ts` | Real focused integration passed 1 file / 7 tests in 4.83s, exit 0. Unit/package-focused command passed 174 tests with 44 integration skips, exit 0. |
+| Package static gates | Required runtime `pnpm --filter @airdrop/database lint` and `typecheck` | Both exit 0. No dependency or production repository change remains. |
+| Full integration investigation | Fresh full `test:integration` before cleanup | Exit 1 with 38/44 passing. One Task 4 failure proved the randomized equal-score IDs invalidated the old fixed-order expectation. Five unrelated queue failures showed reconciliation creating 7 schedules/jobs because prior Task 4 focused runs intentionally retained randomized active-official rows; the queue fixture cleans only its own fixed project. No production defect or queue-code change was indicated. |
+| Random tie-order correction | Keep both active fixtures at score 90 and derive the expected pair by the documented `project_id asc` tie-breaker; rerun the complete project integration file | Focused project integration returned GREEN: 1 file / 7 tests, exit 0, 7.05s. This preserves cursor tie coverage while supporting randomized test-owned IDs. The required fresh reset now precedes the next full integration run. |
+| Pre-full fresh reset | In one fail-closed remote command verify exact workdir/project ID/container names/64322/64321/fixed marker, 21 migrations, seed SHA `f1ceaddc...7e55`, and Task 2 migration SHA `8c0a2e3...ea60`; then reset only the disposable stack and recheck marker | Preflight and reset both exit 0; 21 migrations and seed reapplied, containers restarted, fixed marker exact. This removed accumulated project fixtures before the final full suite. |
+| Final full integration GREEN | Fresh-reset required-runtime `pnpm --filter @airdrop/database test:integration` | 7 files / 44 tests passed, exit 0, 104.45s. This is the final full integration evidence. |
+| Final append-only cleanup | Repeat the same fail-closed disposable-only preflight and fresh reset after the GREEN run; additionally require zero `project_scores.model_version = 'repository-test'` rows | Exit 0; fixed marker remains exact and repository-test score count is 0. No fixture history was deleted individually. Production and forbidden ports were untouched. |
+| Full repository gate | Required-runtime fresh `pnpm verify` after final source/test/documentation changes | Exit 0: lint/typecheck/build/placeholders green; contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests passed, with 46 environment-gated skips. |
+
+Task 4 changes only anonymous repository integration fixtures/assertions and
+execution documentation. It adds no production code, dependency, migration,
+generated-type, score math, recommendation, or browser grant. The only
+production mutation was the required disposable score-ID-filter sensitivity
+check; it was fully restored before GREEN and is absent from the commit.
