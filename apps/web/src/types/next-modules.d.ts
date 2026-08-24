@@ -18,6 +18,11 @@ declare module 'next/link' {
 }
 
 declare module 'next/navigation' {
+  export interface AppRouterInstance {
+    replace(href: string): void;
+  }
+
   export function usePathname(): string;
+  export function useRouter(): AppRouterInstance;
   export function notFound(): never;
 }

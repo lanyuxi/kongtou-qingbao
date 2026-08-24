@@ -34,6 +34,118 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_run_review_commands: {
+        Row: {
+          ai_run_id: string
+          created_at: string
+          decision: string
+          decision_id: string
+          expected_review_version: number
+          id: string
+          idempotency_key: string
+          note: string | null
+          reason_code: string
+          resulting_review_version: number
+          reviewer_user_id: string
+        }
+        Insert: {
+          ai_run_id: string
+          created_at: string
+          decision: string
+          decision_id: string
+          expected_review_version: number
+          id: string
+          idempotency_key: string
+          note?: string | null
+          reason_code: string
+          resulting_review_version: number
+          reviewer_user_id: string
+        }
+        Update: {
+          ai_run_id?: string
+          created_at?: string
+          decision?: string
+          decision_id?: string
+          expected_review_version?: number
+          id?: string
+          idempotency_key?: string
+          note?: string | null
+          reason_code?: string
+          resulting_review_version?: number
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_run_review_commands_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_run_review_commands_decision_id_fkey"
+            columns: ["decision_id"]
+            isOneToOne: false
+            referencedRelation: "ai_run_review_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_run_review_commands_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_run_review_decisions: {
+        Row: {
+          ai_run_id: string
+          created_at: string
+          decision: string
+          id: string
+          note: string | null
+          reason_code: string
+          review_version: number
+          reviewer_user_id: string
+        }
+        Insert: {
+          ai_run_id: string
+          created_at: string
+          decision: string
+          id: string
+          note?: string | null
+          reason_code: string
+          review_version: number
+          reviewer_user_id: string
+        }
+        Update: {
+          ai_run_id?: string
+          created_at?: string
+          decision?: string
+          id?: string
+          note?: string | null
+          reason_code?: string
+          review_version?: number
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_run_review_decisions_ai_run_id_fkey"
+            columns: ["ai_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_run_review_decisions_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_runs: {
         Row: {
           created_at: string
@@ -2019,6 +2131,23 @@ export type Database = {
           signal_id: string
         }[]
       }
+      execute_failed_ai_run_review: {
+        Args: {
+          p_ai_run_id: string
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_now: string
+        }
+        Returns: {
+          commandId: string
+          decisionId: string
+          replayed: boolean
+          reviewState: string
+          reviewVersion: number
+          runId: string
+          version: number
+        }[]
+      }
       execute_source_schedule_command: {
         Args: {
           p_actor_id: string
@@ -2039,6 +2168,15 @@ export type Database = {
           schedule_version: number
         }[]
       }
+      get_failed_ai_run: {
+        Args: { p_ai_run_id: string }
+        Returns: {
+          decisions: Json
+          input: Json
+          run: Json
+          version: number
+        }[]
+      }
       has_active_role: {
         Args: { requested_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
@@ -2046,6 +2184,33 @@ export type Database = {
       is_source_collection_eligible: {
         Args: { project_id: string; source_id: string }
         Returns: boolean
+      }
+      list_failed_ai_runs: {
+        Args: {
+          p_cursor_created_at: string
+          p_cursor_id: string
+          p_limit: number
+          p_review_state: string
+          p_status: string
+        }
+        Returns: {
+          createdAt: string
+          inputKind: string
+          latestDecisionAt: string
+          modelId: string
+          pipelineVersion: string
+          project: Json
+          promptVersion: string
+          reviewState: string
+          reviewVersion: number
+          runId: string
+          safeFailureCode: string
+          schemaVersion: string
+          source: Json
+          stage: string
+          status: string
+          version: number
+        }[]
       }
       list_historical_extraction_candidates: {
         Args: { p_after_candidate_id: string; p_limit: number }
