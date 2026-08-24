@@ -613,6 +613,8 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-24 Project score Evidence local integration（DONE）**：用户选择 finishing workflow 的 option 1。主工作区确认基线分支 `codex/phase-0-1-foundation` 精确位于 `63f5278`，仅有三个既有未跟踪 `.DS_Store`，随后将 `codex/project-score-evidence-detail` 快进合并到 `a372880`；这些个人文件未触碰。合并后首次 `pnpm verify` 因主工作区 `node_modules` 重建并尝试访问 registry，命中 DNS `ENOTFOUND`，未进入代码测试；用本机既有 pnpm v11 store 执行 `--offline --frozen-lockfile` 恢复 196 个锁定包后，fresh 完整门禁 exit 0：contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 gated skips，lint/typecheck/build/placeholders 全绿。该步骤只做本地 Git 集成与本地门禁，未访问生产、未应用第 21 个 migration；下一步是保留生产冻结边界并选择后续产品功能，而不是自动 rollout。
 
+**2026-08-24 Project score Evidence branch cleanup（DONE）**：在主线交接提交 `0293cd3` 后再次运行完整 `pnpm verify`，861 non-skipped / 46 gated skips 全绿。随后确认功能 worktree 无 tracked/untracked 改动、`a372880` 已是主线祖先，再移除 `.worktrees/project-score-evidence-detail`、执行 `git worktree prune` 并删除已合并分支 `codex/project-score-evidence-detail`。其他 Phase 2 / 6A / 6B worktree 与主工作区三个既有 `.DS_Store` 均未触碰；功能全部保留在主线，生产仍未应用。
+
 ---
 
 ## 9. 其他
