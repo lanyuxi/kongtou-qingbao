@@ -520,6 +520,18 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-24 Project score Evidence Task 3（final fresh rerun）**：在 focused worker 8/8 后且保持 worker 零改动，fresh `pnpm verify` exit 0：lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 173 + worker 212 + web 127 = 841 个 non-skipped 测试通过，42 个既有环境门禁 skip。此轮为 Task 3 提交采用的最终全仓证据；仅剩文档占位/diff/提交范围检查，不再修改产品代码。
 
+**2026-08-24 Project score Evidence Task 3（independent-review fix loop opened）**：独立审查 `1a5e26e` 发现 1 个 Important 测试敏感性缺口，生产实现本身确认正确：原 `createProjectLookupClient` 未记录 relation calls / exact selection，因此移除 `project_score_id` 投影或增加第二次 latest lookup 时测试可能仍通过。最小 test-only 修复已加入具名 current-state snapshot-query 用例，literal projection 同时包含 `project_score_id` 与全部已展示 score fields；fake 记录 relation/selections，并对非 `project_current_state` 或任何第二次 relation lookup 立即失败。workbook Task 3 Commit 已同步为 `1a5e26e`。下一步用 disposable mutation 分别证明 projection 与单次 lookup 断言会 RED，完整恢复后再运行 GREEN；不改生产实现、不做独立自审。
+
+**2026-08-24 Project score Evidence Task 3（review-fix projection sensitivity RED）**：临时仅从生产 current-state selection 移除 `project_score_id`，精确运行 `project-repository.test.ts`；具名 “reads the immutable score identity and displayed score fields in one exact current-state query” 断言按预期失败，diff 明确为 expected `project_id,project_score_id,...`、received `project_id,...`，1 failed / 13 passed，exit 1。disposable mutation 随即用 apply_patch 完整恢复，不进入 fix diff；下一项验证任何第二次 relation lookup 均会具名失败。
+
+**2026-08-24 Project score Evidence Task 3（review-fix single-query sensitivity RED）**：临时在 current-state response 后增加第二次 `client.from('project_current_state')`，并用 Vitest `-t` 只运行具名 invariant test；fake 按预期抛出 `Project lookup must query project_current_state exactly once.`，1 failed / 13 skipped，exit 1。disposable mutation 随即完整恢复，不进入 fix diff。至此 exact projection 与恰好一次 lookup 两个审查缺口均有独立 RED 证据；下一步验证生产文件相对 HEAD 零差异并运行 focused GREEN/package gates。
+
+**2026-08-24 Project score Evidence Task 3（review-fix focused GREEN）**：先对 `project-repository.ts` 与 `project-score-evidence.ts` 执行相对 HEAD 的零差异检查，exit 0，确认两项 disposable mutation 均完整恢复且生产实现未改。随后精确运行 `project-repository.test.ts` + `project-score-evidence.test.ts`，2 files / 28 tests 全绿、exit 0；当前仅测试 fake/断言和文档有改动。
+
+**2026-08-24 Project score Evidence Task 3（review-fix package gates）**：database lint 与 typecheck 均在指定 Node 22.22.2 / pnpm 11.16.0 环境下 exit 0。未新增依赖、生产代码、migration/RLS 或真实数据库访问；按仓库完成规则继续运行 fresh `pnpm verify` 后提交最小 test/docs fix。
+
+**2026-08-24 Project score Evidence Task 3（review-fix complete local gate）**：fresh `pnpm verify` 一次通过、exit 0：lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 个 non-skipped 测试通过，42 个既有环境门禁 skip。review fix 只修改 `project-repository.test.ts` 与交接文档；生产 repository 相对 `1a5e26e` 零差异，无依赖、评分、migration/RLS、真实 DB、生产或远端变更。Important 已由 exact projection 与 single-query 两项独立 sensitivity RED、focused GREEN 和 full gate 闭环。
+
 ---
 
 ## 9. 其他

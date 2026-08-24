@@ -8,7 +8,7 @@
 | --- | --- | --- | --- |
 | 1 | DONE | Strict public projection contracts | `28c2fef` |
 | 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
-| 3 | DONE | Strict repository reads | Pending |
+| 3 | DONE | Strict repository reads | `1a5e26e` |
 | 4 | READY | Anonymous integration coverage | — |
 | 5 | READY | Detail loader and safe presentation | — |
 | 6 | READY | Full gate and documentation | — |
@@ -96,3 +96,19 @@ dependency, production, or remote-environment change. Both public reads are boun
 to one project and one immutable current score ID, expose only the dedicated safe
 view projections, reject any non-contract row before mapping, and return inert
 Evidence citation metadata without URL or governance payloads.
+
+### Task 3 independent-review fix loop
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Review finding | Independent review of `1a5e26e` | One Important test-sensitivity gap: the project lookup fake did not record relation calls or selected columns, so removing `project_score_id` from the current-state projection or adding a second latest-score lookup could escape the regression suite. Production behavior was confirmed correct. |
+| Test hardening | Add one exact current-state snapshot-query assertion and make the fake reject any relation other than one `project_current_state` call | Test-only scope. The literal projection contains `project_score_id` and every displayed score field; the fake records relation calls/selections and throws on any second lookup. Disposable sensitivity mutations are required before GREEN. |
+| Projection sensitivity RED | Temporarily remove `project_score_id` only from the production current-state selection, then run `pnpm --filter @airdrop/database exec vitest run src/tests/project-repository.test.ts` | Exit 1 as required: named immutable-score snapshot-query test failed with an exact diff showing expected `project_id,project_score_id,...` versus received `project_id,...`; 13 other tests passed. The disposable mutation was immediately restored and is not part of the fix diff. |
+| Single-query sensitivity RED | Temporarily add a second `client.from('project_current_state')`, then run only the named invariant test with Vitest `-t` | Exit 1 as required: the named test failed with `Project lookup must query project_current_state exactly once.`; 1 failed / 13 skipped. The disposable mutation was immediately restored and is not part of the fix diff. |
+| Focused GREEN | First require zero diff from HEAD for both production repository files; then run `pnpm --filter @airdrop/database exec vitest run src/tests/project-repository.test.ts src/tests/project-score-evidence.test.ts` | Production diff check exit 0; 2 files / 28 tests passed, exit 0. Only the test fake/assertion and documentation remain changed. |
+| Package gates | Required runtime: `pnpm --filter @airdrop/database lint` and `pnpm --filter @airdrop/database typecheck` | Both commands exit 0. |
+| Full repository gate | Required runtime: fresh `pnpm verify` | Exit 0: lint/typecheck/build/placeholders green; contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests passed, with 42 existing environment-gated skips. |
+
+The review fix changes no production code. It closes both sensitivity gaps with
+one named invariant test and a strict fake, while preserving the original Task 3
+repository behavior and scope.

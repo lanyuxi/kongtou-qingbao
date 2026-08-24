@@ -188,6 +188,17 @@ describe('ProjectRepository.getProjectBySlug', () => {
     });
   });
 
+  it('reads the immutable score identity and displayed score fields in one exact current-state query', async () => {
+    const client = createProjectLookupClient(projectDetailRow);
+
+    await createProjectRepository(client).getProjectBySlug('demo-project');
+
+    expect(client.relationCalls).toEqual(['project_current_state']);
+    expect(client.selections).toEqual([
+      'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at',
+    ]);
+  });
+
   it('returns null when no project matches', async () => {
     const client = createProjectLookupClient(null);
 
@@ -245,9 +256,17 @@ describe('ProjectRepository.listProjectSignals', () => {
 
 function createProjectLookupClient(
   fixtureRow: typeof projectDetailRow | { readonly opportunity_score: null } | null,
-): SupabaseClient<Database> {
+): SupabaseClient<Database> & {
+  readonly relationCalls: string[];
+  readonly selections: string[];
+} {
+  const relationCalls: string[] = [];
+  const selections: string[] = [];
   const query = {
-    select: () => query,
+    select: (columns: string) => {
+      selections.push(columns);
+      return query;
+    },
     eq: () => query,
     maybeSingle: () =>
       Promise.resolve({
@@ -255,7 +274,23 @@ function createProjectLookupClient(
         error: null,
       }),
   };
-  return { from: () => query } as unknown as SupabaseClient<Database>;
+  return {
+    relationCalls,
+    selections,
+    from: (relation: string) => {
+      relationCalls.push(relation);
+      if (relation !== 'project_current_state') {
+        throw new Error('Project lookup queried an unexpected relation.');
+      }
+      if (relationCalls.length !== 1) {
+        throw new Error('Project lookup must query project_current_state exactly once.');
+      }
+      return query;
+    },
+  } as unknown as SupabaseClient<Database> & {
+    readonly relationCalls: string[];
+    readonly selections: string[];
+  };
 }
 
 function createSignalClient(
