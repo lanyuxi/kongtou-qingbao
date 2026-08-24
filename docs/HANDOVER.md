@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 六任务本地实现与全门禁完成；production unapplied）
+> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 最终整分支复审通过，Ready to merge: Yes；production unapplied）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结。详情页 score factors + 经审核 Evidence 引用已在 `codex/project-score-evidence-detail` 完成六任务本地实现与全门禁；**local implementation complete; production unapplied**。Task 6 未访问生产，该表述不代替下次 rollout 前的实时预检。
+> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结。详情页 score factors + 经审核 Evidence 引用已在 `codex/project-score-evidence-detail` 完成本地实现，最终整分支复审在 `2e80dbf565feba939252c4fed590b9dd9528b6f9` 通过且 **Ready to merge: Yes**；下一步由用户决定如何集成。该功能 **production unapplied**；生产 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
 > **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
 
@@ -14,7 +14,7 @@
 |---|---|---|
 | 1. 完整阅读交接手册 | **完成** | 已逐行读完本文件 432 行；确认手册同时包含“主线 Phase 0–6A 快照”和“Phase 6B Task 1–8 本地完成”两层状态，后续必须用当前仓库事实校准，不能只沿用顶部旧摘要 |
 | 2. 复核项目目录下产出文件 | **完成** | 已核对 228 个主线跟踪文件、应用/包源码、19 个迁移与 10 个 pgTAP 文件、全部阶段文档，以及 6B worktree 的 46 文件 / 8,776 行新增实现；确认 6B 分支干净（仅未跟踪 `.DS_Store`）且产出闭环 |
-| 3. 判断当前阶段与下一开发内容 | **完成** | 详情页 score factors + 经审核 Evidence 的本地实现与 Task 6 审查已完成；下一步是整分支独立审查与主线集成决策。任何生产 rollout 仍须先做实时 preflight 并获得显式授权 |
+| 3. 判断当前阶段与下一开发内容 | **完成** | 详情页 score factors + 经审核 Evidence 的本地实现与最终整分支复审已完成，Ready to merge: Yes；下一步由用户决定如何集成。生产 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权 |
 | 4. 执行主线集成与正式门禁 | **完成** | 已协调 HANDOVER 冲突、修正 workbook 的 Task 7/8 commit 残留，并在 Node 22.22.2 / pnpm 11.16.0 下执行合并后 `pnpm verify`：798 通过、42 条环境条件跳过，lint / typecheck / build / placeholders 全绿，exit 0 |
 
 ### 2026-08-24 本轮最终判定
@@ -607,6 +607,8 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence final pagination fix（first package-gate iteration）**：database lint exit 0；typecheck exit 2，唯一错误位于测试 helper 的显式返回注解：`typeof citationRow[]` 把动态 Evidence ID 错误收窄成 base fixture 的单一 literal ID。生产 helper 无类型错误。最小测试修正为复用 Task 1 既有 `PublicProjectEvidenceCitationRow[]`，不改变行为或生产代码；修正后必须重跑 focused/lint/typecheck。
 
 **2026-08-24 Project score Evidence final pagination fix（corrected package GREEN）**：测试 fixture factory 改为既有共享 `PublicProjectEvidenceCitationRow[]` 后，精确 unit 1 file / 20 tests、database lint、database typecheck 均 exit 0。当前无类型/风格问题；下一步做 disposable count-consistency mutation RED，range/order/count request 已由 1001-row 用例逐页 literal recorder assertions 保护。
+
+**2026-08-24 Project score Evidence final whole-branch review（Ready to merge）**：最终 reviewer 以 base `63f5278` 和精确 reviewed HEAD `2e80dbf565feba939252c4fed590b9dd9528b6f9` 复核整分支；原 citation pagination Important 已 Resolved，Critical / Important / Minor 全部为 None。Reviewer 独立重跑 focused 20/20，并在 Node 22.22.2 / pnpm 11.16.0 下重跑 `pnpm verify`：861 non-skipped 通过、46 environment-gated skipped，结论 **Ready to merge: Yes**。本次复审对 DB/remote/production 运行声明仍标记 cannot-verify，不将报告证据推导为当前外部事实。下一步由用户决定如何集成该分支；功能仍为 **production unapplied**，任何 rollout 前必须重做实时 preflight，确认备份、Auth 服务与 human reviewer readiness，并获得显式 rollout 授权。
 
 ---
 
