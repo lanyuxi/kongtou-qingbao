@@ -11,7 +11,7 @@
 | 3 | DONE | Strict repository reads | `1a5e26e` |
 | 4 | DONE | Anonymous integration coverage | `97d5f46` |
 | 5 | DONE | Detail loader and safe presentation | `ab73551` |
-| 6 | DONE | Full gate and documentation | This commit (`docs: close project score evidence detail`) |
+| 6 | DONE | Full gate and documentation | `ba055c9` |
 
 ## Task 1 — strict public projection contracts
 
@@ -183,6 +183,7 @@ unchanged and outside the citation component.
 | Append-only cleanup | After integration, perform the only final fresh reset rather than deleting Evidence/links/history row by row | Exit 0; fixed marker exact, `project_scores.model_version = 'repository-test'` count 0, unsafe Evidence-hash grant false, committed migration SHA intact. |
 | Root gate | Required runtime `pnpm verify` | Exit 0: lint/typecheck/build/placeholders passed; contracts 107 + domain 222 + database 174 + worker 212 + web 140 = 855 non-skipped tests, with 46 environment-gated skips. |
 | Whitespace and unsafe/secret scan | `git diff --check`, then the Task 6 four-file `rg` scan with manual classification of every match | `git diff --check` exit 0. Five matches: the `article_raw_text` value is a safe source-field locator enum, not content; two `service_role` matches preserve revoke/grant on the existing safe `project_current_state` view; two more revoke `service_role` from the new views. Component and repository had no matches. No secret value, credential, unsafe URL, Raw Item body, candidate/reviewer/outbox payload, or browser-visible privileged field was present. |
+| Independent-review docs cleanup | Resolve the three non-blocking documentation Minors after Task 6 review | Review was substantively compliant with 0 Critical/Important. Updated the stale HANDOVER next-step row to local implementation/review complete and whole-branch review/integration next; replaced the package-wide database command with exact `pnpm --filter @airdrop/database exec vitest run src/tests/project-score-evidence.test.ts`; changed the Task 6 Commit cell to `ba055c9`. The exact Node 22.22.2 / pnpm 11.16.0 command passed 1 file / 14 tests. Cleanup scope is docs-only; final whole-branch review remains separate. |
 
 Commit sequence: `28c2fef` (contracts), `e106c8a` (database boundary),
 `1a5e26e` plus `23c30d7` (repository and invariant hardening), `97d5f46`

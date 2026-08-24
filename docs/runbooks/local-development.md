@@ -215,7 +215,7 @@ Focused checks are:
 
 ```bash
 supabase test db supabase/tests/012_project_score_evidence_detail.test.sql
-pnpm --filter @airdrop/database test -- project-score-evidence.test.ts
+pnpm --filter @airdrop/database exec vitest run src/tests/project-score-evidence.test.ts
 pnpm --filter @airdrop/database test:integration
 pnpm --filter @airdrop/web exec vitest run src/tests/project-score-evidence.test.ts src/tests/project-detail-loader.test.ts
 ```

@@ -14,7 +14,7 @@
 |---|---|---|
 | 1. 完整阅读交接手册 | **完成** | 已逐行读完本文件 432 行；确认手册同时包含“主线 Phase 0–6A 快照”和“Phase 6B Task 1–8 本地完成”两层状态，后续必须用当前仓库事实校准，不能只沿用顶部旧摘要 |
 | 2. 复核项目目录下产出文件 | **完成** | 已核对 228 个主线跟踪文件、应用/包源码、19 个迁移与 10 个 pgTAP 文件、全部阶段文档，以及 6B worktree 的 46 文件 / 8,776 行新增实现；确认 6B 分支干净（仅未跟踪 `.DS_Store`）且产出闭环 |
-| 3. 判断当前阶段与下一开发内容 | **完成** | 当前为“Phase 6B 主线集成完成、生产受控冻结”；下一项功能是详情页 score factors + 经审核 Evidence 展示，先完成匿名安全读边界设计再进入 TDD 实现 |
+| 3. 判断当前阶段与下一开发内容 | **完成** | 详情页 score factors + 经审核 Evidence 的本地实现与 Task 6 审查已完成；下一步是整分支独立审查与主线集成决策。任何生产 rollout 仍须先做实时 preflight 并获得显式授权 |
 | 4. 执行主线集成与正式门禁 | **完成** | 已协调 HANDOVER 冲突、修正 workbook 的 Task 7/8 commit 残留，并在 Node 22.22.2 / pnpm 11.16.0 下执行合并后 `pnpm verify`：798 通过、42 条环境条件跳过，lint / typecheck / build / placeholders 全绿，exit 0 |
 
 ### 2026-08-24 本轮最终判定
@@ -517,6 +517,8 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence Task 6 Step 4–5（repository gate + classified scan）**：Node 22.22.2 / pnpm 11.16.0 声明运行时下 fresh `pnpm verify` exit 0；lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 174 + worker 212 + web 140 = 855 non-skipped tests，46 environment-gated skips。`git diff --check` exit 0。指定四文件 unsafe/secret scan 共 5 个命中，逐条分类为：contracts 的 `article_raw_text` 是安全 `source_field` locator enum，不是 Raw Item 正文；migration 两个 `service_role` 命中是既有安全 `project_current_state` view 的 revoke/grant ACL，另两个是新 views 的显式 revoke。组件与 repository 零命中；无 secret value、credential、unsafe URL、Raw Item body、candidate/reviewer/outbox payload 或 browser-visible privileged field。
 
 **2026-08-24 Project score Evidence Task 6（local completion checkpoint）**：Task 1–6 实现、敏感性 RED→GREEN、focused/full pgTAP、真实 integration、root gate、whitespace 与人工分类 scan 已闭环；Task 5 workbook commit 修正为 `ab73551`。功能状态为 **local implementation complete; production unapplied**。Task 6 执行期间未访问生产；这是本次执行事实，不根据未访问行为推断任何其他外部状态。
+
+**2026-08-24 Project score Evidence Task 6（independent-review docs cleanup）**：Task 6 审查结论为实质合规/非阻塞通过，Critical/Important 为 0，留下 3 个 docs Minor。本轮只做最小文档协调：将上方过期的“下一项先设计再 TDD”更正为“本地实现与 Task 6 审查完成，下一步整分支独立审查/主线集成决策，生产仍需实时 preflight 与显式 rollout 授权”；runbook 的 database focused 命令改为精确 Vitest 文件路径；workbook Task 6 Commit 改为 `ba055c9`。Node 22.22.2 / pnpm 11.16.0 下精确 focused 命令 1 file / 14 tests PASS。本轮不改代码、测试或迁移，不扩展 Task 6 范围；后续交由整分支 reviewer 统一复核。
 
 **2026-08-24 Project score Evidence Task 5（preflight / Web baseline）**：已确认指定目录是 linked worktree `.worktrees/project-score-evidence-detail`，分支 `codex/project-score-evidence-detail`，HEAD 精确为基础提交 `d039f3ea3f3e4a9756aa9cd08cc1f17f245134e8`；仅保留 controller 未提交的上一段 Task 4 复审记录，workbook Task 4 Commit 仍为 `97d5f46`。Task 5 brief 与已批准设计一致，无需重新定型。Node 22.22.2 / pnpm 11.16.0 下 Web 基线 7 files / 127 tests passed，exit 0；尚未新增 Task 5 测试或生产实现，未访问数据库、生产或远端。
 
