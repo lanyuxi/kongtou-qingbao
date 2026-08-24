@@ -473,11 +473,30 @@ git branch -d codex/phase-6a-canonical-governance
 
 **附带发现（建议尽快处理，不阻塞 6B 本地状态）**：生产栈缺 Auth 容器属 Phase 6A 上生产后未被使用到的服务面（6A CLI 走数据库角色，不经 Auth HTTP），但任何基于浏览器会话的功能（6B 审核 UI、未来用户认证）都依赖它；建议在下一次生产变更前先排查 `supabase_auth` 容器为何未随栈启动（可能是 compose 配置或崩溃退出），并确认 Kong 路由。
 
+### 8.6 下一功能设计检查点：详情页评分因子与 Evidence 引用（2026-08-24）
+
+**已完成的现状研究**：
+
+- `score_factors` 已保存最新评分的三轴因子（axis / factor_code / contribution / input_value / detail），但 Phase 4 有意未向 `anon` / `authenticated` 开放；详情页目前只读取 `project_current_state` 的总分与 explanation。
+- `score_signal_links` 记录“一次评分消费的全部 signals”，`signal_evidence_links` 再把 signal 追到 append-only Evidence；当前 schema **没有 factor → signal / Evidence 的逐因子链接**。因此首版必须把“评分因子”和“本次评分使用的证据集”分成两个区块，不能声称某条 Evidence 单独证明某个聚合因子。
+- Evidence 的 `quote_text` 已受 10–500 字、确定性 grounding、Source / Raw Item 身份一致和人工 Promotion 门禁约束，但底表及链接表当前对浏览器全部拒绝；任何公开展示必须新增 forward-only、列级最小化、Evidence-gated 的专用读模型，不能直接放开治理底表。
+- 当前 `project_current_state` 不返回 `project_score_id`。为保证总分、因子和证据来自同一不可变评分快照，设计应显式携带 score ID，再按该 ID 读取因子和 score-level Evidence 集合。
+- `sources.canonical_url` 与 Raw Item URL 当前都不是匿名安全列；在 verified allowlisted references 功能落地前，不应把采集到的文章 URL直接变成可点击链接。
+
+**推荐的最小方案（待产品边界确认后写正式 spec）**：
+
+1. 新增 forward-only migration：扩展当前读模型携带 `project_score_id`；新增两个 security-invoker / security-barrier 安全投影，分别公开同一 Evidence-complete score 的安全因子列，以及其已发布 signals 对应的最小 Evidence citation 列。
+2. 新增精确 RLS / 列授权和 pgTAP 全主体矩阵；`anon` / `authenticated` 只可读 active / rumored 项目当前 Evidence-complete score 关联的数据，不能读取 Raw Item、candidate payload、review note、hash 或治理命令。
+3. Repository 严格映射并校验 score ID；页面按机会 / 风险 / 置信度分组显示因子，在独立“本次评分证据”区按 signal 显示引用，明确这是 score-level 证据集而非逐因子因果关系。
+4. 引用文本只按纯文本渲染，不解释或执行来源中的任何指令；机会、风险、置信度继续独立，Evidence 数量或质量不得用于降低风险分。
+
+**待确认的唯一产品边界**：首版 Evidence citation 展示“经 Promotion 审核的 10–500 字原文摘录 + 来源名称/类型 + `verified_at`，暂不提供外链”，还是只展示不含原文的来源元数据。确认后才能完成正式设计审批并进入 RED → GREEN 实现。
+
 ---
 
 ## 9. 其他
 
-- Git 分支：主开发线 `codex/phase-0-1-foundation`（含 Phase 0–6A）；Phase 6A 于独立分支 `codex/phase-6a-canonical-governance` 开发，2026-08-21 fast-forward 合并回主线（合并后主线 `pnpm verify` 全绿，具体 HEAD 以 `git log --oneline -1` 为准）；两分支及 worktree 的清理见 §8.3
+- Git 分支：主开发线 `codex/phase-0-1-foundation` 已含 Phase 0–6B Task 1–8；Phase 6B 通过双父提交 `3c96edf` 合并，合并后主线 `pnpm verify` 全绿。`.worktrees/phase-6b-failed-ai-review` 仍含未跟踪 `.DS_Store`，本轮未替用户删除，故未强制移除该 worktree；既有 Phase 2 / 6A worktree 清理说明见 §8.3。
 - dev server / worker 是否仍在运行不作为持久状态；每次接手都按 §4 重新确认并从当次日志判断
 - 历史决策细节（为什么这样做）：`docs/superpowers/specs/` 与 `docs/superpowers/plans/` 下的设计文档；Phase 6A 的逐任务 RED/GREEN 证据在 `docs/tasks/canonical-intelligence-governance-workbook.md`
 - DeepSeek 计费注意：130 次真实抽取消耗约 62 万 prompt tokens（每输入截取 12K 字符上限）；批量跑前评估成本
