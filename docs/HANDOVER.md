@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 最终整分支复审通过，Ready to merge: Yes；production unapplied）
+> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 已本地快进集成主线；合并后正式门禁通过；production unapplied）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结。详情页 score factors + 经审核 Evidence 引用已在 `codex/project-score-evidence-detail` 完成本地实现，最终整分支复审在 `2e80dbf565feba939252c4fed590b9dd9528b6f9` 通过且 **Ready to merge: Yes**；下一步由用户决定如何集成。该功能 **production unapplied**；生产 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`，后者由 `63f5278` 快进到 `a372880` 并通过合并后正式门禁；**两项功能均尚未部署生产**。Phase 6B Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结；详情页功能的第 21 个 migration 同样 production unapplied。任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
 > **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
 
@@ -16,6 +16,7 @@
 | 2. 复核项目目录下产出文件 | **完成** | 已核对 228 个主线跟踪文件、应用/包源码、19 个迁移与 10 个 pgTAP 文件、全部阶段文档，以及 6B worktree 的 46 文件 / 8,776 行新增实现；确认 6B 分支干净（仅未跟踪 `.DS_Store`）且产出闭环 |
 | 3. 判断当前阶段与下一开发内容 | **完成** | 详情页 score factors + 经审核 Evidence 的本地实现与最终整分支复审已完成，Ready to merge: Yes；下一步由用户决定如何集成。生产 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权 |
 | 4. 执行主线集成与正式门禁 | **完成** | 已协调 HANDOVER 冲突、修正 workbook 的 Task 7/8 commit 残留，并在 Node 22.22.2 / pnpm 11.16.0 下执行合并后 `pnpm verify`：798 通过、42 条环境条件跳过，lint / typecheck / build / placeholders 全绿，exit 0 |
+| 5. 集成详情页评分因子与 Evidence 引用 | **完成** | 用户选择本地合并；`codex/project-score-evidence-detail` 已从 `63f5278` 快进集成到 `codex/phase-0-1-foundation` 的 `a372880`。主工作区首次门禁因 registry DNS `ENOTFOUND` 止于依赖安装，随后从既有 pnpm v11 缓存以 frozen lockfile 离线恢复（lockfile 未变），fresh `pnpm verify` 861 non-skipped / 46 gated skips 全绿，lint/typecheck/build/placeholders 均 exit 0。生产未访问、迁移未应用。 |
 
 ### 2026-08-24 本轮最终判定
 
@@ -62,7 +63,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6B Task 7 E2E/授权矩阵（DONE）**（2026-08-22） | 真实 reviewer 全流程（list 三状态、safe detail、`needs_investigation` + 精确 replay + 下一版 `dismiss`、两版不可变历史）、七主体授权矩阵、两类独立 client race、malformed repository detail → 规范化 500 的 HTTP 回归；fix round 1 将 Auth signup 返回的 user ID 在 confirmation/sign-in 前写入共享 Set，teardown 复用经测试的 `presentFixtureUserIds` | Codex 原始门禁：focused 6/6、full 40/40、pgTAP 1031/1031；WorkBuddy 验收：disposable focused 6/6（Node 22.22.2）、fixture 5/5、full `test:integration` 40/40；scoped re-review 无 Critical/Important 破坏；提交 `b2f104b`、`e9b3e52`、`bcbbe7c` |
 | **Phase 6B Task 8 runbook/安全审查/仓库门禁（DONE）**（2026-08-22） | runbook 新增「Failed AI run review (Phase 6B)」操作节（flat-SQL 审核人供给、`revoked_at` 即时失效语义、`/review/sign-in` 流程、focused 测试命令、disposable-only 集成变量、迁移前向安全、failed-run retry 明确排除；UI 不建账号/角色）；全分支 secret/unsafe-field 扫描逐条人工分类；本地与远端产物 SHA 一致 | 扫描命中全部归类为测试 fixture/禁令/服务端 bearer 管道/既有 schema 列/ACL revoke（grant 仅 `execute` 给 `authenticated` 且函数内复核）；migration SHA `5150c830…`、011 SHA `e9158648…` 本地=远端；disposable reset exit 0 + full pgTAP 11 files / 1031 PASS；Node 22 根 `pnpm verify` exit 0（798 非跳过）；`git diff --check` 清洁；生产未访问 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），798 个非跳过测试，exit 0（contracts 78 / domain 222 / database 159+40 skipped / worker 212+2 skipped / web 127）。Task 7 fix round 1 后 disposable focused integration 6/6、full repository integration 40/40、fixture 5/5；隔离栈 reset exit 0 + full pgTAP 1031/1031（本地与远端 artifact SHA 一致）。
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下主线合并后 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），861 个非跳过测试、46 个 environment-gated skips，exit 0（contracts 107 / domain 222 / database 180+44 skipped / worker 212+2 skipped / web 140）。详情页功能在 disposable 栈的最终执行报告记录 full pgTAP 1114/1114 与 anonymous repository integration 44/44；这些远端/数据库证据未在本次本地合并步骤重放，生产仍未访问或应用第 21 个 migration。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -609,6 +610,8 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence final pagination fix（corrected package GREEN）**：测试 fixture factory 改为既有共享 `PublicProjectEvidenceCitationRow[]` 后，精确 unit 1 file / 20 tests、database lint、database typecheck 均 exit 0。当前无类型/风格问题；下一步做 disposable count-consistency mutation RED，range/order/count request 已由 1001-row 用例逐页 literal recorder assertions 保护。
 
 **2026-08-24 Project score Evidence final whole-branch review（Ready to merge）**：最终 reviewer 以 base `63f5278` 和精确 reviewed HEAD `2e80dbf565feba939252c4fed590b9dd9528b6f9` 复核整分支；原 citation pagination Important 已 Resolved，Critical / Important / Minor 全部为 None。Reviewer 独立重跑 focused 20/20，并在 Node 22.22.2 / pnpm 11.16.0 下重跑 `pnpm verify`：861 non-skipped 通过、46 environment-gated skipped，结论 **Ready to merge: Yes**。本次复审对 DB/remote/production 运行声明仍标记 cannot-verify，不将报告证据推导为当前外部事实。下一步由用户决定如何集成该分支；功能仍为 **production unapplied**，任何 rollout 前必须重做实时 preflight，确认备份、Auth 服务与 human reviewer readiness，并获得显式 rollout 授权。
+
+**2026-08-24 Project score Evidence local integration（DONE）**：用户选择 finishing workflow 的 option 1。主工作区确认基线分支 `codex/phase-0-1-foundation` 精确位于 `63f5278`，仅有三个既有未跟踪 `.DS_Store`，随后将 `codex/project-score-evidence-detail` 快进合并到 `a372880`；这些个人文件未触碰。合并后首次 `pnpm verify` 因主工作区 `node_modules` 重建并尝试访问 registry，命中 DNS `ENOTFOUND`，未进入代码测试；用本机既有 pnpm v11 store 执行 `--offline --frozen-lockfile` 恢复 196 个锁定包后，fresh 完整门禁 exit 0：contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 gated skips，lint/typecheck/build/placeholders 全绿。该步骤只做本地 Git 集成与本地门禁，未访问生产、未应用第 21 个 migration；下一步是保留生产冻结边界并选择后续产品功能，而不是自动 rollout。
 
 ---
 
