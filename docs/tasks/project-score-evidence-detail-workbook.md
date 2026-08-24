@@ -10,7 +10,7 @@
 | 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
 | 3 | DONE | Strict repository reads | `1a5e26e` |
 | 4 | DONE | Anonymous integration coverage | `97d5f46` |
-| 5 | READY | Detail loader and safe presentation | — |
+| 5 | DONE | Detail loader and safe presentation | `feat(web): show score factors and evidence citations` |
 | 6 | READY | Full gate and documentation | — |
 
 ## Task 1 — strict public projection contracts
@@ -148,3 +148,24 @@ check; it was fully restored before GREEN and is absent from the commit.
 | Package gates | Required runtime unit command, database lint, and database typecheck | Unit 174 passed / 44 environment-gated skipped; lint and typecheck both exit 0. |
 | Final append-only cleanup | One fail-closed SSH command verifies exact disposable workdir/project/containers/64322/64321/marker, 21 files, and both artifact SHAs before reset; recheck marker and repository-test score count afterward | Exit 0. Only `airdrop-intelligence-governance-test` was reset; marker exact and repository-test score count 0. Production and 54321/54322 were untouched. |
 | Final repository gate | Fresh required-runtime `pnpm verify`, followed by tracked/production diff checks | Exit 0: lint/typecheck/build/placeholders green; contracts 107 + domain 222 + database 174 + worker 212 + web 127 = 842 non-skipped tests, 46 skips. Production repositories, migrations, and generated types have zero diff; tracked fix scope is one integration test plus workbook/HANDOVER. |
+
+## Task 5 — detail loader and safe presentation
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Preflight and baseline | Confirm linked worktree/HEAD, preserve controller-owned HANDOVER changes, inspect Task 5 brief/design/current Web boundary, and run required-runtime `pnpm --filter @airdrop/web test` | Worktree is `.worktrees/project-score-evidence-detail` on `codex/project-score-evidence-detail`, exact base `d039f3ea3f3e4a9756aa9cd08cc1f17f245134e8`. Only the controller's Task 4 review entry was initially modified; Task 4 Commit stayed exact `97d5f46`. Baseline passed 7 files / 127 tests, exit 0. |
+| Component RED | Add only `project-score-evidence.test.ts`, then run required-runtime `pnpm --filter @airdrop/web test -- project-score-evidence.test.ts` | Exit 1 as expected. The new suite failed collection only because `../components/project-score-evidence.js` did not exist; all 127 existing tests passed. Tests cover three independent axes, nine current axis/factor labels, contribution/input values, unknown fallback, factor empty state, active grouped citations, multiple/conflicting Evidence, rumored hiding, all eight source types, approved official wording, score-level non-causality, inert `<script>` escaping, and unsafe/outbound source absence. |
+| Loader RED | Add only `project-detail-loader.test.ts`, then run required-runtime `pnpm --filter @airdrop/web test -- project-detail-loader.test.ts` | Exit 1 as expected. The loader suite failed collection only because `../lib/project-detail-loader.js` did not exist; the other failure remained the already-recorded missing component, and all 127 existing tests passed. A complete hand-written `ProjectRepository` implementation locks signal timeline behavior, exact project/score IDs, parallel score-read start, scoreless zero calls, and not-found zero follow-up reads. |
+| Minimal implementation | Add the pure loader and safe components; delegate the existing server-only query; render explanation → factors → score-level Evidence → existing signal timeline; add only matching CSS and fixture-note copy | `loadProjectDetailFromRepository` keeps `listProjectSignals(projectId, 20)`, skips both score reads when `latestScore?.id` is absent, otherwise starts both reads in one `Promise.all` with the same `project.projectId + scoreId`. Components consume safe application types only; no dependency, query projection, database, RLS, scoring, or recommendation change. |
+| First GREEN correction | Re-run the brief package command after implementation | Two local failures only: the explicit `not '<a'` assertion also matched the semantic `<article>` tag prefix, and one test quote repeated its signal title. Replaced `<article>` with equivalent `<section>` and removed the accidental title repetition from the fixture; no product behavior or security expectation was weakened. |
+| Focused GREEN | Required runtime `pnpm --filter @airdrop/web exec vitest run src/tests/project-score-evidence.test.ts src/tests/project-detail-loader.test.ts`, followed by the brief package command | Focused 2 files / 13 tests passed, exit 0. The package command collected 9 files / 140 tests and also passed, exit 0. Citation markup contains escaped inert text and no citation anchor. |
+| Web gates | Required runtime `pnpm --filter @airdrop/web test`, `lint`, `typecheck`, and `build` | All exit 0. Tests: 9 files / 140 tests. ESLint and `tsc --noEmit` emitted no errors. Next 16.3.0 production build compiled successfully and included dynamic `/projects/[slug]`. |
+| Static safety and scope | Component forbidden-field scan, page/loader wiring inspection, `git diff --check`, and tracked-scope inspection | Component source has zero matches for `href`, `canonical_url`, `raw_text`, `reviewer`, `outbox`, `hash`, `dangerouslySetInnerHTML`, anchor markup, Markdown, or URL parsing. Citation text is the direct React text child of `blockquote`; multiple/conflicting rows remain separate within signal groups. `git diff --check` exits 0. No database, migration, generated type, repository, dependency, score math, production, or remote change. |
+| Full repository gate | `pnpm verify` | Not run in Task 5: the approved task brief requires the four Web gates, while Task 6 owns fresh full repository/database acceptance. This is recorded as not run, not inferred green. |
+
+Task 5 exposes the deterministic factor decomposition and reviewed score-level
+Evidence set without inventing factor-to-Evidence causality. Opportunity, risk,
+and confidence remain separate. Active projects render grouped inert citations;
+rumored projects render only the approved hidden-state explanation. No external
+citation link is exposed, and the existing official-project website link is
+unchanged and outside the citation component.

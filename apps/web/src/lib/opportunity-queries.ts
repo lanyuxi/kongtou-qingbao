@@ -3,10 +3,12 @@ import 'server-only';
 import {
   createProjectRepository,
   type OpportunityListItem,
-  type ProjectDetail,
-  type ProjectSignal,
 } from '@airdrop/database';
 
+import {
+  loadProjectDetailFromRepository,
+  type ProjectDetailResult,
+} from './project-detail-loader.js';
 import { createServerSupabaseClient } from './supabase-server.js';
 
 export interface OpportunityOverview {
@@ -53,16 +55,9 @@ export async function listOpportunities(input: {
   });
 }
 
-export async function loadProjectDetail(
-  slug: string,
-): Promise<{ readonly project: ProjectDetail; readonly signals: readonly ProjectSignal[] } | null> {
+export async function loadProjectDetail(slug: string): Promise<ProjectDetailResult | null> {
   const repository = createProjectRepository(createServerSupabaseClient());
-  const project = await repository.getProjectBySlug(slug);
-  if (project === null) {
-    return null;
-  }
-  const signals = await repository.listProjectSignals(project.projectId, 20);
-  return { project, signals };
+  return loadProjectDetailFromRepository(repository, slug);
 }
 
 function countBy(

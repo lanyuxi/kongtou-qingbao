@@ -7,6 +7,10 @@ import {
   formatTimestamp,
   lifecycleLabel,
 } from '../../../components/opportunity-elements.js';
+import {
+  ScoreEvidenceCitations,
+  ScoreFactorGroups,
+} from '../../../components/project-score-evidence.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +26,7 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const { project, signals } = detail;
+  const { project, signals, factors, citations } = detail;
   const score = project.latestScore;
 
   return (
@@ -98,6 +102,19 @@ export default async function ProjectDetailPage({
               </section>
 
               <section className="card detail-section">
+                <h2 className="detail-section-title">评分因子</h2>
+                <ScoreFactorGroups factors={factors} />
+              </section>
+
+              <section className="card detail-section">
+                <h2 className="detail-section-title">本次评分证据</h2>
+                <ScoreEvidenceCitations
+                  projectLifecycle={project.lifecycle}
+                  citations={citations}
+                />
+              </section>
+
+              <section className="card detail-section">
                 <h2 className="detail-section-title">已发布信号</h2>
                 <SignalTimeline signals={signals} />
               </section>
@@ -129,7 +146,7 @@ export default async function ProjectDetailPage({
       <p className="fixture-note">
         演示项目的评分仍为手工样例数据（模型版本 <code>seed-fixture-v1</code>
         ）；真实来源项目由确定性评分管线计算（模型版本 <code>score-model-v1</code>
-        ）。已验证的教程与证据链接将随后续阶段上线。
+        ）。引用首版仅展示经审核的纯文本与安全来源元数据，暂不提供外部引用链接。
       </p>
     </main>
   );
