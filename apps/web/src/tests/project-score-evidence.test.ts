@@ -80,7 +80,7 @@ describe('ScoreFactorGroups', () => {
 });
 
 describe('ScoreEvidenceCitations', () => {
-  it('renders reviewed citation content as escaped inert text with score-level wording', () => {
+  it('renders reviewed citation content as escaped inert text with no anchor and score-level wording', () => {
     const html = renderToStaticMarkup(
       createElement(ScoreEvidenceCitations, {
         projectLifecycle: 'active',

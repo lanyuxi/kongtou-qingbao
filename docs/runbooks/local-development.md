@@ -191,6 +191,45 @@ Real repository integration for the review boundary additionally requires the fo
 
 Migration safety: `20260822000100_failed_ai_run_review.sql` is forward-only and additive; it does not modify any of the 19 earlier migrations or any canonical intelligence table. It adds two append-only review tables, three fixed-search-path security-definer RPCs, append-only triggers, and least-privilege grants, and grants no direct review-table access to browser or worker roles. Review decisions never write signals, scores, evidence, or promotion rows.
 
+## Project score factors and Evidence citations
+
+The project detail page binds its displayed scores, factor decomposition, and
+reviewed Evidence set to one immutable current score ID. `project_current_state`
+returns that ID as `project_score_id`; the Web loader then reads only
+`project_current_score_factors` and
+`project_current_score_evidence_citations` with the same project and score IDs.
+The factor view exposes deterministic opportunity, risk, and confidence inputs
+without changing their independent scoring semantics. The citation view is a
+score-level Evidence set and does not claim that one citation caused one factor.
+
+Citation text is rendered as escaped, inert text. The public projection and
+component expose no source URL, Raw Item body, hash, review payload, governance
+metadata, anchor, or `href`. Until a separate verified allowlisted-reference
+feature exists, do not turn citation metadata into links. An active project may
+show its current factors and grouped reviewed citations, including distinct or
+conflicting Evidence rows. A rumored project may show current factors but keeps
+all citations hidden. Historical-score factor and citation queries return no
+public rows.
+
+Focused checks are:
+
+```bash
+supabase test db supabase/tests/012_project_score_evidence_detail.test.sql
+pnpm --filter @airdrop/database test -- project-score-evidence.test.ts
+pnpm --filter @airdrop/database test:integration
+pnpm --filter @airdrop/web exec vitest run src/tests/project-score-evidence.test.ts src/tests/project-detail-loader.test.ts
+```
+
+Database resets and real integration are destructive acceptance operations. In
+the current remote acceptance topology, run them only after a fail-closed check
+of `/root/airdrop-governance-test`, project
+`airdrop-intelligence-governance-test`, database/Kong host ports `64322`/`64321`,
+local tunnels `16432`/`16433`, the exact paused seed marker, and the migration,
+test, and seed hashes. Never target `airdrop-intelligence-os` or ports
+`54321`/`54322` for these acceptance commands. Integration fixtures create
+append-only Evidence and score history; clean them only with a final fresh reset
+of the verified disposable stack, never with row-by-row history deletion.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:

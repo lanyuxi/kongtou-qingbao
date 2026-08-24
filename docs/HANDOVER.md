@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-24（Phase 6B 已完成主线集成：冲突仅涉及本手册，产品代码自动合入；Node 22.22.2 / pnpm 11.16.0 合并后门禁全绿）
+> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 六任务本地实现与全门禁完成；production unapplied）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`；第 20 个迁移继续冻结。下一项“详情页 score factors + 经审核 Evidence 引用”的书面规范已审核通过，六任务 TDD 实施计划已完成，等待选择执行方式。
+> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation` 并通过正式门禁；**Phase 6B 尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结。详情页 score factors + 经审核 Evidence 引用已在 `codex/project-score-evidence-detail` 完成六任务本地实现与全门禁；**local implementation complete; production unapplied**。Task 6 未访问生产，该表述不代替下次 rollout 前的实时预检。
 
 > **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
 
@@ -22,7 +22,7 @@
 1. **当前阶段**：Phase 6B 的产品代码、迁移、契约、BFF、审核 UI、授权矩阵与文档已完成并集成到主线。“主线集成完成”和“生产部署完成”仍必须分开表述；后者尚未发生。
 2. **本轮集成结果**：已合入 `codex/phase-6b-failed-ai-review`，人工协调本手册并保留 §8.5 生产检查点；修正 workbook 的 Task 7/8 commit 残留和重复 Task 7 汇总；Node 22.22.2 / pnpm 11.16.0 合并后 `pnpm verify` exit 0。
 3. **生产 rollout 不是当前可自动执行的下一步**：截至 2026-08-22 最后一次只读预检，仍缺项目所有者确认的 human reviewer、健康的生产 Auth 服务和已演练的迁移前备份；三项补齐后还需显式生产授权，才能应用第 20 个迁移并执行 smoke/拒绝矩阵。
-4. **下一项功能开发**：现在进入项目详情页 `score_factors` + 经审核 Evidence 引用展示及其 anon 安全读模型/策略设计。Raw quote 不得直接公开，机会/风险/置信度继续独立。教程生成仍应排在链接白名单与 security incidents 前置设计之后。
+4. **详情页功能开发**：`score_factors` + 经审核 Evidence 引用的 anon 安全读模型、repository、真实集成与 Web 展示已在独立分支本地完成。引用只展示已审核、受 grounding 约束的惰性文本，无链接；机会/风险/置信度继续独立。该功能 production unapplied；教程生成仍应排在链接白名单与 security incidents 前置设计之后。
 > **2026-08-22 本轮接续结果（Codex → WorkBuddy 交接）**：Codex 完成 Task 1–7 实现与多轮评审，但 Task 7 fix round 1（partial Auth setup 精确清理缺口修复）因账户额度耗尽，其 disposable focused 复验与 scoped re-review 未获审批而搁置，代码与文档修改未提交。WorkBuddy 接手后：① 通读 HANDOVER、6B spec/plan/workbook/progress 与未提交 diff，确认修复最小且与报告一致；② 以容器名 `governance-test` 双重白名单脚本在远程 disposable 栈推导 4 个集成测试环境变量（脚本仅输出行数校验，值经 SSH 加密通道回传本地 `/tmp/airdrop-6b-test.env`，umask 077/chmod 600，远程副本当场删除）；③ 恢复 `16433 → 64321` 隧道并以 `/auth/v1/health` 200 确认目标为 disposable 栈；生产端口（54321/54322）无隧道、未访问。随后按序执行 focused integration 6/6 复验、提交 fix round 1、scoped re-review，并续作 Task 8/9。Phase 6A 生产落地、Evidence 补证/对账与 Web 验证保持不变，详见 §8.2。
 
 ---
@@ -85,7 +85,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 7. 通知系统（alerts、偏好）
 8. 安全风控（incidents、indicators、protect-first 工作流）
 9. 用户认证与私有数据（profiles、RLS user_id 场景目前未启用）
-10. 运营/审核后台界面（目前只有 API）；详情页尚无 score_factors / score_signal_links 的展示（数据已落库，anon 读策略未开，随详情页因子展示一起做）
+10. 运营/审核后台界面（目前只有 API）；详情页 score factors / reviewed Evidence 的本地实现已完成，生产未应用
 11. 多源扩展：X/Twitter、项目方公告页结构化解析等
 
 ---
@@ -505,6 +505,18 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence Task 3（repository + review fix）**：`1a5e26e` 新增两个严格 repository 读取 API；`ProjectScore.id` 与总分字段来自同一 `project_current_state` 行，因子/引用查询同时 filter `project_id` 与不可变 `project_score_id`，只选择 7/15 个安全列，每行先经 Task 1 strict Zod schema 再映射，PostgREST 错误不携带 message/details/hint/body，排序规则具备稳定 tie-breaker。首轮独立审查确认生产实现正确，但发现 1 个 Important：测试未锁住“同一次 current-state 查询 + 精确 projection”。原实现代理以 test-only commit `23c30d7` 增加 exact projection 与 exactly-once relation lookup 保护；移除 `project_score_id` 和增加第二次 lookup 的两项临时 mutation 均产生具名 RED，恢复后 focused 28/28、database lint/typecheck 及 fresh `pnpm verify`（842 non-skipped、42 existing skips）全绿。复审结论 **Compliant / Approved**，原 Important Resolved，Critical/Important/Minor 均为 0；生产 repository 相对 `1a5e26e` 无额外改动。现进入 Task 4 真实匿名 PostgREST 集成覆盖。
 
 **2026-08-24 Project score Evidence Task 4（real anon integration + isolation fix）**：`97d5f46` 用随机 test-owned IDs 扩展真实匿名 PostgREST fixture，覆盖同一 `latestScore.id`、active 三轴 factors、active 同一 signal 的两条 distinct Evidence、rumored factors 可见但 citations 隐藏、historical factors/citations 隐藏及安全对象 exact keys。新断言因 Task 2–3 已完成而首次直接 GREEN（full integration 44/44）；按 ledger 临时移除 score-ID filter 后，历史 score 具名断言 RED，恢复后 focused 7/7。首轮独立审查发现 1 个 Important：focused run 遗留的 official+verified `project_sources` 会污染 durable-queue eligibility；另有 1 个 workbook commit Minor。`d039f3e` 在 `afterAll` 事务内先复验固定 disposable marker，再仅按本轮随机 source/project IDs 删除三条**可变** `project_sources`，不删除 Evidence、signal/Evidence links、score links、factors 或 score history。无中间 reset 的 project 7/7 → queue 9/9、连续两轮 full integration 44/44 均通过；fresh `pnpm verify` 842 non-skipped、46 environment-gated skips 全绿，最终 marker-verified disposable reset 后 repository-test score count=0。复审结论 **Compliant / Approved**，原 Important/Minor 均 Resolved，无剩余 Critical/Important/Minor；production repository/migration/generated types 无改动。现进入 Task 5 详情 loader 与安全展示。
+
+**2026-08-24 Project score Evidence Task 5（detail loader + safe rendering）**：`ab73551` 新增纯 `loadProjectDetailFromRepository`，保留 signals timeline；scoreless 时不调用 factor/citation，有 current score 时以同一 `projectId + latestScore.id` 在 `Promise.all` 并行读取。页面新增机会/风险/置信度三组因子与独立的“本次评分快照使用的证据集”；active citation 按 signal 分组并保留多条/冲突 Evidence，非 active 隐藏，官方来源文案只在 relation official 且具 verified timestamp 时显示。引用正文直接作为 `<blockquote>` 的 React text child，动态 `<script>` fixture 只产生 escaped inert text；组件无 anchor/href、URL/Markdown/HTML parser、`dangerouslySetInnerHTML` 或 unsafe field。Web focused 13/13、full 140/140、lint/typecheck/Next build 全绿。独立审查结论 **Compliant / Approved**，Critical/Important 为 0；仅 1 个文档 Minor：workbook Task 5 Commit 单元格应从 subject 改为 `ab73551`，已交由 Task 6 修正。全仓 `pnpm verify` 按计划由 Task 6 执行。
+
+**2026-08-24 Project score Evidence Task 6 Step 1（database sensitivity）**：所有写入/reset/test 前均 fail-closed 复验唯一 disposable `/root/airdrop-governance-test`、project `airdrop-intelligence-governance-test`、DB/Kong containers、64322/64321、fixed paused marker、21 migrations 以及 migration/012/006/seed hashes；16432/16433 现有隧道命令亦精确指向 64322/64321。仅在远端 disposable migration copy 临时向 `anon, authenticated` 授予 Evidence `normalized_quote_sha256` SELECT，mutation SHA-256 `5ea5bf2f7337d5068d1be97e4605090d27913b8a3d51e8a78f6dd2158655899e`。Focused 012 如期 exit 1：具名第 24 项“browser roles have the exact safe base-table column SELECT matrix”与第 58 项“anonymous users cannot read Evidence hashes”失败（81/83 通过）。立即用备份 `cmp` 恢复，本地 `git diff --exit-code` 与本地/远端 SHA 均证明 migration 恢复为 committed `8c0a2e3c4a76ad8b3b155701cc665544470b9b2715deabd91d6731566c42ea60`；再次 marker/hash 复验后 fresh reset，focused 012 为 83/83 PASS。变异未进入本地 diff；未访问生产项目、容器或 54321/54322。
+
+**2026-08-24 Project score Evidence Task 6 Step 2（UI sensitivity）**：仅将现有 citation escaping 测试名强化为具名 no-anchor 边界，再在组件中临时包装 `<a href="https://unsafe.test">`。Focused Web RED 如期 exit 1：“renders reviewed citation content as escaped inert text with no anchor and score-level wording”的 `not.toContain('<a')` 以及组件源码的 unsafe/outbound-field 断言失败（8/10 通过）。组件在同一受控流程的 `finally` 中立即恢复，恢复后与 HEAD 零 diff，SHA-256 `3760b17ac6dff9a53d58d1352a7cdcdcf471fd3be66a5c22789a6b03c33ef9b1`；focused Web 恢复态 10/10 PASS，`git diff --check` exit 0。Unsafe anchor 未进入 diff。
+
+**2026-08-24 Project score Evidence Task 6 Step 3（final disposable database + integration gates）**：在再次完整 marker/topology/hash 复验后，仅 reset `airdrop-intelligence-governance-test`；21 migrations 与 seed 应用成功。Focused 012 为 83/83 PASS，full pgTAP 为 12 files / 1114 tests PASS。再复验 16432 → 64322、16433 → 64321 的精确 SSH 隧道与 disposable marker/artifacts，仅从指定 test containers 在 shell 内派生临时凭据（不打印、不落盘，测试后 unset）；real repository integration 为 7 files / 44 tests PASS。遵守 append-only fixture 规则，未逐行删除 Evidence/links/history；最后仅用一次 guarded fresh reset 清理，并证明 `model_version = 'repository-test'` score count 为 0、`anon` 无 `evidence.normalized_quote_sha256` SELECT、migration SHA 仍为 `8c0a2e3c4a76ad8b3b155701cc665544470b9b2715deabd91d6731566c42ea60`。未访问生产项目、生产容器或 54321/54322。
+
+**2026-08-24 Project score Evidence Task 6 Step 4–5（repository gate + classified scan）**：Node 22.22.2 / pnpm 11.16.0 声明运行时下 fresh `pnpm verify` exit 0；lint/typecheck/build/placeholders 全绿，contracts 107 + domain 222 + database 174 + worker 212 + web 140 = 855 non-skipped tests，46 environment-gated skips。`git diff --check` exit 0。指定四文件 unsafe/secret scan 共 5 个命中，逐条分类为：contracts 的 `article_raw_text` 是安全 `source_field` locator enum，不是 Raw Item 正文；migration 两个 `service_role` 命中是既有安全 `project_current_state` view 的 revoke/grant ACL，另两个是新 views 的显式 revoke。组件与 repository 零命中；无 secret value、credential、unsafe URL、Raw Item body、candidate/reviewer/outbox payload 或 browser-visible privileged field。
+
+**2026-08-24 Project score Evidence Task 6（local completion checkpoint）**：Task 1–6 实现、敏感性 RED→GREEN、focused/full pgTAP、真实 integration、root gate、whitespace 与人工分类 scan 已闭环；Task 5 workbook commit 修正为 `ab73551`。功能状态为 **local implementation complete; production unapplied**。Task 6 执行期间未访问生产；这是本次执行事实，不根据未访问行为推断任何其他外部状态。
 
 **2026-08-24 Project score Evidence Task 5（preflight / Web baseline）**：已确认指定目录是 linked worktree `.worktrees/project-score-evidence-detail`，分支 `codex/project-score-evidence-detail`，HEAD 精确为基础提交 `d039f3ea3f3e4a9756aa9cd08cc1f17f245134e8`；仅保留 controller 未提交的上一段 Task 4 复审记录，workbook Task 4 Commit 仍为 `97d5f46`。Task 5 brief 与已批准设计一致，无需重新定型。Node 22.22.2 / pnpm 11.16.0 下 Web 基线 7 files / 127 tests passed，exit 0；尚未新增 Task 5 测试或生产实现，未访问数据库、生产或远端。
 

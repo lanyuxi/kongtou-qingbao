@@ -10,8 +10,8 @@
 | 2 | DONE | Minimum-privilege database read boundary | `e106c8a` |
 | 3 | DONE | Strict repository reads | `1a5e26e` |
 | 4 | DONE | Anonymous integration coverage | `97d5f46` |
-| 5 | DONE | Detail loader and safe presentation | `feat(web): show score factors and evidence citations` |
-| 6 | READY | Full gate and documentation | — |
+| 5 | DONE | Detail loader and safe presentation | `ab73551` |
+| 6 | DONE | Full gate and documentation | This commit (`docs: close project score evidence detail`) |
 
 ## Task 1 — strict public projection contracts
 
@@ -169,3 +169,27 @@ and confidence remain separate. Active projects render grouped inert citations;
 rumored projects render only the approved hidden-state explanation. No external
 citation link is exposed, and the existing official-project website link is
 unchanged and outside the citation component.
+
+## Task 6 — security sensitivity, full gates, and handover
+
+| Phase | Command or check | Result |
+| --- | --- | --- |
+| Preflight | Verify linked worktree/HEAD/runtime; inspect exact `16432 -> 64322` and `16433 -> 64321` SSH commands; before every remote write/reset/test recheck `/root/airdrop-governance-test`, project/container names, 64322/64321, fixed paused marker, 21 migrations, and migration/012/006/seed hashes | Passed fail-closed throughout. Node 22.22.2 / pnpm 11.16.0 and base `ab73551d155941a623b3e7935ee367d3ec9d595c` matched. Only the disposable project was accessed; production and forbidden 54321/54322 were not accessed. |
+| Database sensitivity RED | On only the remote disposable migration copy, temporarily grant `SELECT (normalized_quote_sha256)` on Evidence to browser roles, reset, and run focused 012 | Mutation SHA-256 `5ea5bf2f7337d5068d1be97e4605090d27913b8a3d51e8a78f6dd2158655899e`; exit 1 with 81/83 passing. Named failures were test 24, `browser roles have the exact safe base-table column SELECT matrix`, and test 58, `anonymous users cannot read Evidence hashes`. |
+| Database restore GREEN | Restore from the pre-mutation backup, require remote `cmp`, local production-file zero diff, and local/remote SHA `8c0a2e3c4a76ad8b3b155701cc665544470b9b2715deabd91d6731566c42ea60`; then guarded fresh reset and focused 012 | Restoration proofs passed; focused 012 passed 1 file / 83 tests. The unsafe migration mutation is absent from the local diff and remote artifact. |
+| UI sensitivity RED/GREEN | Rename the existing escaping test to state the no-anchor invariant; temporarily render `<a href="https://unsafe.test">`, run focused Web, restore in `finally`, require component zero diff, and rerun | RED: exit 1, 8/10 passed; the named no-anchor render assertion and unsafe-source assertion failed. Restored component SHA-256 `3760b17ac6dff9a53d58d1352a7cdcdcf471fd3be66a5c22789a6b03c33ef9b1`; GREEN: 1 file / 10 tests passed. The anchor mutation is absent from the diff. |
+| Final database gate | Recheck all disposable guards, fresh reset, focused 012, then full `supabase test db` | Reset applied all 21 migrations and seed. Focused 83/83 and full 12 files / 1114 tests passed; migration remained at committed SHA `8c0a2e3...ea60`. |
+| Real integration | Recheck marker/artifacts and exact tunnels; derive temporary test-container credentials only inside the shell without printing or persisting them; run `pnpm --filter @airdrop/database test:integration` | 7 files / 44 tests passed, exit 0; temporary variables were unset. |
+| Append-only cleanup | After integration, perform the only final fresh reset rather than deleting Evidence/links/history row by row | Exit 0; fixed marker exact, `project_scores.model_version = 'repository-test'` count 0, unsafe Evidence-hash grant false, committed migration SHA intact. |
+| Root gate | Required runtime `pnpm verify` | Exit 0: lint/typecheck/build/placeholders passed; contracts 107 + domain 222 + database 174 + worker 212 + web 140 = 855 non-skipped tests, with 46 environment-gated skips. |
+| Whitespace and unsafe/secret scan | `git diff --check`, then the Task 6 four-file `rg` scan with manual classification of every match | `git diff --check` exit 0. Five matches: the `article_raw_text` value is a safe source-field locator enum, not content; two `service_role` matches preserve revoke/grant on the existing safe `project_current_state` view; two more revoke `service_role` from the new views. Component and repository had no matches. No secret value, credential, unsafe URL, Raw Item body, candidate/reviewer/outbox payload, or browser-visible privileged field was present. |
+
+Commit sequence: `28c2fef` (contracts), `e106c8a` (database boundary),
+`1a5e26e` plus `23c30d7` (repository and invariant hardening), `97d5f46`
+plus `d039f3e` (real integration and fixture isolation), `ab73551` (Web
+presentation), and this Task 6 documentation commit.
+
+**Status:** local implementation complete; production unapplied. Task 6 did not
+access production. That statement records this execution only and does not infer
+external production state beyond the fact that this task made no production
+connection or change.
