@@ -14,6 +14,7 @@ const factorSelection =
   'project_id,project_score_id,axis,factor_code,contribution,input_value,detail';
 const citationSelection =
   'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at';
+const citationPageSize = 1_000;
 
 const axisOrder = { opportunity: 0, risk: 1, confidence: 2 } as const;
 
@@ -77,19 +78,64 @@ export async function listCurrentScoreEvidenceCitations(
 ): Promise<ProjectEvidenceCitation[]> {
   validateIdentifiers(projectId, projectScoreId);
 
-  const response = await client
-    .from('project_current_score_evidence_citations')
-    .select(citationSelection)
-    .eq('project_id', projectId)
-    .eq('project_score_id', projectScoreId);
+  const rows: PublicProjectEvidenceCitationRow[] = [];
+  const rowKeys = new Set<string>();
+  let expectedCount: number | undefined;
 
-  if (response.error !== null) {
-    throw new ProjectEvidenceCitationQueryError(response.error.code);
+  for (let from = 0; ; from += citationPageSize) {
+    const response = await client
+      .from('project_current_score_evidence_citations')
+      .select(citationSelection, { count: 'exact' })
+      .eq('project_id', projectId)
+      .eq('project_score_id', projectScoreId)
+      .order('signal_published_at', { ascending: false, nullsFirst: false })
+      .order('signal_id', { ascending: true })
+      .order('evidence_verified_at', { ascending: false })
+      .order('evidence_id', { ascending: true })
+      .range(from, from + citationPageSize - 1);
+
+    if (response.error !== null) {
+      throw new ProjectEvidenceCitationQueryError(response.error.code);
+    }
+    if (
+      response.count === null ||
+      !Number.isSafeInteger(response.count) ||
+      response.count < 0
+    ) {
+      throw new ProjectEvidenceCitationQueryError('citation_count_missing');
+    }
+    if (expectedCount === undefined) {
+      expectedCount = response.count;
+    } else if (response.count !== expectedCount) {
+      throw new ProjectEvidenceCitationQueryError('citation_count_changed');
+    }
+
+    const page = response.data ?? [];
+    const expectedPageLength = Math.min(citationPageSize, expectedCount - from);
+    if (page.length !== expectedPageLength) {
+      throw new ProjectEvidenceCitationQueryError('citation_page_size_mismatch');
+    }
+
+    for (const value of page) {
+      const row = publicProjectEvidenceCitationRowSchema.parse(value);
+      const rowKey = `${row.signal_id}:${row.evidence_id}`;
+      if (rowKeys.has(rowKey)) {
+        throw new ProjectEvidenceCitationQueryError('citation_duplicate_row');
+      }
+      rowKeys.add(rowKey);
+      rows.push(row);
+    }
+
+    if (rows.length === expectedCount) {
+      break;
+    }
   }
 
-  const citations = (response.data ?? []).map((row) =>
-    mapProjectEvidenceCitation(publicProjectEvidenceCitationRowSchema.parse(row)),
-  );
+  if (expectedCount === undefined || rows.length !== expectedCount) {
+    throw new ProjectEvidenceCitationQueryError('citation_count_mismatch');
+  }
+
+  const citations = rows.map(mapProjectEvidenceCitation);
   citations.sort(compareProjectEvidenceCitations);
   return citations;
 }
