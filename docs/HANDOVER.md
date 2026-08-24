@@ -1,13 +1,28 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-22（Phase 6B 详细设计已确认并固化：失败 AI run 使用真实 Supabase reviewer 会话、追加式审核决定、幂等/版本门禁与事务 outbox；Phase 6A 生产证据见 §8.2）
+> 最近更新：2026-08-24（本轮重新接手复核已完成：交接手册、当前仓库产出、Git/worktree、Phase 6B 设计/计划/workbook/实现与验证证据已校准；当前结论和下一步见下方“本轮最终判定”）
 > **2026-08-22 续**：Phase 6B 在独立分支 `codex/phase-6b-failed-ai-review`（worktree `.worktrees/phase-6b-failed-ai-review`）开发；Codex 额度耗尽后由 WorkBuddy（傻妞）接手，继续完成 Task 7 复验/提交与 Task 8/9。**6B 的实时状态以 worktree 内 `docs/HANDOVER.md` 为准**，本主线手册在 6B 合并前保持 Phase 0–6A 快照。
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态**：Phase 0–6A 全部完成并合并在主线 `codex/phase-0-1-foundation`（HEAD 以 `git log --oneline -1` 为准），`pnpm verify` 650 测试全绿；**生产库已应用全部 19 个迁移并完成 Evidence 补证/对账**，匿名读模型实测 12 个 opportunities，Ethereum 6 条真实 signals 已恢复。
+> **当前一句话状态（2026-08-24 复核）**：Phase 0–6A 已在主线；Phase 6B Task 1–8 已在 `codex/phase-6b-failed-ai-review` 本地完成并通过门禁，但**尚未合入主线、尚未部署生产**。Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`；立即下一步是先完成 6B 主线集成与 Node 22 合并后复验，而不是开始另一项功能或直接应用生产迁移。
 
-> **2026-08-22 本轮接续结果**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN。
+> **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
+
+### 2026-08-24 本轮交接复核进度
+
+| 步骤 | 状态 | 已核对内容 / 后续动作 |
+|---|---|---|
+| 1. 完整阅读交接手册 | **完成** | 已逐行读完本文件 432 行；确认手册同时包含“主线 Phase 0–6A 快照”和“Phase 6B Task 1–8 本地完成”两层状态，后续必须用当前仓库事实校准，不能只沿用顶部旧摘要 |
+| 2. 复核项目目录下产出文件 | **完成** | 已核对 228 个主线跟踪文件、应用/包源码、19 个迁移与 10 个 pgTAP 文件、全部阶段文档，以及 6B worktree 的 46 文件 / 8,776 行新增实现；确认 6B 分支干净（仅未跟踪 `.DS_Store`）且产出闭环 |
+| 3. 判断当前阶段与下一开发内容 | **完成** | 当前为“Phase 6B 本地完成、待主线集成/受控上线”；立即下一步是合并 6B 并复验，下一项功能才是详情页 score factors + 经审核 Evidence 展示 |
+
+### 2026-08-24 本轮最终判定
+
+1. **当前阶段**：Phase 6B 的产品代码、迁移、契约、BFF、审核 UI、授权矩阵与文档已在独立分支完成；主线仍停在 Phase 6A + 6B 设计/状态摘要。因此“本地实现完成”与“主线完成/生产部署完成”必须分开表述。
+2. **立即下一步（唯一优先项）**：将 `codex/phase-6b-failed-ai-review` 合入 `codex/phase-0-1-foundation`。合并时人工协调 `docs/HANDOVER.md`，保留本轮 2026-08-24 复核记录并吸收 6B worktree 的 §8.5 生产检查点；同时修正 workbook 的 Task 7/8 commit 残留和 6B HANDOVER 的重复 Task 7 行。合并后在项目声明的 Node 22 / pnpm 11.16.0 下运行 `pnpm verify`；本轮可用 bundled runtime 为 Node 24.19.0 / pnpm 11.19.0，已补跑并通过 798 个非跳过测试，但不能替代 Node 22 正式合并门禁。
+3. **生产 rollout 不是当前可自动执行的下一步**：截至 2026-08-22 最后一次只读预检，仍缺项目所有者确认的 human reviewer、健康的生产 Auth 服务和已演练的迁移前备份；三项补齐后还需显式生产授权，才能应用第 20 个迁移并执行 smoke/拒绝矩阵。
+4. **下一项功能开发**：6B 合并（以及生产策略明确）后，优先开发项目详情页 `score_factors` + 经审核 Evidence 引用展示及其 anon 安全读模型/策略。Raw quote 不得直接公开，机会/风险/置信度继续独立。教程生成仍应排在链接白名单与 security incidents 前置设计之后。
 
 ---
 
@@ -65,6 +80,14 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 ---
 
 ## 3. 架构与代码地图
+
+### 2026-08-24 产出文件复核摘要
+
+- **主线现状**：当前分支 `codex/phase-0-1-foundation`，HEAD `d2c71de`，共 228 个 Git 跟踪文件；源码分布为 Web 18、worker 48、contracts 13、domain 23、database 35 个文件；数据库为 19 个 forward-only 迁移和 10 个 pgTAP 文件。主线的 `failed-ai-run-review-workbook.md` 仍是 Task 1–9 全部 `READY` 的设计起点，不代表实际 6B 进度。
+- **Phase 6B 实际产出**：独立分支 `codex/phase-6b-failed-ai-review` HEAD `4ce6466`，相对主线新增/修改 46 个文件（`+8,776 / -31`）。产出包括严格 contracts、两张追加式审核表、3 个受保护 RPC、第 20 个迁移与第 11 个 pgTAP 文件、bearer-scoped server-only repository、3 条 `/api/v1/review/ai-runs` BFF 路由、登录/列表/详情/决策页面、浏览器 session/API client、安全文本显示策略、集成/授权矩阵测试、runbook 与 263 行执行 workbook。
+- **6B 验证证据**：worktree workbook 记录 Node 22 `pnpm verify` 798 个非跳过测试全绿，disposable focused integration 6/6、full repository integration 40/40、fixture 5/5、full pgTAP 1031/1031；迁移和 pgTAP 产物本地/远端 SHA-256 一致。当前 6B worktree 无已跟踪文件改动，仅有未跟踪 `.DS_Store`。
+- **分支关系**：主线与 6B 的 merge-base 是 `13c19e`；主线此后只有 `d2c71de` 这一笔 HANDOVER 状态同步，6B 此后有完整实现提交。两边共同修改 `docs/HANDOVER.md`，因此合并时应先保留本轮 2026-08-24 复核记录，再吸收 6B 手册的实时状态，不能用任一版本整文件覆盖另一版本。
+- **文档残留**：6B workbook 顶部 Task 7/8 的 Commit 单元格仍写 `acceptance commit pending`，但后文验收日志和 Git 已有 `bcbbe7c`、`5234807`；6B HANDOVER 的 Phase 6B Task 7 汇总行重复。两项属于合并时应修正的文档一致性问题，不推翻代码或测试结论。
 
 ### 2026-08-22 产出文件复核摘要
 
@@ -412,13 +435,13 @@ git branch -d codex/phase-6a-canonical-governance
 
 ⚠️ 删除前自查 phase-6a worktree 内有无未跟踪的个人文件（`git -C .worktrees/phase-6a-canonical-governance status --short`）。
 
-### 8.4 下一阶段开发方向（Phase 6B 起，按建议优先级）
+### 8.4 下一阶段操作与开发方向（2026-08-24，按优先级）
 
-1. **Phase 6B：失败 AI run 的 review / dead-letter 审核界面**——治理地基（决策表/受保护命令/幂等回执/outbox）已在 6A 就绪；毒物防护 park 住的失败输入与对账产生的 `needs_review` 决策都在等这个界面
-2. **详情页 score_factors / Evidence 引用展示 + anon 读策略**——把 Phase 4 因子数据变成用户可见；注意展示需符合「Raw quote 不自动公开」的约束（经审核的公共读模型才能带引用文本）
-3. **教程生成 tutorials**——价值链「执行」环；其前置（安全 incidents / 白名单链接）尚未开始，需先排期
-4. 其余按 §2「未开始」清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）
-5. 若上生产部署：worker 常驻进程（带 AI env）+ 采集调度常态化 + `collection_schedule_admin_login` 补建（§2 缺口表）
+1. **先集成 Phase 6B**：`codex/phase-6b-failed-ai-review` Task 1–8 已本地完成，先合入主线、协调 HANDOVER、修正文档残留，并在 Node 22 下运行合并后 `pnpm verify`。这是当前唯一立即动作。
+2. **再决定 Phase 6B 生产 rollout**：沿用 2026-08-22 只读预检的停止条件；human reviewer、生产 Auth 200、已演练备份和显式授权缺一不可。满足前不得应用第 20 个迁移。
+3. **下一项功能：详情页 score_factors / Evidence 引用展示 + anon 安全读策略**——把 Phase 4 因子数据变成用户可见；Raw quote 不自动公开，只能经审核的公共读模型提供引用文本。
+4. **教程生成 tutorials**——价值链“执行”环；其前置（安全 incidents / 白名单链接）尚未开始，需先设计排期。
+5. 其余按 §2“未开始”清单顺序（任务管理 → 通知 → 安全风控 → 认证 → 多源扩展）。若上生产部署，另需 worker 常驻进程（带 AI env）、采集调度常态化与 `collection_schedule_admin_login` 补建。
 
 ---
 
