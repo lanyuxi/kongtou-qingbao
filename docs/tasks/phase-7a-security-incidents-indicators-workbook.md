@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：Task 2 pure security rules 已完成；下一步为 Task 3 Security Ledger migration、commands、RLS、pgTAP
+> 当前状态：Task 2 经 Fix Round 2 scoped re-review APPROVED；下一步为 Task 3 Security Ledger migration、commands、RLS、pgTAP
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -21,7 +21,7 @@
 | Task | 交付物 | 状态 | RED / GREEN / 评审证据 |
 |---|---|---|---|
 | 1 | Strict security contracts | 已完成（review clean） | 初始 RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；初始 GREEN：contracts 12 files / 128 tests。Fix Round 1 RED：`projections.test.ts incident.test.ts` 3 个具名状态/scope 矛盾断言失败；GREEN：contracts 12 files / 131 tests，lint、typecheck 均 exit 0；scoped re-review 3/3 ADDRESSED、无新 Critical/Important。无数据库或应用行为变更。 |
-| 2 | Pure posture/transition/indicator rules | 已完成（Fix Round 2） | 初始 RED/GREEN 同前。Fix Round 1 补强完整 reason matrix、length 和 composite identity，但未覆盖 every action×current-state pair；Fix Round 2 以 5×3 literal lifecycle table 修复该缺口。state-gate mutation RED 精确失败，restored GREEN：domain 12 files / 375 tests，lint/typecheck、contracts 12 files / 131 tests，以及 `pnpm verify` 均 exit 0。无生产代码、数据库、迁移、网络、生产或依赖改动。 |
+| 2 | Pure posture/transition/indicator rules | 已完成（review clean） | 初始 RED/GREEN 同前。Fix Round 1 补强完整 reason matrix、length 和 composite identity，但未覆盖 every action×current-state pair；Fix Round 2 以 5×3 literal lifecycle table修复。state-gate mutation RED 精确失败，restored GREEN：domain 12 files / 375 tests，lint/typecheck、contracts 12 files / 131 tests，以及 `pnpm verify` 1,038 non-skipped / 46 skipped 均 exit 0；scoped re-review APPROVED。无生产代码、数据库、迁移、网络、生产或依赖改动。 |
 | 3 | Security Ledger migration、commands、RLS、pgTAP | 待执行 | — |
 | 4 | Bearer-scoped security review repositories + races | 待执行 | — |
 | 5 | Security extraction routing + ordinary Promotion guards | 待执行 | — |
@@ -50,6 +50,7 @@
 | 2026-08-26 | Task 2 pure security rules | 完成：以 3 个新测试文件的 72 个真实缺失-export failures 开始，新增无依赖 posture precedence/lock ordering、candidate/incident/disclosure reason-transition，以及 indicator normalization/lexical/exact normalized occurrence 规则。测试覆盖 all posture pairs、independent resolve、open/reopen/adjust/attach/no-op、reason matrix、target dedupe/order、Unicode whitespace、unpaired surrogate/control、domain 253/254、HTTP(S) URL 和 exact occurrence。GREEN：domain 12 files / 295 tests，lint/typecheck exit 0；contracts 12 files / 131 tests，exit 0。未运行数据库 reset/integration，未连接生产。 |
 | 2026-08-26 | Task 2 Fix Round 1 | 完成：只补测试。candidate 以手写 literal 覆盖 4×7=28 decision×reason pairs；disclosure 覆盖 2×3 pairs；incident 补强 open/reopen、resolve、attach 和 strict/lower/same adjust 的 reason matrix、no-op 和 independent resolve；但未穷尽 action×current-state，Round 2 已纠正。补 general non-domain 1/500/0/501 长度与 project/source same UUID composite-key tests。临时删除 `accept_and_open` allowlist、将通用上限改为 499、将 lock key 降为 id-only 后，covering run 精确 3 failed / 356 passed；立即逐行恢复，covering/full domain 为 12 files / 360 tests，lint/typecheck、contracts 12 files / 131 tests 和 `pnpm verify` 均 exit 0。无 production diff、数据库、迁移、网络、生产或依赖改动。 |
 | 2026-08-26 | Task 2 Fix Round 2 | 完成：新增 5 actions × 3 current states 的 literal lifecycle matrix。每个 action 使用自身有效 reason/payload，明确仅 none→open、active→adjust/attach_indicator/resolve、resolved→reopen 为 true，其余 10 pair 均 false。临时把 `open` gate 放宽为允许 active 后，covering `review-rules.test.ts` 精确 1 failed / 374 passed，具名 `permits open from active: false` 实际为 true；立即逐行恢复 production check。GREEN：covering/full domain 12 files / 375 tests，domain lint/typecheck、contracts 12 files / 131 tests 与 `pnpm verify` 均 exit 0。无 production diff、数据库、迁移、网络、生产或依赖改动。 |
+| 2026-08-26 | Task 2 scoped re-review | 完成：round 1 的 boundary/composite identity finding 已 ADDRESSED；round 2 的 lifecycle-state matrix finding 已 APPROVED，修复 diff 无新 breakage，最终 production files 相对 `debc2c5` 零变化。复审提到“未提交 Round 1 改动”，但 controller 以 clean `git status` 与提交 `2db7827` 核对为已提交、非遗留工作树改动。 |
 
 ## 4. 执行证据模板
 
