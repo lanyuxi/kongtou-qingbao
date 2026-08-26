@@ -18,6 +18,60 @@ const resolved = {
   severity: 'high' as const,
   summary: '此前风险已经处理。',
 };
+const activeCaution = {
+  state: 'active' as const,
+  posture: 'caution' as const,
+  severity: 'high' as const,
+  summary: '谨慎状态仍在调查中。',
+};
+
+const lifecycleCurrentByState = {
+  none: null,
+  active: activeCaution,
+  resolved,
+} as const;
+
+const validLifecycleCommandByAction = {
+  open: {
+    action: 'open' as const,
+    reasonCode: 'precautionary_evidence' as const,
+    evidenceId: 'evidence-lifecycle-open',
+    resultingPosture: 'caution' as const,
+    resultingSeverity: 'low' as const,
+    publicSummary: '新近证据显示需要保持谨慎。',
+  },
+  adjust: {
+    action: 'adjust' as const,
+    reasonCode: 'evidence_escalated' as const,
+    evidenceId: 'evidence-lifecycle-adjust',
+    resultingPosture: 'blocked' as const,
+    resultingSeverity: 'high' as const,
+    publicSummary: '升级后的公开风险摘要。',
+  },
+  attach_indicator: {
+    action: 'attach_indicator' as const,
+    reasonCode: 'additional_evidence' as const,
+    evidenceId: 'evidence-lifecycle-attach',
+    resultingPosture: 'caution' as const,
+    resultingSeverity: 'high' as const,
+    publicSummary: activeCaution.summary,
+  },
+  resolve: {
+    action: 'resolve' as const,
+    reasonCode: 'mitigation_verified' as const,
+    evidenceId: 'evidence-lifecycle-resolve',
+    resultingSeverity: 'high' as const,
+    publicSummary: '该独立事件已完成缓解。',
+  },
+  reopen: {
+    action: 'reopen' as const,
+    reasonCode: 'precautionary_evidence' as const,
+    evidenceId: 'evidence-lifecycle-reopen',
+    resultingPosture: 'caution' as const,
+    resultingSeverity: 'high' as const,
+    publicSummary: '新的证据需要恢复谨慎状态。',
+  },
+} as const;
 
 function expectInvalid(result: { readonly ok: boolean; readonly code?: string }): void {
   expect(result).toEqual({ ok: false, code: 'security_command_invalid' });
@@ -60,6 +114,30 @@ describe('candidate decision reasons', () => {
 });
 
 describe('incident transitions', () => {
+  // Break caught: accepting an otherwise valid action from a lifecycle state that does not permit it.
+  it.each([
+    ['open', 'none', true],
+    ['open', 'active', false],
+    ['open', 'resolved', false],
+    ['adjust', 'none', false],
+    ['adjust', 'active', true],
+    ['adjust', 'resolved', false],
+    ['attach_indicator', 'none', false],
+    ['attach_indicator', 'active', true],
+    ['attach_indicator', 'resolved', false],
+    ['resolve', 'none', false],
+    ['resolve', 'active', true],
+    ['resolve', 'resolved', false],
+    ['reopen', 'none', false],
+    ['reopen', 'active', false],
+    ['reopen', 'resolved', true],
+  ] as const)('permits %s from %s: %s', (action, currentState, expected) => {
+    expect(validateIncidentTransition({
+      current: lifecycleCurrentByState[currentState],
+      command: validLifecycleCommandByAction[action],
+    }).ok).toBe(expected);
+  });
+
   // Break caught: allowing invalid reasons while opening or reopening an incident.
   it.each([
     ['open', 'precautionary_evidence', true],
