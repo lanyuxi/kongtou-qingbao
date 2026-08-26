@@ -1,10 +1,77 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-24（Project score factors + reviewed Evidence detail 已本地快进集成主线；合并后正式门禁通过；production unapplied）
+> 最近更新：2026-08-26（用户已选择方案 1：Subagent-Driven；正在建立隔离 worktree、执行账本与 declared-runtime 基线，随后直接开始 Task 1）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-24）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`，后者由 `63f5278` 快进到 `a372880` 并通过合并后正式门禁；**两项功能均尚未部署生产**。Phase 6B Task 9 依据 2026-08-22 最后一次只读预检停在 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`，第 20 个迁移继续冻结；详情页功能的第 21 个 migration 同样 production unapplied。任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-26 仓库复核）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`；当前 HEAD `74f0e6c`，功能锚点 `a372880`。仓库含 21 个迁移，但生产仍只能按 2026-08-22 的最后证据视为已应用 19 个；第 20/21 个 migration 均为 **production unapplied**。下一产品开发入口是安全事件/指标与 verified allowlisted references 的前置架构设计，不是直接开发教程；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+
+### 2026-08-26 本轮接续复核进度
+
+| 步骤 | 状态 | 已核对内容 / 后续动作 |
+|---|---|---|
+| 1. 阅读交接手册与上一会话 `01a03208-81fd-7983-afad-2dec796e5aeb` | **完成** | 上一会话已完成详情页 score factors + reviewed Evidence 功能的最终复审、本地主线快进集成和合并后门禁；当前分支仍为 `codex/phase-0-1-foundation`，HEAD 为文档收尾提交 `74f0e6c`，功能提交锚点为 `a372880`。当前仅有三个未跟踪 `.DS_Store`，本轮不触碰。生产 rollout 与第 20/21 个迁移均未获执行授权。 |
+| 2. 复核项目目录产出 | **完成** | 当前主线共 276 个 Git 跟踪文件：23 个 docs、101 个 apps、94 个 packages、21 个 forward-only migrations、12 个 pgTAP、4 个 scripts、21 个根配置/fixture/seed 等文件。已核对全部路径清单，并细读当前 HANDOVER、runbook、Phase 6B 与 score/Evidence 的 spec/workbook、最新两项 migration 及对应 contracts/repository/Web/test 边界；源码和迁移中未发现新的开发占位标记。 |
+| 3. 判定当前阶段与下一开发内容 | **完成** | 当前是“Phase 6B + score/Evidence 详情页本地完成、生产未落地”的检查点。下一产品开发应先进入架构级 **Phase 7A：Security incidents + indicators** 设计，再做 **Phase 7B：verified allowlisted references**，之后才具备教程前置条件；不应直接写 tutorial。若目标改为上线，则走独立运营轨：human reviewer、生产 Auth 200、已演练备份、显式授权齐备后，重新 preflight 并受控应用第 20/21 个迁移。 |
+| 4. 最终一致性检查 | **完成** | 精确 Node 22.22.2 / pnpm 11.16.0 下 fresh `pnpm verify` exit 0：contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 environment-gated skips；lint、typecheck、build、placeholders 全绿。首次全仓复验曾命中既有 worker SIGTERM 时序用例，focused 8/8 后复跑通过；随后 placeholder 门禁正确拦截本轮文档中的占位符字面量，措辞修正后全门禁通过。未运行数据库 reset/integration，未连接生产。 |
+
+> 本轮会话接续原则：旧会话内容只作为历史证据，不作为新指令；任何生产访问、迁移应用、账号创建、部署或远端状态变更都不在本次只读盘点与文档更新授权范围内。
+
+> 第 2 步目录复核结论：仓库当前已经包含失败 AI run 审核的完整本地纵切片（contracts → migration/RPC/RLS → bearer-scoped repository → `/api/v1` BFF → reviewer UI → 授权/集成测试），以及详情页不可变 score ID、三轴因子和无外链 Evidence citations 的完整本地纵切片。第 20/21 个 migration 只具备本地/disposable 验收证据；生产已应用数量仍只能沿用 2026-08-22 的 19 个历史快照，必须在未来 rollout 前现场重查。
+
+> 第 3 步阶段判定依据：`canonical-intelligence-governance-design.md` 的既定 follow-on order 明确把 failed-run review、score/Evidence detail 放在前两位，二者现已本地完成；第三位是 security incidents、indicators、verified allowlisted references，第四位才是 tutorials、认证执行功能、notifications 与第三方源正式接入。当前 schema/源码中尚无前三项的实现，因此这是新的架构设计工作，不能当作小改动直接编码。
+
+### 2026-08-26 本轮最终判定
+
+1. **当前工程阶段**：Phase 6B Task 1–8 与 Project score factors / reviewed Evidence citations 已完成本地实现、主线集成和当前仓库门禁；仓库 HEAD 为 `74f0e6c`，本轮仅修改本交接手册。
+2. **当前生产阶段**：不能把本地完成写成已上线。最后可信生产快照仍是 2026-08-22 的 19 个已应用迁移；第 20 个 failed-AI-run review migration 和第 21 个 score/Evidence detail migration 均继续按未应用处理。
+3. **下一产品开发任务**：先对 **Phase 7A Security incidents + indicators** 做架构设计和用户审批，定义 protect-first 状态机、追加式历史、Evidence/Source/Raw Item 追溯、Promotion/audit/outbox 边界和最小授权；再单独设计 **Phase 7B verified allowlisted references**。两者完成后才进入 tutorials。
+4. **若下一目标是生产上线而不是继续开发**：先由项目所有者指定真实 human reviewer，恢复生产 Auth 并现场确认 health 200，建立并演练迁移前备份，再明确授权 rollout；之后重新只读 preflight，按顺序受控应用/登记第 20、21 个迁移并执行 reviewer 与匿名读路径 smoke/拒绝矩阵。
+
+### 2026-08-26 Phase 7A 设计进度
+
+| 步骤 | 状态 | 结论 / 后续动作 |
+|---|---|---|
+| 1. 现状与边界研究 | **完成** | 当前仓库已预留 `security_reviewer` 角色、`security_risk` / `scam_indicator` AI 候选类型、`paused` project lifecycle 与 `blocked` recommendation 枚举；但没有 security incident/indicator 的 canonical 表、契约、命令、repository、API 或 UI。现有确定性评分器只产生 `act_now/watch/research/avoid`，不会产生 `blocked`。 |
+| 2. 产品范围澄清 | **完成** | 已确认独立 posture、两级作用域、三档状态、最严格合成、权限/候选入口、source/project 门禁、完整 reviewer/public UI 与逐 indicator 公共披露审批。 |
+| 3. 架构方案与分节设计 | **完成** | **已确认**采用追加式 Security Ledger，不采用可变 incident 聚合或复用 signal/catalog；总体架构与数据边界、命令/状态/事务、读模型/门禁/UI、安全测试/验收/不做项四节均已逐节确认。 |
+| 4. Spec / plan / TDD 实施 | **进行中** | 正式 spec 已批准；实施计划 `docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md` 与 workbook `docs/tasks/phase-7a-security-incidents-indicators-workbook.md` 已完成并自审，拆成 11 个独立 RED/GREEN/review/commit 任务。用户已选择方案 1：Subagent-Driven；当前按强制流程封存规划基线、建立 `codex/phase-7a-security-ledger` 隔离 worktree、创建 SDD ledger 并重跑 declared-runtime baseline，随后直接从 Task 1 contracts 进入 RED → GREEN。尚未写 Phase 7A 业务代码或 migration。 |
+
+Phase 7A 设计铁律：安全态与 opportunity/risk/confidence/score recommendation 保持独立；AI/collector 只能提交候选数据，不能写 canonical incident、最终 security decision 或解除封锁；事件、指标、决策和解除历史必须追加保留并追溯到 Evidence、Raw Item 与 Source；先施加最小相关预防措施，再调查；本阶段不包含 verified links、tutorials、notifications、自动交易或绕过类功能。
+
+**已确认的 Phase 7A 产品决定 1 — 独立安全覆盖层**：公开/内部消费者读取独立的 security posture，而不是由安全事件重写 Catalog lifecycle 或评分历史。安全封锁不会降低或覆盖 opportunity/risk/confidence，也不会伪造新的 deterministic score recommendation；页面可以同时显示原评分与当前安全限制。安全态恢复必须追加新的 reviewer decision，保留原 incident、indicator、precaution 与解除依据。
+
+**已确认的 Phase 7A 产品决定 2 — 最小封锁粒度**：首版 canonical security effect 仅作用于 `project` 或 `source`。来源级风险只暂停该来源的后续安全消费，不自动扩大为项目级封锁；只有事件证据指向项目整体时才创建项目级 precaution。indicator 可以记录域名、URL、合约地址、交易哈希或其他受约束观察值，但本阶段不为这些值建立公开链接解析、reference 级 enforcement 或教程联动。
+
+**已确认的 Phase 7A 产品决定 3 — 人工 canonical 权限边界**：只有当前持有未撤销 `security_reviewer` 或 `admin` grant 的 Supabase 会话，才能调用受保护命令创建 incident + 初始 precaution、升级/降级 precaution 或解除安全限制；调用者身份必须来自 `auth.uid()`，不能由请求体指定。AI、collector、普通 reviewer、普通 admin 以外的应用角色只能提交或持有候选数据，不能写 canonical security decision。接受命令必须把 decision、precaution history、audit/command receipt 与 transactional outbox 原子提交。
+
+**已确认的 Phase 7A 产品决定 4 — blocked source 的 Evidence 门禁**：来源级 precaution 生效后，该 source 立即停止进入新的采集/公开情报消费，并从公开 Evidence 有效性判断中排除。仅由 blocked source 支撑的 published signals 与 scores 保留在数据库但从公共读模型隐藏；若同一 claim/score 仍有其他未封锁来源的完整有效 Evidence，则继续公开。项目详情与冲突/历史记录不被删除或静默覆盖。
+
+**已确认的 Phase 7A 产品决定 5 — blocked project 的公开呈现**：项目级 precaution 生效后，该项目立即退出首页推荐、可执行机会排序和 `act_now/watch/research/avoid` 统计，但不删除项目、signals、scores、Evidence 或安全历史。公共机会页提供独立“安全封锁”视图；详情页继续可访问，优先展示安全警告、当前 posture 与可公开的 incident 摘要，并将既有机会/风险/置信度和 score recommendation 明确标成安全事件前的历史评分快照，不能作为当前行动建议。
+
+**已确认的 Phase 7A 产品决定 6 — 三档 posture**：安全覆盖层使用 `clear / caution / blocked`。`clear` 表示没有有效 precaution；`caution` 保留公开展示与普通排序并显示警示，既有 Evidence 暂不失效，但该 target 的新 canonical intelligence 必须经过 active security reviewer 复核；`blocked` 执行已确认的 source/project 强制门禁。posture 不写回评分轴、score recommendation 或 project lifecycle。
+
+**已确认的 Phase 7A 产品决定 7 — 并发 incident 合成与解除**：同一 target 的当前 posture 由全部未解除 precaution 的最严格等级确定，优先级固定为 `blocked > caution > clear`。incident 的降级、解除与重新开启都追加新 decision/precaution history，并要求受约束 reason code 与 Evidence；处理一个 incident 不影响其他 incident。`clear` 只能在该 target 不再存在任何有效 precaution 时由读模型推导，禁止用可变字段或最后写入覆盖历史。
+
+**已确认的 Phase 7A 产品决定 8 — 两类 candidate 入口**：现有 AI/collector 管线产生的 `security_risk` / `scam_indicator` extraction candidates 必须从普通 signal Promotion 路由到专用 security candidate review queue；它们是非 canonical 候选，不能触发 precaution。active security reviewer 还可选择既有 Evidence 提交结构化 indicator candidate，但仍需经过同一受保护审核边界。首版不接第三方 threat-intelligence API、链上监控供应商或社区公开举报入口，这些后续单独设计来源可信度、速率限制与滥用防护。
+
+**已确认的 Phase 7A 产品决定 9 — 完整 reviewer + public UI 纵切片**：复用既有 Supabase browser session、认证验证器和 `/review` 专用 shell，但在 contracts、database、repository、BFF routes 与 UI 上建立独立 security 模块，不把安全事件塞进 failed-AI-run review 表。reviewer 端覆盖候选列表/详情、人工候选、incident 创建、precaution 调整、历史与解除；公共端覆盖 blocked 列表、机会/详情 posture 与安全警示。CLI 仅作受保护运维辅助，不是主审核入口。
+
+**已确认的 Phase 7A 产品决定 10 — 分级公共披露**：公共投影默认只暴露 posture、事件类别、严重度、安全摘要、首次发现/最近验证时间与受影响 scope。indicator 值只有在 security reviewer 的追加式决策中被逐条标记 `public_safe` 后才能公开，并始终按受约束惰性文本渲染，不生成 anchor、HTML、Markdown 或可执行链接。内部调查 note、Evidence locator、candidate payload、reviewer identity 和未批准 indicator 永不进入公共投影。
+
+**已确认的 Phase 7A 架构选型 — 追加式 Security Ledger**：采用独立的 candidate → indicator → incident → decision/precaution history → derived posture 数据链。拒绝在 incident 主记录上覆盖当前状态，也拒绝复用 signals、project lifecycle 或 score recommendation 表达安全决定。protected command 必须以真实 Supabase reviewer session 归因，并原子写入追加式历史、command receipt、security audit 与 transactional outbox；公共/内部 current posture 只从 ledger 推导。
+
+**已确认的 Phase 7A 设计第 1 节 — 总体架构与数据边界**：完整链路固定为“AI/collector 或 reviewer 人工提交 candidate → 专用 security candidate review → 受保护命令 → canonical indicator + Evidence links → incident + 追加式 decision/event history → project/source derived posture → collection、Evidence、opportunity 与公共投影门禁”。独立数据对象为 `security_indicator_candidates`、`security_candidate_review_decisions`、`security_indicators`、`security_indicator_evidence_links`、`security_incidents`、`security_incident_indicator_links`、`security_incident_decisions`、`security_events`、`security_review_commands`；事务性消息复用既有 `outbox_events`，但使用版本化 security event type。`packages/contracts` 唯一定义枚举、命令、回执、读模型、错误与事件 payload；`packages/domain` 只实现 posture 合成、状态转换、reason compatibility 与公开披露等纯规则；`packages/database` 负责追加式 schema、RLS、受保护事务命令、repository、读模型和 outbox。禁止在 incident 或 target 上存可覆盖的 `current_posture`：单 incident 当前效力由其最新追加决策推导，同一 target 再按 `blocked > caution > clear` 合成；canonical 写入不得经浏览器或普通表 DML 绕过受保护命令。
+
+**已确认的 Phase 7A 设计第 2 节 — 命令、状态与事务流程**：candidate 审核支持追加式 `needs_review`、`reject`、`accept_and_open` 与 `accept_and_attach`；前两者不创建 canonical 数据，后两者必须先确定性验证 target、Evidence → Raw Item → Source、locator、indicator 类型/值、source posture 与 scope。grounding 失败时只追加 `needs_review` 决定与安全审计，不创建 indicator、incident 或 precaution。incident 命令固定为 `open`、`adjust`、`resolve`、`reopen`，indicator 披露由独立 `set_indicator_disclosure` 命令逐条追加或撤销 `public_safe`；初始/重开/调整 posture 只能显式选择 `caution` 或 `blocked`，`clear` 仅由无有效 precaution 推导。所有 posture 变化均要求受约束 reason code 与有效 Evidence。每个成功 mutation 必须在单一数据库事务中原子提交 decision、必要的 indicator/Evidence/incident links、security event、command receipt 与版本化 outbox；事务期间不得调用模型、collector 或外部 API。所有 mutation 使用 `Idempotency-Key`，candidate/incident mutable aggregate 命令使用 `expected_version`；同 key 同请求精确重放，同 key 异请求报幂等冲突，同 incident 并发仅一个期望版本成功，不同 incident 可并发且 target posture 始终按全部有效 precaution 的最严格等级推导。调用者只取当前 Supabase `auth.uid()`，每次重新验证 active `security_reviewer` 或 `admin`；错误使用稳定领域码并清洗，outbox 仅携带安全对象引用/版本/类型/scope/posture，不携带身份、内部 note、locator、candidate payload 或 indicator 值。
+
+**已确认的 Phase 7A 设计第 3 节 — 读模型、门禁与界面流程**：内部读模型提供 candidate queue/detail、incident detail/history 与分别按 project/source 推导的 target posture；公共读模型只提供 project posture、获批 incident 摘要、逐条 `public_safe` indicator 和独立 blocked-project 游标列表。`blocked source` 在调度、外部请求前和写入事务前多点重检，停止新增采集/抽取/普通 Promotion/公开 Evidence 消费但保留历史；其已采集且确定性 grounded 的 Evidence 仍可由 Security Ledger 作为内部调查依据，绝不因此恢复普通公共资格。`caution` 可继续采集抽取，新 canonical intelligence 只能由 active security reviewer/admin Promotion。`clear` 沿用普通 Promotion 权限，`caution` 强制 security reviewer，`blocked` 除 Security Ledger 命令外拒绝新 canonical intelligence；强制检查必须落在受保护数据库命令边界。当前 schema 只有 score → signals → Evidence 而没有 factor → Evidence 归因，因此安全资格按整份 score 处理：每个 score-linked signal 均须保留至少一条非 blocked source Evidence，否则整份 score 及其 factor rows 退出当前公共排序并保留为历史，禁止伪造 factor 级证明；source 封锁不得自动升级为 project 封锁。reviewer UI 复用 `/review` 认证 shell，新建 `/review/security` 完整候选、incident、posture、披露和历史流程，高影响命令显式确认，409 刷新而不覆盖；公共 UI 提供独立安全封锁视图，`caution` 保留排序并警示，`blocked` 退出普通机会/统计但详情可访问且行动入口停用。公开 indicator 始终是经批准的惰性文本。Reviewer API 使用 `/api/v1/review/security/*`，公共 blocked 列表使用 `/api/v1/security/blocked-projects`，现有 opportunity/detail 只接严格 security projection；Route Handler 不执行长任务。
+
+**已确认的 Phase 7A 设计第 4 节 — 安全测试、验收标准与明确不做项**：contracts 必须验证 strict schema、类型/scope/reason 兼容、游标/边界、精确安全投影及敏感字段泄漏变异；domain 必须穷举 posture 合成、多 incident、追加式状态转换、Evidence/整份 score 门禁与披露规则；disposable Supabase 必须覆盖全部主体 RLS、protected-command-only canonical 写入、`auth.uid()` 归因、append-only、原子回滚/outbox、幂等/版本与双 session 并发。集成测试必须覆盖 source 在排队后、请求前、请求中的封锁时序、替代 Evidence、最后有效 Evidence 失效、caution Promotion、blocked project 公共流与 incident 独立解除；BFF/UI 覆盖认证、角色撤销、游标、409、确认流程、惰性文本/XSS 与 browser bundle 泄漏。Golden Dataset 增补明确/否定/历史/错实体/格式/冲突/prompt injection/locator/虚构引用样本，模型永远只产 candidate。完成必须同时证明 Evidence → Raw Item → Source 追溯、protect-first 原子性、即时门禁、公共零泄漏、clear 无回归、完整数据库与仓库门禁全绿并同步文档；明确排除 Phase 7B、reference enforcement、tutorials、notifications、钱包/交易、第三方威胁源/链上监控/公众举报、AI 自动 canonical 决策、scope 自动升级、评分/lifecycle 改写、实时推送及生产 rollout。
+
+**Phase 7A 正式设计规范与自审结论**：正式规范已写入 `docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`，并已获用户最终批准，状态为 `Approved`。自审补强了三项不改变已批产品范围的实现约束：① Security Ledger 可使用 blocked source 的历史 grounded Evidence 进行内部调查，但普通公共 Evidence/score 资格继续 fail-closed；② 现有模型没有 factor 直接 Evidence 归因，故门禁整份 score 及其 factor set，避免虚构因果关系；③ security command、ordinary Promotion、score persistence 与 source collection persistence 使用同一确定性 target advisory lock，按提交先后序列化封锁竞态，且命令时间取数据库事务时钟、不接受调用者伪造 reviewer/timestamp。规范已明确严格枚举/契约、九张 ledger 对象、RLS/append-only、candidate 版本、outbox 安全字段、全部 reviewer/public API/UI、Golden Dataset 与完成门禁；下一步是完成实施计划并由用户选择执行方式，不是直接跳过计划编码。
+
+**Phase 7A writing-plans 结果**：实施计划已写入 `docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`，配套跟踪表已写入 `docs/tasks/phase-7a-security-incidents-indicators-workbook.md`。计划按 contracts → domain → 单一 forward migration/pgTAP → bearer repository/races → extraction/Promotion → collection/scoring → public repository → BFF/client → reviewer UI → public UI → Golden/E2E/runbook/full verify 拆为 11 个任务、67 个 checkbox steps；每个任务均要求 RED、具名失败、最小 GREEN、focused gate、HANDOVER/workbook 更新和独立 conventional commit。自审已逐节映射 approved spec，修正跨任务类型/函数名、candidate/incident/indicator 版本、数据库事务时钟、score-level Evidence 语义和同 target advisory-lock 竞态；占位措辞扫描、`pnpm check:placeholders`、结构检查与 `git diff --check` 均通过。执行前必须使用 using-git-worktrees 建立 `codex/phase-7a-security-ledger` 隔离 worktree 并重跑 declared-runtime baseline；生产继续不在授权范围。
 
 > **2026-08-22 历史接续结果（当时状态）**：先完成 225 个跟踪产出与主线核验，再按 §8.2 将 Phase 6A 三迁移原子应用并逐条登记；创建强随机密码的最小权限治理登录与在册审核人；补齐 12 组 demo Evidence；历史对账 `processed=7 / linked=7 / needsReview=0` 且重跑为 0；四个真实 Web 请求均为 HTTP 200。Phase 6B 的详细设计、九任务实施计划和开发工作簿已经固化；当时的下一步是在隔离 worktree 中从 Task 1 contracts 开始执行 RED → GREEN（该动作现已由 6B 分支完成）。
 
