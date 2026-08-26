@@ -21,7 +21,7 @@
 | Task | 交付物 | 状态 | RED / GREEN / 评审证据 |
 |---|---|---|---|
 | 1 | Strict security contracts | 已完成（review clean） | 初始 RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；初始 GREEN：contracts 12 files / 128 tests。Fix Round 1 RED：`projections.test.ts incident.test.ts` 3 个具名状态/scope 矛盾断言失败；GREEN：contracts 12 files / 131 tests，lint、typecheck 均 exit 0；scoped re-review 3/3 ADDRESSED、无新 Critical/Important。无数据库或应用行为变更。 |
-| 2 | Pure posture/transition/indicator rules | 已完成 | RED：`CI=true pnpm --filter @airdrop/domain test -- security` exit 1，3 个新增文件的 72 个断言均因缺少 root export 而失败，既有 222 个断言通过。GREEN：同一 focused 命令及完整 domain test 均为 12 files / 295 tests；domain lint/typecheck、contracts 12 files / 131 tests 均 exit 0。无数据库、迁移、网络、生产或依赖改动。 |
+| 2 | Pure posture/transition/indicator rules | 已完成（Fix Round 1） | 初始 RED/GREEN 同前。Fix Round 1：review 指出的 reason/lifecycle matrix、general indicator length、composite target identity 已由 test-only 补强；三项最小 mutation RED 精确失败，restored GREEN：domain 12 files / 360 tests，lint/typecheck、contracts 12 files / 131 tests，以及 `pnpm verify` 均 exit 0。无生产代码、数据库、迁移、网络、生产或依赖改动。 |
 | 3 | Security Ledger migration、commands、RLS、pgTAP | 待执行 | — |
 | 4 | Bearer-scoped security review repositories + races | 待执行 | — |
 | 5 | Security extraction routing + ordinary Promotion guards | 待执行 | — |
@@ -48,6 +48,7 @@
 | 2026-08-26 | Task 1 Fix Round 1 review | 完成：public active incident collection 限为 `active`；blocked-project target 限为 matching project target；reviewer incident list 改为 `active`/非空 posture 与 `resolved`/null posture 的 discriminated union。RED 2 files / 3 failed tests，covering GREEN 与完整 contracts 皆为 12 files / 131 tests，lint/typecheck exit 0。未涉及 deferred Minor findings，未运行数据库 reset/integration，未连接生产。 |
 | 2026-08-26 | Task 1 scoped re-review | 完成：三个 Important finding 均判定 ADDRESSED，修复 diff 无新 Critical/Important；controller 对 spec §§6/12/13 的合同类别/root exports 做交叉核对并确认 Task 1 范围完整。跨数据库授权、Evidence 全链追溯与惰性 UI 约束按计划由后续任务验收。 |
 | 2026-08-26 | Task 2 pure security rules | 完成：以 3 个新测试文件的 72 个真实缺失-export failures 开始，新增无依赖 posture precedence/lock ordering、candidate/incident/disclosure reason-transition，以及 indicator normalization/lexical/exact normalized occurrence 规则。测试覆盖 all posture pairs、independent resolve、open/reopen/adjust/attach/no-op、reason matrix、target dedupe/order、Unicode whitespace、unpaired surrogate/control、domain 253/254、HTTP(S) URL 和 exact occurrence。GREEN：domain 12 files / 295 tests，lint/typecheck exit 0；contracts 12 files / 131 tests，exit 0。未运行数据库 reset/integration，未连接生产。 |
+| 2026-08-26 | Task 2 Fix Round 1 | 完成：只补测试。candidate 以手写 literal 覆盖 4×7=28 decision×reason pairs；disclosure 覆盖 2×3 pairs；incident 覆盖 open/reopen、resolve、attach 的完整 reason/lifecycle matrix，以及 strict/lower/same adjust matrix、no-op 和 independent resolve。补 general non-domain 1/500/0/501 长度与 project/source same UUID composite-key tests。临时删除 `accept_and_open` allowlist、将通用上限改为 499、将 lock key 降为 id-only 后，covering run 精确 3 failed / 356 passed；立即逐行恢复，covering/full domain 为 12 files / 360 tests，lint/typecheck、contracts 12 files / 131 tests 和 `pnpm verify` 均 exit 0。无 production diff、数据库、迁移、网络、生产或依赖改动。 |
 
 ## 4. 执行证据模板
 

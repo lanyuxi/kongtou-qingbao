@@ -684,6 +684,8 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-26 Phase 7A Task 2（pure security rules）**：在隔离 worktree `codex/phase-7a-security-ledger` 上，先新增 3 个 security domain 测试文件；指定 Node `v22.22.2` / pnpm `11.16.0` 下 `CI=true pnpm --filter @airdrop/domain test -- security` 如预期 exit 1，72 个新增断言均因 root export 不存在而真实失败，既有 222 个断言通过。最小实现只新增依赖-free posture precedence/lock ordering、candidate/incident/disclosure transition matrix 与 indicator Unicode normalization/lexical/exact normalized Evidence occurrence 规则，并从 `@airdrop/domain` 根入口导出。修复一处 trailing high-surrogate `NaN` 边界后，focused 与完整 domain 均为 12 files / 295 tests，domain lint/typecheck exit 0，contracts 为 12 files / 131 tests exit 0。未运行 database reset/integration，未访问网络或生产，未添加 dependency/migration；下一步为 Task 3 ledger migration、protected commands、RLS 与 pgTAP。
 
+**2026-08-26 Phase 7A Task 2 Fix Round 1（test coverage）**：只处理 review 的三项 Important 覆盖缺口，生产文件最终零 diff。`review-rules.test.ts` 现以 literal expectations 覆盖 candidate 全部 28 decision×reason、disclosure 全部 6 decision×reason（包含 `publish + disclosure_no_longer_needed`），以及 incident open/reopen、resolve、attach 和 strict/lower/same adjust 的 reason/lifecycle matrix，并保留 no-op/independent resolve。`indicator.test.ts` 覆盖 general non-domain 1/500 accept 与 0/501 reject；`posture.test.ts` 覆盖 project/source 同 UUID 仍为两个 lock identity、仅 exact identity dedupe。临时将 acceptance allowlist 清空、general bound 改 499、lock map key 改 id-only 后，covering test 精确 3 failed / 356 passed（具名 accepted evidence、500 boundary、same-ID cross-target identity）；三行 production mutation 已立即恢复。声明运行时下 covering/full domain 为 12 files / 360 tests，domain lint/typecheck、contracts 12 files / 131 tests 和 full `pnpm verify` 均 exit 0。未运行 database reset/integration，未访问网络/生产、未增依赖或迁移；下一步仍为 Task 3。
+
 ---
 
 ## 9. 其他

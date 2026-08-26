@@ -51,4 +51,19 @@ describe('security posture rules', () => {
       { type: 'source', id: 'source-z' },
     ]);
   });
+
+  // Break caught: treating project and source targets with the same UUID as one lock identity.
+  it('keeps same-ID project and source targets distinct while deduplicating exact identities', () => {
+    const id = '11111111-1111-4111-8111-111111111111';
+
+    expect(orderSecurityTargetsForLock([
+      { type: 'source', id },
+      { type: 'project', id },
+      { type: 'source', id },
+      { type: 'project', id },
+    ])).toEqual([
+      { type: 'project', id },
+      { type: 'source', id },
+    ]);
+  });
 });

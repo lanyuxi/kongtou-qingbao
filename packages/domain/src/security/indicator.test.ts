@@ -25,6 +25,20 @@ describe('security indicator normalization', () => {
 });
 
 describe('security indicator lexical validity', () => {
+  // Break caught: applying the domain-specific limit to general indicator types, or accepting empty/oversized values.
+  it.each([
+    [1, 'x', true],
+    [500, 'x'.repeat(500), true],
+    [0, '', false],
+    [501, 'x'.repeat(501), false],
+  ] as const)('enforces the general %d-character boundary', (_length, value, expected) => {
+    expect(isSecurityIndicatorLexicallyValid({
+      type: 'observed_behavior',
+      value,
+      evidenceText: value,
+    })).toBe(expected);
+  });
+
   // Break caught: allowing a domain above the 253-character boundary or rejecting the inclusive boundary.
   it.each([
     ['a'.repeat(253), true],
