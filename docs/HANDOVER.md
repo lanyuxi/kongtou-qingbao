@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-26（Phase 7A Task 1 经 Fix Round 1 scoped re-review 全部通过；下一步为 Task 2 pure domain security rules）
+> 最近更新：2026-08-26（Phase 7A Task 2 pure domain security rules 已通过；下一步为 Task 3 Security Ledger migration、commands、RLS、pgTAP）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-08-26 仓库复核）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`；当前 HEAD `74f0e6c`，功能锚点 `a372880`。仓库含 21 个迁移，但生产仍只能按 2026-08-22 的最后证据视为已应用 19 个；第 20/21 个 migration 均为 **production unapplied**。下一产品开发入口是安全事件/指标与 verified allowlisted references 的前置架构设计，不是直接开发教程；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
@@ -681,6 +681,8 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence local integration（DONE）**：用户选择 finishing workflow 的 option 1。主工作区确认基线分支 `codex/phase-0-1-foundation` 精确位于 `63f5278`，仅有三个既有未跟踪 `.DS_Store`，随后将 `codex/project-score-evidence-detail` 快进合并到 `a372880`；这些个人文件未触碰。合并后首次 `pnpm verify` 因主工作区 `node_modules` 重建并尝试访问 registry，命中 DNS `ENOTFOUND`，未进入代码测试；用本机既有 pnpm v11 store 执行 `--offline --frozen-lockfile` 恢复 196 个锁定包后，fresh 完整门禁 exit 0：contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 gated skips，lint/typecheck/build/placeholders 全绿。该步骤只做本地 Git 集成与本地门禁，未访问生产、未应用第 21 个 migration；下一步是保留生产冻结边界并选择后续产品功能，而不是自动 rollout。
 
 **2026-08-24 Project score Evidence branch cleanup（DONE）**：在主线交接提交 `0293cd3` 后再次运行完整 `pnpm verify`，861 non-skipped / 46 gated skips 全绿。随后确认功能 worktree 无 tracked/untracked 改动、`a372880` 已是主线祖先，再移除 `.worktrees/project-score-evidence-detail`、执行 `git worktree prune` 并删除已合并分支 `codex/project-score-evidence-detail`。其他 Phase 2 / 6A / 6B worktree 与主工作区三个既有 `.DS_Store` 均未触碰；功能全部保留在主线，生产仍未应用。
+
+**2026-08-26 Phase 7A Task 2（pure security rules）**：在隔离 worktree `codex/phase-7a-security-ledger` 上，先新增 3 个 security domain 测试文件；指定 Node `v22.22.2` / pnpm `11.16.0` 下 `CI=true pnpm --filter @airdrop/domain test -- security` 如预期 exit 1，72 个新增断言均因 root export 不存在而真实失败，既有 222 个断言通过。最小实现只新增依赖-free posture precedence/lock ordering、candidate/incident/disclosure transition matrix 与 indicator Unicode normalization/lexical/exact normalized Evidence occurrence 规则，并从 `@airdrop/domain` 根入口导出。修复一处 trailing high-surrogate `NaN` 边界后，focused 与完整 domain 均为 12 files / 295 tests，domain lint/typecheck exit 0，contracts 为 12 files / 131 tests exit 0。未运行 database reset/integration，未访问网络或生产，未添加 dependency/migration；下一步为 Task 3 ledger migration、protected commands、RLS 与 pgTAP。
 
 ---
 
