@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：隔离 worktree、SDD 预检与完整基线均已完成；Task 1 strict security contracts 即将进入 RED
+> 当前状态：Task 1 strict security contracts 已完成；下一步为 Task 2 pure security rules
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -20,7 +20,7 @@
 
 | Task | 交付物 | 状态 | RED / GREEN / 评审证据 |
 |---|---|---|---|
-| 1 | Strict security contracts | 待执行 | — |
+| 1 | Strict security contracts | 已完成 | RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；GREEN：contracts 12 files / 128 tests，lint、typecheck 均 exit 0。无数据库或应用行为变更；outbox 测试拒绝 reviewer identity、note、locator、quote、payload、indicator value。 |
 | 2 | Pure posture/transition/indicator rules | 待执行 | — |
 | 3 | Security Ledger migration、commands、RLS、pgTAP | 待执行 | — |
 | 4 | Bearer-scoped security review repositories + races | 待执行 | — |
@@ -44,6 +44,7 @@
 | 2026-08-26 | 隔离工作区 | 完成：规划文档以 `c102df6` 封存；从该提交创建 `.worktrees/phase-7a-security-ledger` 与 `codex/phase-7a-security-ledger`，初始 worktree 干净；旧 worktree 与三个既有 `.DS_Store` 均未触碰。 |
 | 2026-08-26 | SDD 执行预检 | 完成：创建计划专属 gitignored ledger；逐行核对 55 个 task-pair 的共享文件/接口与 11 个任务内部测试-实现一致性。未发现互相矛盾、违反 Global Constraints 或计划强制但审查规则禁止的内容，无需 Ruling。 |
 | 2026-08-26 | declared-runtime baseline | 完成：Node `v22.22.2` / pnpm `11.16.0`，offline frozen install 无 lockfile 变化；fresh `pnpm verify` exit 0，contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 environment-gated skips，lint/typecheck/build/placeholders 全绿。未运行数据库 reset/integration，未连接生产。 |
+| 2026-08-26 | Task 1 strict security contracts | 完成：新增严格 security 枚举、candidate/review/incident/disclosure 命令、internal/public projections、opaque cursor 与 safe outbox v1 schemas，全部仅由 `@airdrop/contracts` 根入口导出。有效 RED 为 5 files / 20 failed tests，缺失导出导致 schema 为 `undefined`；GREEN 为 contracts 12 files / 128 tests，lint/typecheck 均 exit 0。未运行数据库 reset/integration，未连接生产，未新增依赖、迁移或应用行为。 |
 
 ## 4. 执行证据模板
 
