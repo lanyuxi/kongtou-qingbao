@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-26（Phase 7A Task 1 strict security contracts 已完成；下一步为纯 domain security rules）
+> 最近更新：2026-08-26（Phase 7A Task 1 经 Fix Round 1 scoped re-review 全部通过；下一步为 Task 2 pure domain security rules）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-08-26 仓库复核）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`；当前 HEAD `74f0e6c`，功能锚点 `a372880`。仓库含 21 个迁移，但生产仍只能按 2026-08-22 的最后证据视为已应用 19 个；第 20/21 个 migration 均为 **production unapplied**。下一产品开发入口是安全事件/指标与 verified allowlisted references 的前置架构设计，不是直接开发教程；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
@@ -35,7 +35,7 @@
 | 1. 现状与边界研究 | **完成** | 当前仓库已预留 `security_reviewer` 角色、`security_risk` / `scam_indicator` AI 候选类型、`paused` project lifecycle 与 `blocked` recommendation 枚举；但没有 security incident/indicator 的 canonical 表、契约、命令、repository、API 或 UI。现有确定性评分器只产生 `act_now/watch/research/avoid`，不会产生 `blocked`。 |
 | 2. 产品范围澄清 | **完成** | 已确认独立 posture、两级作用域、三档状态、最严格合成、权限/候选入口、source/project 门禁、完整 reviewer/public UI 与逐 indicator 公共披露审批。 |
 | 3. 架构方案与分节设计 | **完成** | **已确认**采用追加式 Security Ledger，不采用可变 incident 聚合或复用 signal/catalog；总体架构与数据边界、命令/状态/事务、读模型/门禁/UI、安全测试/验收/不做项四节均已逐节确认。 |
-| 4. Spec / plan / TDD 实施 | **进行中** | 正式 spec 已批准；实施计划 `docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md` 与 workbook `docs/tasks/phase-7a-security-incidents-indicators-workbook.md` 已完成并自审，拆成 11 个独立 RED/GREEN/review/commit 任务。用户已选择方案 1：Subagent-Driven；规划基线 `c102df6`、隔离 worktree/分支与 SDD ledger 均已就绪，55 个 task-pair 和 11 个任务内部预检无冲突。Task 1 已以 TDD 新增 `@airdrop/contracts` 的 strict security enums、candidate/review/incident/disclosure commands、internal/public projections、opaque cursors 和 safe outbox events；初始 RED 是缺失 root exports，初始 GREEN 为 contracts 12 files / 128 tests。Fix Round 1 已以 3 个回归 RED 收紧 public active incidents、blocked-project target/project identity 和 reviewer incident state/posture pairing；最新 contracts GREEN 为 12 files / 131 tests，lint/typecheck 均 exit 0。没有数据库、应用行为、依赖、迁移、reset、集成或生产访问变更。下一步执行 Task 2 pure security rules。 |
+| 4. Spec / plan / TDD 实施 | **进行中** | 正式 spec 已批准；实施计划 `docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md` 与 workbook `docs/tasks/phase-7a-security-incidents-indicators-workbook.md` 已完成并自审，拆成 11 个独立 RED/GREEN/review/commit 任务。用户已选择方案 1：Subagent-Driven；规划基线 `c102df6`、隔离 worktree/分支与 SDD ledger 均已就绪，55 个 task-pair 和 11 个任务内部预检无冲突。Task 1 已以 TDD 新增 `@airdrop/contracts` 的 strict security enums、candidate/review/incident/disclosure commands、internal/public projections、opaque cursors 和 safe outbox events；初始 RED 是缺失 root exports，初始 GREEN 为 contracts 12 files / 128 tests。独立审查发现的 3 个 Important 已在 Fix Round 1 以回归 RED 收紧 public active incidents、blocked-project target/project identity 和 reviewer incident state/posture pairing；最新 contracts GREEN 为 12 files / 131 tests，lint/typecheck 均 exit 0，scoped re-review 确认 3/3 ADDRESSED 且无新 Critical/Important。Task 1 的 spec §§6/12/13 合同类别与 root exports 已由 controller 复核完整；数据库授权/追溯/UI 约束明确归属后续任务。没有数据库、应用行为、依赖、迁移、reset、集成或生产访问变更。下一步执行 Task 2 pure security rules。 |
 
 Phase 7A 设计铁律：安全态与 opportunity/risk/confidence/score recommendation 保持独立；AI/collector 只能提交候选数据，不能写 canonical incident、最终 security decision 或解除封锁；事件、指标、决策和解除历史必须追加保留并追溯到 Evidence、Raw Item 与 Source；先施加最小相关预防措施，再调查；本阶段不包含 verified links、tutorials、notifications、自动交易或绕过类功能。
 
