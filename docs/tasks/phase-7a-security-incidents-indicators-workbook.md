@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：用户已选择方案 1（Subagent-Driven）；正在建立隔离 worktree、SDD ledger 与 declared-runtime baseline
+> 当前状态：隔离 worktree/分支已从规划基线 `c102df6` 建立；正在创建 SDD ledger、做冲突预检并重跑 declared-runtime baseline
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -41,6 +41,7 @@
 | 2026-08-26 | 正式设计规范 | 完成：规范获用户批准，状态 `Approved`。 |
 | 2026-08-26 | writing-plans | 完成：11 个任务、67 个 checkbox steps；spec 覆盖、占位措辞、类型/函数命名、任务顺序与 TDD 边界均已自审，文档门禁通过。 |
 | 2026-08-26 | 执行方式 | 用户选择方案 1：Subagent-Driven。按技能强制流程先封存规划基线，建立 `codex/phase-7a-security-ledger` 隔离 worktree、SDD ledger 和 declared-runtime baseline；完成后不再逐 task 等待确认，直接进入 Task 1。 |
+| 2026-08-26 | 隔离工作区 | 完成：规划文档以 `c102df6` 封存；从该提交创建 `.worktrees/phase-7a-security-ledger` 与 `codex/phase-7a-security-ledger`，初始 worktree 干净；旧 worktree 与三个既有 `.DS_Store` 均未触碰。 |
 
 ## 4. 执行证据模板
 
