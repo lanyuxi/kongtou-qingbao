@@ -20,7 +20,7 @@
 
 | Task | 交付物 | 状态 | RED / GREEN / 评审证据 |
 |---|---|---|---|
-| 1 | Strict security contracts | 已完成 | RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；GREEN：contracts 12 files / 128 tests，lint、typecheck 均 exit 0。无数据库或应用行为变更；outbox 测试拒绝 reviewer identity、note、locator、quote、payload、indicator value。 |
+| 1 | Strict security contracts | 已完成（Fix Round 1） | 初始 RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；初始 GREEN：contracts 12 files / 128 tests。Fix Round 1 RED：`projections.test.ts incident.test.ts` 3 个具名状态/scope 矛盾断言失败；GREEN：contracts 12 files / 131 tests，lint、typecheck 均 exit 0。无数据库或应用行为变更。 |
 | 2 | Pure posture/transition/indicator rules | 待执行 | — |
 | 3 | Security Ledger migration、commands、RLS、pgTAP | 待执行 | — |
 | 4 | Bearer-scoped security review repositories + races | 待执行 | — |
@@ -45,6 +45,7 @@
 | 2026-08-26 | SDD 执行预检 | 完成：创建计划专属 gitignored ledger；逐行核对 55 个 task-pair 的共享文件/接口与 11 个任务内部测试-实现一致性。未发现互相矛盾、违反 Global Constraints 或计划强制但审查规则禁止的内容，无需 Ruling。 |
 | 2026-08-26 | declared-runtime baseline | 完成：Node `v22.22.2` / pnpm `11.16.0`，offline frozen install 无 lockfile 变化；fresh `pnpm verify` exit 0，contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 environment-gated skips，lint/typecheck/build/placeholders 全绿。未运行数据库 reset/integration，未连接生产。 |
 | 2026-08-26 | Task 1 strict security contracts | 完成：新增严格 security 枚举、candidate/review/incident/disclosure 命令、internal/public projections、opaque cursor 与 safe outbox v1 schemas，全部仅由 `@airdrop/contracts` 根入口导出。有效 RED 为 5 files / 20 failed tests，缺失导出导致 schema 为 `undefined`；GREEN 为 contracts 12 files / 128 tests，lint/typecheck 均 exit 0。未运行数据库 reset/integration，未连接生产，未新增依赖、迁移或应用行为。 |
+| 2026-08-26 | Task 1 Fix Round 1 review | 完成：public active incident collection 限为 `active`；blocked-project target 限为 matching project target；reviewer incident list 改为 `active`/非空 posture 与 `resolved`/null posture 的 discriminated union。RED 2 files / 3 failed tests，covering GREEN 与完整 contracts 皆为 12 files / 131 tests，lint/typecheck exit 0。未涉及 deferred Minor findings，未运行数据库 reset/integration，未连接生产。 |
 
 ## 4. 执行证据模板
 

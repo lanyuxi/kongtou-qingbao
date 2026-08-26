@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   publicBlockedProjectSecurityRowSchema,
+  publicProjectSecurityStateSchema,
   publicSecurityIndicatorSchema,
   reviewerSecurityCandidateDetailSchema,
 } from '../index.js';
@@ -61,6 +62,57 @@ describe('security projection contracts', () => {
       target: { type: 'project', id: projectId },
       indicators: [],
       note: 'internal',
+    }).success).toBe(false);
+  });
+
+  it('rejects resolved incidents from the active project incident collection', () => {
+    const incident = {
+      version: 1,
+      incidentId,
+      target: { type: 'project', id: projectId },
+      category: 'phishing',
+      severity: 'high',
+      state: 'active',
+      publicSummary: '该项目当前存在经审查的安全限制，请勿执行相关操作。',
+      firstObservedAt: '2026-08-26T00:00:00.000Z',
+      lastVerifiedAt: '2026-08-26T01:00:00.000Z',
+      indicators: [],
+    } as const;
+    expect(publicProjectSecurityStateSchema.parse({
+      version: 1,
+      projectId,
+      posture: 'blocked',
+      activeIncidents: [incident],
+    }).activeIncidents).toEqual([incident]);
+    expect(publicProjectSecurityStateSchema.safeParse({
+      version: 1,
+      projectId,
+      posture: 'clear',
+      activeIncidents: [{ ...incident, state: 'resolved' }],
+    }).success).toBe(false);
+  });
+
+  it('rejects non-project and mismatched targets from blocked project rows', () => {
+    const row = {
+      version: 1,
+      project: { id: projectId, slug: 'example', name: 'Example' },
+      posture: 'blocked',
+      category: 'phishing',
+      severity: 'critical',
+      publicSummary: '该项目当前存在经审查的安全限制，请勿执行相关操作。',
+      firstObservedAt: '2026-08-26T00:00:00.000Z',
+      lastVerifiedAt: '2026-08-26T01:00:00.000Z',
+      target: { type: 'project', id: projectId },
+      indicators: [],
+    } as const;
+    expect(publicBlockedProjectSecurityRowSchema.parse(row)).toEqual(row);
+    expect(publicBlockedProjectSecurityRowSchema.safeParse({
+      ...row,
+      target: { type: 'source', id: incidentId },
+    }).success).toBe(false);
+    expect(publicBlockedProjectSecurityRowSchema.safeParse({
+      ...row,
+      target: { type: 'project', id: incidentId },
     }).success).toBe(false);
   });
 });

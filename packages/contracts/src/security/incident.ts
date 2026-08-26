@@ -152,19 +152,29 @@ export const reviewerSecurityIncidentDecisionSchema = z.strictObject({
   reviewerUserId: uuidSchema,
   createdAt: timestampSchema,
 });
-export const reviewerSecurityIncidentListItemSchema = z.strictObject({
+const reviewerSecurityIncidentListItemBase = {
   version: z.literal(1),
   incidentId: uuidSchema,
   target: securityTargetSchema,
   category: securityIncidentCategorySchema,
-  state: securityIncidentStateSchema,
-  currentPosture: activeSecurityPostureSchema.nullable(),
   currentSeverity: securitySeveritySchema,
   publicSummary: publicSummarySchema,
   incidentVersion: nonNegativeVersionSchema,
   openedAt: timestampSchema,
   lastDecisionAt: timestampSchema,
-});
+};
+export const reviewerSecurityIncidentListItemSchema = z.discriminatedUnion('state', [
+  z.strictObject({
+    ...reviewerSecurityIncidentListItemBase,
+    state: z.literal('active'),
+    currentPosture: activeSecurityPostureSchema,
+  }),
+  z.strictObject({
+    ...reviewerSecurityIncidentListItemBase,
+    state: z.literal('resolved'),
+    currentPosture: z.null(),
+  }),
+]);
 export const reviewerSecurityIncidentDetailSchema = z.strictObject({
   version: z.literal(1),
   incident: reviewerSecurityIncidentListItemSchema,

@@ -220,6 +220,7 @@ export type {
 export {
   blockedProjectSecurityCursorSchema,
   blockedProjectSecurityListQuerySchema,
+  publicActiveSecurityIncidentSummarySchema,
   publicBlockedProjectSecurityPageSchema,
   publicBlockedProjectSecurityRowSchema,
   publicProjectSecurityStateSchema,
@@ -229,6 +230,7 @@ export {
 export type {
   BlockedProjectSecurityCursor,
   BlockedProjectSecurityListQuery,
+  PublicActiveSecurityIncidentSummary,
   PublicBlockedProjectSecurityPage,
   PublicBlockedProjectSecurityRow,
   PublicProjectSecurityState,

@@ -37,25 +37,39 @@ export const publicSecurityIncidentSummarySchema = z.strictObject({
   indicators: z.array(publicSecurityIndicatorSchema),
 });
 
+export const publicActiveSecurityIncidentSummarySchema = publicSecurityIncidentSummarySchema.extend({
+  state: z.literal('active'),
+});
+
 export const publicProjectSecurityStateSchema = z.strictObject({
   version: z.literal(1),
   projectId: uuidSchema,
   posture: securityPostureSchema,
-  activeIncidents: z.array(publicSecurityIncidentSummarySchema),
+  activeIncidents: z.array(publicActiveSecurityIncidentSummarySchema),
 });
 
-export const publicBlockedProjectSecurityRowSchema = z.strictObject({
-  version: z.literal(1),
-  project: projectSchema,
-  posture: z.literal('blocked'),
-  category: securityIncidentCategorySchema,
-  severity: securitySeveritySchema,
-  publicSummary: publicSummarySchema,
-  firstObservedAt: timestampSchema,
-  lastVerifiedAt: timestampSchema,
-  target: securityTargetSchema,
-  indicators: z.array(publicSecurityIndicatorSchema),
-});
+export const publicBlockedProjectSecurityRowSchema = z
+  .strictObject({
+    version: z.literal(1),
+    project: projectSchema,
+    posture: z.literal('blocked'),
+    category: securityIncidentCategorySchema,
+    severity: securitySeveritySchema,
+    publicSummary: publicSummarySchema,
+    firstObservedAt: timestampSchema,
+    lastVerifiedAt: timestampSchema,
+    target: z.strictObject({ type: z.literal('project'), id: uuidSchema }),
+    indicators: z.array(publicSecurityIndicatorSchema),
+  })
+  .superRefine((value, context) => {
+    if (value.target.id !== value.project.id) {
+      context.addIssue({
+        code: 'custom',
+        path: ['target', 'id'],
+        message: 'blocked project target must match project.id',
+      });
+    }
+  });
 
 const blockedCursorPayloadSchema = z.strictObject({
   lastVerifiedAt: timestampSchema,
@@ -91,6 +105,9 @@ export const publicBlockedProjectSecurityPageSchema = z.strictObject({
 
 export type PublicSecurityIndicator = z.infer<typeof publicSecurityIndicatorSchema>;
 export type PublicSecurityIncidentSummary = z.infer<typeof publicSecurityIncidentSummarySchema>;
+export type PublicActiveSecurityIncidentSummary = z.infer<
+  typeof publicActiveSecurityIncidentSummarySchema
+>;
 export type PublicProjectSecurityState = z.infer<typeof publicProjectSecurityStateSchema>;
 export type PublicBlockedProjectSecurityRow = z.infer<typeof publicBlockedProjectSecurityRowSchema>;
 export type BlockedProjectSecurityCursor = z.infer<typeof blockedProjectSecurityCursorSchema>;

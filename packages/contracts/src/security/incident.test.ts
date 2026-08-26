@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  reviewerSecurityIncidentListItemSchema,
   securityCandidateReviewCommandV1Schema,
   securityIncidentCommandV1Schema,
 } from '../index.js';
@@ -69,5 +70,39 @@ describe('security review and incident command contracts', () => {
     expect(securityIncidentCommandV1Schema.safeParse({ ...resolve, publicSummary: 'a'.repeat(501) }).success).toBe(false);
     expect(securityIncidentCommandV1Schema.safeParse({ ...resolve, resultingPosture: 'clear' }).success).toBe(false);
     expect(securityIncidentCommandV1Schema.safeParse({ ...resolve, extra: true }).success).toBe(false);
+  });
+
+  it('requires a posture exactly when a reviewer incident is active', () => {
+    const item = {
+      version: 1,
+      incidentId,
+      target: { type: 'project', id: projectId },
+      category: 'phishing',
+      state: 'active',
+      currentPosture: 'blocked',
+      currentSeverity: 'high',
+      publicSummary: '该项目出现经过证据支持的钓鱼风险，请停止当前操作。',
+      incidentVersion: 1,
+      openedAt: '2026-08-26T00:00:00.000Z',
+      lastDecisionAt: '2026-08-26T01:00:00.000Z',
+    } as const;
+    expect(reviewerSecurityIncidentListItemSchema.parse(item)).toEqual(item);
+    expect(reviewerSecurityIncidentListItemSchema.parse({
+      ...item,
+      state: 'resolved',
+      currentPosture: null,
+    })).toEqual({
+      ...item,
+      state: 'resolved',
+      currentPosture: null,
+    });
+    expect(reviewerSecurityIncidentListItemSchema.safeParse({
+      ...item,
+      currentPosture: null,
+    }).success).toBe(false);
+    expect(reviewerSecurityIncidentListItemSchema.safeParse({
+      ...item,
+      state: 'resolved',
+    }).success).toBe(false);
   });
 });
