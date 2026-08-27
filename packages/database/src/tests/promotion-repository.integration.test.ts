@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   createPromotionRepository,
+  PromotionCommandRejectionError,
   type ExecuteCandidateReviewInput,
 } from '../promotion/promotion-repository.js';
 
@@ -14,12 +15,16 @@ const sourceId = `${namespace}000000000020`;
 const feedRawItemId = `${namespace}000000000030`;
 const activeReviewerId = `${namespace}000000000090`;
 const revokedReviewerId = `${namespace}000000000091`;
+const securityReviewerId = `${namespace}000000000092`;
+const adminReviewerId = `${namespace}000000000093`;
 const candidateIds = {
   approve: `${namespace}000000000061`,
   reject: `${namespace}000000000062`,
   needsReview: `${namespace}000000000063`,
   concurrent: `${namespace}000000000064`,
   rollback: `${namespace}000000000065`,
+  securityRisk: `${namespace}000000000066`,
+  scamIndicator: `${namespace}000000000067`,
 };
 const historicalCandidateIds = {
   grounded: `${namespace}000000000071`,
@@ -36,6 +41,8 @@ const historicalSignalIds = {
   pagination: `${namespace}000000000085`,
 } as const;
 const baseTime = new Date('2026-08-20T04:00:00.000Z');
+const securityIncidentId = `${namespace}000000000087`;
+const securityEvidenceId = `${namespace}000000000088`;
 const integrationDatabaseUrl = process.env.AIRDROP_DATABASE_TEST_URL;
 const describeIntegration = integrationDatabaseUrl === undefined ? describe.skip : describe;
 const disposableMarker = {
@@ -199,6 +206,60 @@ describeIntegration('PromotionRepository PostgreSQL integration', () => {
       order by id
       limit 1
     `);
+  });
+
+  it.each([
+    [candidateIds.securityRisk, 'security_risk'],
+    [candidateIds.scamIndicator, 'scam_indicator'],
+  ] as const)('routes %s away from ordinary Promotion with a stable rejection', async (
+    candidateId,
+    claimType,
+  ) => {
+    const database = requireSql(owner);
+    const before = await candidateSnapshot(database, candidateId);
+
+    await expect(requireRepository(first).reviewCandidate(reviewInput(candidateId, `security-claim-${claimType}`)))
+      .rejects.toEqual(new PromotionCommandRejectionError('security_review_required'));
+    await expect(candidateSnapshot(database, candidateId)).resolves.toEqual(before);
+  });
+
+  it('enforces the full caution and blocked ordinary Promotion role matrix', async () => {
+    const database = requireSql(owner);
+    const repository = requireRepository(first);
+    await setProjectSecurityPosture(database, 'caution');
+
+    await expect(repository.reviewCandidate(reviewInput(candidateIds.approve, 'caution-ordinary')))
+      .rejects.toEqual(new PromotionCommandRejectionError('security_reviewer_required'));
+
+    await expect(repository.reviewCandidate(reviewInput(
+      candidateIds.approve,
+      'caution-security',
+      null,
+      securityReviewerId,
+    )))
+      .resolves.toMatchObject({ outcome: 'promoted' });
+    await expect(repository.reviewCandidate(reviewInput(
+      candidateIds.reject,
+      'caution-admin',
+      null,
+      adminReviewerId,
+    ))).resolves.toMatchObject({ outcome: 'promoted' });
+
+    await setProjectSecurityPosture(database, 'blocked');
+    for (const [role, candidateId, reviewerUserId] of [
+      ['ordinary', candidateIds.needsReview, activeReviewerId],
+      ['security-reviewer', candidateIds.concurrent, securityReviewerId],
+      ['admin', candidateIds.rollback, adminReviewerId],
+    ] as const) {
+      const before = await candidateSnapshot(database, candidateId);
+      await expect(repository.reviewCandidate(reviewInput(
+        candidateId,
+        `blocked-${role}`,
+        null,
+        reviewerUserId,
+      ))).rejects.toEqual(new PromotionCommandRejectionError('security_promotion_blocked'));
+      await expect(candidateSnapshot(database, candidateId)).resolves.toEqual(before);
+    }
   });
 
   it('lists only unlinked promoted history with stable UUID cursor pagination', async () => {
@@ -475,13 +536,14 @@ function reviewInput(
     readonly decision: 'needs_review';
     readonly reasonCode: 'source_mismatch' | 'grounding_failed' | 'insufficient_context' | 'historical_reconciliation_failed';
   } | null = null,
+  reviewerUserId = activeReviewerId,
 ): ExecuteCandidateReviewInput {
   return {
     command: decision === null
       ? {
         version: 1,
         candidateId,
-        reviewerUserId: activeReviewerId,
+        reviewerUserId,
         expectedCandidateVersion: 1,
         decision: 'approve',
         reasonCode: 'evidence_verified',
@@ -490,7 +552,7 @@ function reviewInput(
       : {
         version: 1,
         candidateId,
-        reviewerUserId: activeReviewerId,
+        reviewerUserId,
         expectedCandidateVersion: 1,
         decision: decision.decision,
         reasonCode: decision.reasonCode,
@@ -528,6 +590,18 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
         'authenticated', 'authenticated', 'promotion-revoked@example.invalid',
         '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
         ${baseTime}::timestamptz, ${baseTime}::timestamptz
+      ),
+      (
+        ${securityReviewerId}::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+        'authenticated', 'authenticated', 'promotion-security@example.invalid',
+        '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+        ${baseTime}::timestamptz, ${baseTime}::timestamptz
+      ),
+      (
+        ${adminReviewerId}::uuid, '00000000-0000-0000-0000-000000000000'::uuid,
+        'authenticated', 'authenticated', 'promotion-admin@example.invalid',
+        '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+        ${baseTime}::timestamptz, ${baseTime}::timestamptz
       )
   `;
   await sql`
@@ -536,7 +610,9 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
       (
         ${revokedReviewerId}::uuid, 'reviewer', ${baseTime}::timestamptz,
         '2026-08-20T04:00:01.000Z'::timestamptz
-      )
+      ),
+      (${securityReviewerId}::uuid, 'security_reviewer', ${baseTime}::timestamptz, null),
+      (${adminReviewerId}::uuid, 'admin', ${baseTime}::timestamptz, null)
   `;
   await sql`insert into public.projects (id, slug, name, lifecycle) values (${projectId}::uuid, 'promotion-repository', 'Promotion Repository', 'active')`;
   await sql`insert into public.sources (id, source_type, name, canonical_url, status) values (${sourceId}::uuid, 'official_web', 'Promotion Repository', 'https://promotion-repository.example/', 'active')`;
@@ -605,7 +681,7 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
           evidenceQuote: quote,
           occurredAtIso: null,
         })},
-        ${String(9 - index).repeat(64)}, ${baseTime}::timestamptz
+        ${((index + 1) % 16).toString(16).repeat(64)}, ${baseTime}::timestamptz
       )
     `;
   }
@@ -632,6 +708,21 @@ async function seedFixtures(sql: postgres.Sql): Promise<void> {
       where id = ${candidateId}::uuid
     `;
   }
+
+  await sql`
+    update public.extraction_candidates
+    set payload = payload || pg_catalog.jsonb_build_object(
+      'claimType', case id
+        when ${candidateIds.securityRisk}::uuid then 'security_risk'
+        else 'scam_indicator'
+      end,
+      'signalType', case id
+        when ${candidateIds.securityRisk}::uuid then 'security_risk'
+        else 'scam_indicator'
+      end
+    )
+    where id in (${candidateIds.securityRisk}::uuid, ${candidateIds.scamIndicator}::uuid)
+  `;
 
   await sql`
     update public.extraction_candidates
@@ -682,6 +773,8 @@ async function removeFixturesInTransaction(transaction: TransactionSql): Promise
   await transaction`delete from public.promotion_commands where candidate_id in ${transaction(allCandidateIds)}`;
   await transaction`delete from public.promotion_events where candidate_id in ${transaction(allCandidateIds)}`;
   await transaction`delete from public.candidate_review_decisions where candidate_id in ${transaction(allCandidateIds)}`;
+  await transaction`delete from public.security_incident_decisions where incident_id = ${securityIncidentId}::uuid`;
+  await transaction`delete from public.security_incidents where id = ${securityIncidentId}::uuid`;
   await transaction`delete from public.signal_evidence_links where signal_id in (select id from public.signals where project_id = ${projectId}::uuid)`;
   await transaction`delete from public.evidence where discovered_item_id in (select id from public.discovered_items where project_id = ${projectId}::uuid)`;
   await transaction`delete from public.extraction_candidates where project_id = ${projectId}::uuid`;
@@ -692,9 +785,62 @@ async function removeFixturesInTransaction(transaction: TransactionSql): Promise
   await transaction`delete from public.project_sources where project_id = ${projectId}::uuid`;
   await transaction`delete from public.sources where id = ${sourceId}::uuid`;
   await transaction`delete from public.projects where id = ${projectId}::uuid`;
-  await transaction`delete from public.user_roles where user_id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
-  await transaction`delete from public.profiles where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
-  await transaction`delete from auth.users where id in (${activeReviewerId}::uuid, ${revokedReviewerId}::uuid)`;
+  const reviewerIds = [activeReviewerId, revokedReviewerId, securityReviewerId, adminReviewerId];
+  await transaction`delete from public.user_roles where user_id = any(${reviewerIds}::uuid[])`;
+  await transaction`delete from public.profiles where id = any(${reviewerIds}::uuid[])`;
+  await transaction`delete from auth.users where id = any(${reviewerIds}::uuid[])`;
+}
+
+async function setProjectSecurityPosture(
+  sql: postgres.Sql,
+  posture: 'caution' | 'blocked',
+): Promise<void> {
+  if (posture === 'caution') {
+    const quote = 'Candidate 1 public points program continues through week twelve.';
+    await sql`
+      insert into public.evidence (
+        id, source_id, raw_item_id, discovered_item_id, source_field,
+        quote_text, normalized_quote_sha256, verified_at, created_at
+      ) values (
+        ${securityEvidenceId}::uuid, ${sourceId}::uuid, ${feedRawItemId}::uuid,
+        ${`${namespace}000000000040`}::uuid, 'discovered_summary', ${quote},
+        public.evidence_quote_sha256_v1(${quote}), ${baseTime}::timestamptz,
+        ${baseTime}::timestamptz
+      )
+    `;
+    await sql`
+      insert into public.security_incidents (
+        id, target_type, project_id, category, opened_at, created_at
+      ) values (
+        ${securityIncidentId}::uuid, 'project', ${projectId}::uuid, 'phishing',
+        ${baseTime}::timestamptz, ${baseTime}::timestamptz
+      )
+    `;
+    await sql`
+      insert into public.security_incident_decisions (
+        incident_id, incident_version, reviewer_user_id, action, reason_code,
+        resulting_posture, resulting_severity, public_summary, evidence_id, created_at
+      ) values (
+        ${securityIncidentId}::uuid, 1, ${activeReviewerId}::uuid, 'open',
+        'precautionary_evidence', 'caution', 'high',
+        'Grounded caution evidence requires security reviewer oversight.',
+        ${securityEvidenceId}::uuid, ${baseTime}::timestamptz
+      )
+    `;
+    return;
+  }
+
+  await sql`
+    insert into public.security_incident_decisions (
+      incident_id, incident_version, reviewer_user_id, action, reason_code,
+      resulting_posture, resulting_severity, public_summary, evidence_id, created_at
+    ) values (
+      ${securityIncidentId}::uuid, 2, ${activeReviewerId}::uuid, 'adjust',
+      'evidence_escalated', 'blocked', 'critical',
+      'Escalated grounded evidence requires an immediate Promotion block.',
+      ${securityEvidenceId}::uuid, ${baseTime}::timestamptz + interval '1 second'
+    )
+  `;
 }
 
 async function dropDisposableRole(sql: postgres.Sql, roleName: string): Promise<void> {

@@ -366,6 +366,9 @@ describe('PromotionRepository', () => {
     ['AI107', 'promotion_evidence_quote_invalid'],
     ['AI108', 'promotion_source_identity_mismatch'],
     ['AI109', 'promotion_grounding_failed'],
+    ['AS104', 'security_reviewer_required'],
+    ['AS111', 'security_review_required'],
+    ['AS112', 'security_promotion_blocked'],
   ] as const)('maps SQLSTATE %s to stable rejection code %s', async (sqlState, code) => {
     const client = new RecordingClient(
       [],

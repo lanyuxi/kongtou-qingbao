@@ -263,6 +263,9 @@ function promotionCommandRejection(error: unknown): PromotionCommandRejectionCod
     case 'AI107': return 'promotion_evidence_quote_invalid';
     case 'AI108': return 'promotion_source_identity_mismatch';
     case 'AI109': return 'promotion_grounding_failed';
+    case 'AS104': return 'security_reviewer_required';
+    case 'AS111': return 'security_review_required';
+    case 'AS112': return 'security_promotion_blocked';
     default: return undefined;
   }
 }

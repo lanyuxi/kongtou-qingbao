@@ -1,10 +1,26 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-26（Phase 7A Task 3 已捕获 verified-disposable focused pgTAP RED；唯一 forward migration、expanded pgTAP、reviewer commands/views/gates 已在本地完成，等待 controller 对更新 source copy 的精确授权后 reset/Green/typegen）
+> 最近更新：2026-08-28（Phase 7A Task 5 已 review clean：本地 RED→GREEN、精确 Node 22.22.2 / pnpm 11.16.0 全仓门禁、授权的 marker-verified disposable integration 和 scoped re-review 全部闭环；最终 `pnpm verify` 1,099 non-skipped / 58 gated skips，focused integration 17/17 PASS，复审 0C/0I/0M、Ready to merge。仅访问 disposable 64322/64321，测试后隧道关闭；未 reset、未访问生产）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-26 仓库复核）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`；当前 HEAD `74f0e6c`，功能锚点 `a372880`。仓库含 21 个迁移，但生产仍只能按 2026-08-22 的最后证据视为已应用 19 个；第 20/21 个 migration 均为 **production unapplied**。下一产品开发入口是安全事件/指标与 verified allowlisted references 的前置架构设计，不是直接开发教程；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-28 Task 5 完成）**：Phase 7A 在 linked worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 继续；Task 1–5 已闭环，Task 5 的原子 security extraction ingress 与 ordinary Promotion guards 已 review clean。下一任务是 Task 6 `Collection/scoring protect-first gates`；生产状态未在本轮重新验证，继续沿用历史冻结边界，严禁生产访问。
+
+### 2026-08-28 Codex 接续与 Task 5 执行记录
+
+| 步骤 | 状态 | 证据 / 下一步 |
+|---|---|---|
+| 1. 交接、产出与阶段复核 | **完成** | 已分段读完交接手册 757 行、Phase 0/1 plan 599 行与 workbook 386 行，并详读 Phase 7A Approved spec 716 行、Task 5 计划及 Task 1–4 实际产出。现场确认 linked worktree HEAD `2d2c29b`、tracked clean，Task 5 尚无实现 diff。 |
+| 2. 新鲜本地基线 | **部分完成（环境限制）** | 当前可用运行时为 Node 24.19.0 / pnpm 11.16.0，非声明的 Node 22.22.2。在 Node 24 下 Task 5 相关 focused 基线为 database 225 passed / 51 skipped、worker 212 passed / 2 skipped。fresh root verify 未进入 lint/test：pnpm 依赖状态检查因 registry `ENOTFOUND`且离线 store 缺 `@eslint/js@10.0.1` 而中止；原 `node_modules` 已原位恢复，源码/lockfile 无改动。Task 5 不得在 Node 22 root verify 与所需 disposable integration 通过前宣布完成。 |
+| 3. Task 5 方案确认 | **完成** | 用户已批准以单 extraction 批次事务原子写入/路由 security 候选、普通 pending 列表隔离 security claim，并在 Promotion repository/CLI 稳定映射 `AS104 → security_reviewer_required`、`AS111 → security_review_required`、`AS112 → security_promotion_blocked`；不根据人类错误文本分支，不泄漏 SQL。 |
+| 4. Task 5 RED | **完成** | 已先新增 extraction repository 的 7 个具名测试，覆盖两类 security claim 路由、重复重放、普通候选不路由、混合批次选择性路由、路由失败整批回滚及普通 pending 隔离；另扩展 worker extraction 透传、Promotion SQLSTATE 与 CLI 稳定错误回归。有效 RED：extraction 7/7 失败，分别因事务数仍为 0、路由失败未拒绝、security rows 仍进入普通 pending；未写生产代码。Promotion focused suite 受当前 worktree 依赖链接缺失阻断于 import，不能计作业务 RED；后续使用恢复后的声明运行时/依赖复验。 |
+| 5. Task 5 本地 GREEN | **完成** | extraction repository 已改为每批单事务，仅对成功新插入的 `security_risk` / `scam_indicator` 调用 `route_security_extraction_candidate`，重复项不重路由，任一路由失败整批回滚；普通 pending SQL 排除两类安全 claim。Promotion 仅按 SQLSTATE 映射 `AS104` / `AS111` / `AS112`，worker CLI 沿用稳定错误码输出。新增真实 ingress integration 及 Promotion caution/blocked 回归，并纳入 database integration script。依赖按 lockfile 恢复后，本地 database 12 files passed / 9 skipped、235 passed / 54 skipped，worker 17 files passed / 1 skipped、217 passed / 2 skipped；两包 lint/typecheck exit 0。 |
+| 6. Task 5 全仓门禁（当前运行时） | **完成（非声明 Node）** | Node 24.19.0 下 fresh `pnpm verify` exit 0：contracts 132 + domain 375 + database 235 + worker 217 + web 140 = **1,099 non-skipped**，56 environment-gated skips；lint、typecheck、build、placeholders 全绿。脚本内 pnpm 为锁定的 11.16.0，但 Node 仍超出 `>=22 <23`，所以不能替代声明运行时验收。 |
+| 7. Task 5 声明运行时验收 | **完成** | 通过隔离 `/tmp` runtime 精确核对 Node 22.22.2 / pnpm 11.16.0，并执行 fresh root `pnpm verify` exit 0：1,099 non-skipped / 56 gated skips，lint/typecheck/build/placeholders 全绿。临时 runtime 不改用户 shell 或项目配置。 |
+| 8. Task 5 disposable integration | **完成** | 用户授权后，仅用手册指定 SSH key 建立 `16432→64322` / `16433→64321` disposable 隧道；仓库环境校验器 fail-closed 通过。首轮 2 files / 15 tests PASS；独立复审补强后复跑 **2 files / 17 tests PASS**（60.37s），覆盖 ingress 真实 ai_stage_worker 角色、RLS/RPC、安全 candidate/event/outbox、重放、路由失败整批回滚、security_risk/scam_indicator 真实 AS111，以及 reviewer/security_reviewer/admin 的 caution 放行矩阵与 blocked 全拒绝。未 reset、未复制远端文件、fixture 自清理；测试后隧道已关闭，生产 54322/54321 未访问。 |
+| 9. Task 5 final review / gate / commit | **完成（review clean）** | 初审 0 Critical / 1 Important / 1 Minor；两项均修复。最终精确 Node 22.22.2 / pnpm 11.16.0 `pnpm verify` exit 0：contracts 132 + domain 375 + database 235 + worker 217 + web 140 = **1,099 non-skipped / 58 gated skips**，lint/typecheck/build/placeholders 全绿。Scoped re-review 判定 Important/Minor Resolved、无新增 C/I/M，Ready to merge: Yes。Task 5 已以 conventional subject `feat(worker): route security extraction candidates` 原子提交；下一步进入 Task 6 设计核对与 RED。 |
+
+> 本轮仅在用户精确授权后通过 `16432→64322` / `16433→64321` 隧道运行 disposable focused integration；未同步远端文件、未 reset，测试 fixture 已清理且隧道已关闭。生产 54322/54321 未访问，任何后续外部动作仍需单独授权。
 
 ### 2026-08-26 本轮接续复核进度
 

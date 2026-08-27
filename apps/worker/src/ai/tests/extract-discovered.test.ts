@@ -106,6 +106,22 @@ describe('runExtractionOnce', () => {
     expect(candidateBatches.at(0)!.runId).toBe('run-1');
   });
 
+  it.each(['security_risk', 'scam_indicator'] as const)(
+    'forwards a grounded %s candidate unchanged to the governed repository ingress',
+    async (claimType) => {
+      const payload = { ...candidatePayload('points program will extend to week 12'), claimType };
+      const { repository, candidateBatches } = recordingRepository([pendingInput()]);
+
+      const summary = await runExtractionOnce({
+        repository,
+        modelClient: modelClientReturning([JSON.stringify({ candidates: [payload] })]),
+      });
+
+      expect(summary.candidatesInserted).toBe(1);
+      expect(candidateBatches.at(0)!.candidates.at(0)!.payload).toEqual(payload);
+    },
+  );
+
   it('drops ungrounded candidates but keeps grounded ones', async () => {
     const output: ExtractionRunOutput = {
       candidates: [

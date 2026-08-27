@@ -1,5 +1,5 @@
 import type { ExtractionCandidatePayload, ExtractionRunStatus } from '@airdrop/contracts';
-import type { Sql } from 'postgres';
+import type { Sql, TransactionSql } from 'postgres';
 
 import type { Database, Json } from '../generated/database.types.js';
 
@@ -167,24 +167,11 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
 
     async insertCandidates(aiRunId, candidates) {
       return run(async () => {
-        let inserted = 0;
-        for (const candidate of candidates) {
-          const rows = await sql`
-            insert into public.extraction_candidates (
-              ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
-              payload, payload_sha256
-            )
-            values (
-              ${aiRunId}, ${candidate.projectId}, ${candidate.sourceId},
-              ${candidate.discoveredItemId}, ${candidate.rawItemId},
-              ${sql.json(candidate.payload)}, ${candidate.payloadSha256}
-            )
-            on conflict (discovered_item_id, payload_sha256) do nothing
-            returning id
-          `;
-          inserted += rows.length;
-        }
-        return inserted;
+        return sql.begin(async (transaction) => insertCandidatesInTransaction(
+          transaction,
+          aiRunId,
+          candidates,
+        ));
       });
     },
 
@@ -194,6 +181,7 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
           select id, project_id, discovered_item_id, payload, created_at
           from public.extraction_candidates
           where status = 'pending'
+            and payload ->> 'claimType' not in ('security_risk', 'scam_indicator')
           order by created_at desc
           limit ${limit}
         `;
@@ -207,4 +195,38 @@ export function createExtractionRepository(sql: Sql): ExtractionRepository {
       });
     },
   };
+}
+
+async function insertCandidatesInTransaction(
+  sql: TransactionSql,
+  aiRunId: string,
+  candidates: readonly ExtractionCandidateInput[],
+): Promise<number> {
+  let inserted = 0;
+  for (const candidate of candidates) {
+    const rows = await sql`
+      insert into public.extraction_candidates (
+        ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
+        payload, payload_sha256
+      )
+      values (
+        ${aiRunId}, ${candidate.projectId}, ${candidate.sourceId},
+        ${candidate.discoveredItemId}, ${candidate.rawItemId},
+        ${sql.json(candidate.payload)}, ${candidate.payloadSha256}
+      )
+      on conflict (discovered_item_id, payload_sha256) do nothing
+      returning id
+    `;
+    const insertedRow = rows.at(0);
+    if (insertedRow === undefined) continue;
+
+    if (candidate.payload.claimType === 'security_risk'
+      || candidate.payload.claimType === 'scam_indicator') {
+      await sql`
+        select public.route_security_extraction_candidate(${insertedRow.id}::uuid)
+      `;
+    }
+    inserted += 1;
+  }
+  return inserted;
 }
