@@ -232,9 +232,32 @@ from (values
   ('security_indicators', 'security_indicators_type_normalized_key', 'u'),
   ('security_incident_decisions', 'security_incident_decisions_incident_version_key', 'u'),
   ('security_review_commands', 'security_review_commands_reviewer_key', 'u'),
+  ('security_events', 'security_events_object_shape', 'c'),
+  ('security_events', 'security_events_payload_identity', 'c'),
+  ('security_review_commands', 'security_review_commands_operation_shape', 'c'),
   ('security_indicator_evidence_links', 'security_indicator_evidence_links_pkey', 'p'),
   ('security_incident_indicator_links', 'security_incident_indicator_links_pkey', 'p')
 ) as expected(table_name, constraint_name, constraint_type);
+
+select ok(
+  coalesce((
+    select pg_catalog.pg_get_constraintdef(constraint_info.oid) like
+      pg_catalog.format('%%REFERENCES %s%%', expected.target_table)
+    from pg_catalog.pg_constraint as constraint_info
+    where constraint_info.conrelid = pg_catalog.to_regclass('public.' || expected.table_name)
+      and constraint_info.conname = expected.constraint_name
+      and constraint_info.contype = 'f'
+  ), false),
+  pg_catalog.format('%s has exact FK %s', expected.table_name, expected.constraint_name)
+)
+from (values
+  ('security_indicator_candidates', 'security_indicator_candidates_extraction_candidate_fkey', 'extraction_candidates'),
+  ('security_indicator_evidence_links', 'security_indicator_evidence_links_evidence_fkey', 'evidence'),
+  ('security_candidate_review_decisions', 'security_candidate_review_decisions_candidate_fkey', 'security_indicator_candidates'),
+  ('security_incident_decisions', 'security_incident_decisions_incident_fkey', 'security_incidents'),
+  ('security_incident_decisions', 'security_incident_decisions_evidence_fkey', 'evidence'),
+  ('security_incident_indicator_links', 'security_incident_indicator_links_decision_fkey', 'security_incident_decisions')
+) as expected(table_name, constraint_name, target_table);
 
 select ok(
   coalesce((
@@ -348,6 +371,58 @@ select ok(
 );
 
 select ok(
+  has_function_privilege('ai_stage_worker',
+    'public.current_security_target_posture(text,uuid)', 'EXECUTE')
+  and has_function_privilege('ai_stage_worker',
+    'public.security_target_lock_key_v1(text,uuid)', 'EXECUTE')
+  and not has_table_privilege('ai_stage_worker', 'public.security_incidents', 'INSERT')
+  and not has_table_privilege('ai_stage_worker', 'public.security_incident_decisions', 'INSERT'),
+  'ai stage scoring role receives only posture and lock helpers, never ledger DML'
+);
+
+select results_eq(
+  $$
+    select policy.tablename::text collate "C", policy.policyname::text collate "C",
+      policy.roles::text collate "C", policy.cmd::text collate "C"
+    from pg_catalog.pg_policies as policy
+    where policy.schemaname = 'public'
+      and policy.tablename in (
+        'security_incidents', 'security_incident_decisions',
+        'security_incident_indicator_links', 'security_indicators'
+      )
+    order by policy.tablename, policy.policyname
+  $$,
+  $$ values
+    ('security_incident_decisions'::text collate "C", 'security_incident_decisions_select_anon'::text collate "C", '{anon}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_incident_decisions'::text collate "C", 'security_incident_decisions_select_authenticated'::text collate "C", '{authenticated}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_incident_indicator_links'::text collate "C", 'security_incident_indicator_links_select_anon'::text collate "C", '{anon}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_incident_indicator_links'::text collate "C", 'security_incident_indicator_links_select_authenticated'::text collate "C", '{authenticated}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_incidents'::text collate "C", 'security_incidents_select_anon'::text collate "C", '{anon}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_incidents'::text collate "C", 'security_incidents_select_authenticated'::text collate "C", '{authenticated}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_indicators'::text collate "C", 'security_indicators_select_anon'::text collate "C", '{anon}'::text collate "C", 'SELECT'::text collate "C"),
+    ('security_indicators'::text collate "C", 'security_indicators_select_authenticated'::text collate "C", '{authenticated}'::text collate "C", 'SELECT'::text collate "C")
+  $$,
+  'public security projections have exact underlying invoker RLS policies'
+);
+
+select ok(
+  has_column_privilege('anon', 'public.security_incidents', 'id', 'SELECT')
+  and has_column_privilege('anon', 'public.security_incident_decisions', 'public_summary', 'SELECT')
+  and has_column_privilege('anon', 'public.security_indicators', 'value_text', 'SELECT')
+  and not has_column_privilege('anon', 'public.security_incident_decisions', 'reviewer_user_id', 'SELECT')
+  and not has_column_privilege('anon', 'public.security_incident_decisions', 'note', 'SELECT')
+  and not has_column_privilege('anon', 'public.security_incident_decisions', 'evidence_id', 'SELECT'),
+  'invoker projections grant only safe underlying columns'
+);
+
+select ok(
+  pg_catalog.to_regprocedure('public.security_public_safe_indicator_rows()') is null
+    and pg_catalog.to_regprocedure('public.security_public_incident_summary_rows()') is null
+    and pg_catalog.to_regprocedure('public.security_public_project_posture(uuid)') is null,
+  'browser-facing row helpers cannot bypass invoker RLS'
+);
+
+select ok(
   coalesce((
     select pg_catalog.pg_get_constraintdef(constraint_info.oid) like '%security.candidate.submitted.v1%'
       and pg_catalog.pg_get_constraintdef(constraint_info.oid) like '%security.candidate.reviewed.v1%'
@@ -418,6 +493,19 @@ values (
   '2026-08-26 00:00:00+00', '2026-08-26 00:00:00+00'
 );
 
+insert into public.project_sources (
+  project_id, source_id, authority_domains, is_official,
+  verified_at, verified_by, created_at
+)
+values
+  (
+    '73000000-0000-4000-8000-000000000010',
+    '73000000-0000-4000-8000-000000000020',
+    array['phase-7a-security.example'], true,
+    '2026-08-26 00:00:00+00', '73000000-0000-4000-8000-000000000090',
+    '2026-08-26 00:00:00+00'
+  );
+
 insert into public.raw_items (
   id, project_id, source_id, logical_url, final_url, content_kind, media_type,
   raw_text, sha256, collected_at, created_at
@@ -429,7 +517,7 @@ values (
   'https://phase-7a-security.example/report',
   'https://phase-7a-security.example/report',
   'official_html', 'text/html',
-  'The malicious domain phish.example is a confirmed phishing site.',
+  'The malicious domain phish.example is a confirmed phishing site. A second extracted warning says wallet drain behavior is confirmed.',
   repeat('7', 64), '2026-08-26 00:01:00+00', '2026-08-26 00:01:00+00'
 );
 
@@ -539,6 +627,9 @@ select * from public.execute_security_candidate_review(
     'expectedCandidateVersion', 1,
     'decision', 'accept_and_open',
     'reasonCode', 'evidence_verified',
+    'target', pg_catalog.jsonb_build_object(
+      'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+    ),
     'evidenceId', '73000000-0000-4000-8000-000000000040',
     'indicator', pg_catalog.jsonb_build_object('type', 'domain', 'value', 'phish.example'),
     'category', 'phishing',
@@ -572,6 +663,63 @@ select is(
    where id = '73000000-0000-4000-8000-000000000010'),
   'active',
   'security posture does not mutate the catalog lifecycle'
+);
+
+select set_config('request.jwt.claim.sub', '73000000-0000-4000-8000-000000000090', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select lives_ok(
+  pg_catalog.format(
+    $command$
+      select * from public.open_security_incident(
+        %L::jsonb,
+        'phase-7a-newer-caution-incident'
+      )
+    $command$,
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'action', 'open',
+      'target', pg_catalog.jsonb_build_object(
+        'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+      ),
+      'category', 'impersonation',
+      'indicatorId', (select "indicatorId"::text from pg_temp.phase_7a_candidate_result),
+      'evidenceId', '73000000-0000-4000-8000-000000000040',
+      'resultingPosture', 'caution',
+      'resultingSeverity', 'medium',
+      'publicSummary', 'A newer caution incident must not replace the active blocked warning.',
+      'note', null,
+      'reasonCode', 'precautionary_evidence'
+    )::text
+  ),
+  'a second newer caution incident can coexist with the blocked incident'
+);
+reset role;
+
+insert into public.projects (id, slug, name, lifecycle, created_at, updated_at)
+values (
+  '73000000-0000-4000-8000-000000000012', 'phase-7a-hidden-security-fixture',
+  'Phase 7A Hidden Security Fixture', 'paused',
+  '2026-08-26 00:00:00+00', '2026-08-26 00:00:00+00'
+);
+insert into public.security_incidents (
+  id, target_type, project_id, category, opened_at, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000072', 'project',
+  '73000000-0000-4000-8000-000000000012', 'phishing',
+  '2026-08-26 00:10:00+00', '2026-08-26 00:10:00+00'
+);
+insert into public.security_incident_decisions (
+  id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+  resulting_posture, resulting_severity, public_summary, evidence_id, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000073',
+  '73000000-0000-4000-8000-000000000072', 1,
+  '73000000-0000-4000-8000-000000000090', 'open', 'precautionary_evidence',
+  'blocked', 'critical', 'A non-catalog project warning must stay outside public projections.',
+  '73000000-0000-4000-8000-000000000040', '2026-08-26 00:10:00+00'
 );
 
 create temporary table phase_7a_disclosure_result (
@@ -657,6 +805,21 @@ select results_eq(
   ) $$,
   'blocked-project projection is catalog-visible, scoped, and does not expose score advice'
 );
+select results_eq(
+  $$
+    select public_summary
+    from public.public_blocked_projects
+    where project_id = '73000000-0000-4000-8000-000000000010'
+  $$,
+  $$ values ('A grounded phishing domain requires a protective block.'::text) $$,
+  'blocked-project warning is selected from a truly blocked incident, not a newer caution incident'
+);
+select is(
+  (select count(*)::integer from public.public_project_security_state
+   where project_id = '73000000-0000-4000-8000-000000000012'),
+  0,
+  'non-catalog projects remain invisible through invoker security projections'
+);
 reset role;
 
 select set_config('request.jwt.claim.sub', '73000000-0000-4000-8000-000000000090', true);
@@ -694,12 +857,14 @@ select is(
     where aggregate_id in (
       (select "candidateId" from pg_temp.phase_7a_candidate_result),
       (select "indicatorId" from pg_temp.phase_7a_candidate_result),
-      (select "incidentId" from pg_temp.phase_7a_candidate_result)
+      (select "incidentId" from pg_temp.phase_7a_candidate_result),
+      (select command.aggregate_id from public.security_review_commands as command
+        where command.idempotency_key = 'phase-7a-newer-caution-incident')
     )
       and event_type like 'security.%'
   ),
-  6,
-  'canonical candidate, incident, and disclosure changes each commit their safe outbox event'
+  7,
+  'canonical candidate, indicator, both incidents, and disclosure changes each commit their safe outbox event'
 );
 select is(
   (
@@ -707,7 +872,7 @@ select is(
     from public.security_review_commands
     where reviewer_user_id = '73000000-0000-4000-8000-000000000090'
   ),
-  4,
+  5,
   'every successful reviewer command has exactly one append-only receipt'
 );
 
@@ -776,6 +941,18 @@ values (
   '73000000-0000-4000-8000-000000000021', 'official_web',
   'Phase 7A Alternative Evidence Source', 'https://phase-7a-alternative.example/', 'active',
   '2026-08-26 00:00:00+00', '2026-08-26 00:00:00+00'
+);
+
+insert into public.project_sources (
+  project_id, source_id, authority_domains, is_official,
+  verified_at, verified_by, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000010',
+  '73000000-0000-4000-8000-000000000021',
+  array['phase-7a-alternative.example'], true,
+  '2026-08-26 00:00:00+00', '73000000-0000-4000-8000-000000000090',
+  '2026-08-26 00:00:00+00'
 );
 
 insert into public.raw_items (
@@ -848,6 +1025,24 @@ values
     '73000000-0000-4000-8000-000000000041',
     '2026-08-26 00:05:00+00'
   );
+
+insert into public.project_scores (
+  id, project_id, model_version, input_version, opportunity_score, risk_score,
+  confidence, recommendation, explanation, calculated_at, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000089',
+  '73000000-0000-4000-8000-000000000010', 'phase-7a-citation-v1',
+  'phase-7a-citation-input', 55, 65, 80, 'research',
+  'A score fixture proves per-Evidence blocked-source filtering.',
+  '2026-08-26 00:06:00+00', '2026-08-26 00:06:00+00'
+);
+insert into public.score_signal_links (project_score_id, signal_id, created_at)
+values (
+  '73000000-0000-4000-8000-000000000089',
+  '73000000-0000-4000-8000-000000000081',
+  '2026-08-26 00:06:00+00'
+);
 
 create temporary table phase_7a_source_incident_results (
   case_name text primary key,
@@ -982,6 +1177,20 @@ select is(
   true,
   'independent alternative Evidence keeps an ordinary signal valid'
 );
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+select results_eq(
+  $$
+    select evidence_id
+    from public.project_current_score_evidence_citations
+    where project_score_id = '73000000-0000-4000-8000-000000000089'
+    order by evidence_id
+  $$,
+  $$ values ('73000000-0000-4000-8000-000000000041'::uuid) $$,
+  'alternative Evidence keeps the score visible while the blocked-source citation is filtered per row'
+);
+reset role;
 
 select ok(
   not exists (
@@ -1253,6 +1462,9 @@ select * from public.execute_security_candidate_review(
     'expectedCandidateVersion', 1,
     'decision', 'accept_and_open',
     'reasonCode', 'evidence_verified',
+    'target', pg_catalog.jsonb_build_object(
+      'type', 'project', 'id', '73000000-0000-4000-8000-000000000011'
+    ),
     'evidenceId', '73000000-0000-4000-8000-000000000042',
     'indicator', pg_catalog.jsonb_build_object(
       'type', 'domain', 'value', 'promotion-risk.example'
@@ -1338,6 +1550,447 @@ select throws_ok(
   $$,
   'AS112', 'security_promotion_blocked',
   'ordinary Promotion is denied for every actor at blocked posture'
+);
+
+-- Extraction-origin review keeps project/source context non-authoritative,
+-- lets the reviewer select one context target, and creates/reuses deterministic
+-- Evidence in the same candidate command.
+insert into public.discovered_items (
+  id, project_id, source_id, feed_raw_item_id, stable_entry_key, version,
+  entry_url, summary, is_authority_domain, disposition, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000074',
+  '73000000-0000-4000-8000-000000000010',
+  '73000000-0000-4000-8000-000000000020',
+  '73000000-0000-4000-8000-000000000030',
+  'phase-7a-security-extraction', 1,
+  'https://phase-7a-security.example/extraction',
+  'The malicious domain phish.example is a confirmed phishing site.',
+  true, 'eligible', '2026-08-26 00:20:00+00'
+);
+insert into public.ai_runs (
+  id, stage, input_kind, input_id, input_hash, model_id, prompt_version,
+  schema_version, pipeline_version, status, output, created_at
+)
+values (
+  '73000000-0000-4000-8000-000000000075', 'extract.v1', 'discovered_item',
+  '73000000-0000-4000-8000-000000000074', repeat('c', 64), 'test-model',
+  'extract-prompt-v1', 'extract-schema-v1', 'extract-pipeline-v1', 'succeeded',
+  '{"candidates":[]}', '2026-08-26 00:20:00+00'
+);
+insert into public.extraction_candidates (
+  id, ai_run_id, project_id, source_id, discovered_item_id, raw_item_id,
+  payload, payload_sha256, created_at
+)
+values
+  (
+    '73000000-0000-4000-8000-000000000076',
+    '73000000-0000-4000-8000-000000000075',
+    '73000000-0000-4000-8000-000000000010',
+    '73000000-0000-4000-8000-000000000020',
+    '73000000-0000-4000-8000-000000000074',
+    '73000000-0000-4000-8000-000000000030',
+    '{"claimType":"security_risk","summary":"Extraction context requires reviewer security review.","evidenceQuote":"The malicious domain phish.example is a confirmed phishing site."}'::jsonb,
+    repeat('d', 64), '2026-08-26 00:20:00+00'
+  ),
+  (
+    '73000000-0000-4000-8000-000000000077',
+    '73000000-0000-4000-8000-000000000075',
+    '73000000-0000-4000-8000-000000000010',
+    '73000000-0000-4000-8000-000000000020',
+    '73000000-0000-4000-8000-000000000074',
+    '73000000-0000-4000-8000-000000000030',
+    '{"claimType":"scam_indicator","summary":"Second extraction context exercises stale incident version.","evidenceQuote":"A second extracted warning says wallet drain behavior is confirmed."}'::jsonb,
+    repeat('e', 64), '2026-08-26 00:20:01+00'
+  );
+
+create temporary table phase_7a_extraction_security_candidates (
+  extraction_candidate_id uuid primary key,
+  security_candidate_id uuid not null
+) on commit drop;
+grant select, insert on table pg_temp.phase_7a_extraction_security_candidates
+to ai_stage_worker, authenticated;
+
+set local role ai_stage_worker;
+insert into pg_temp.phase_7a_extraction_security_candidates
+select extraction.id, public.route_security_extraction_candidate(extraction.id)
+from public.extraction_candidates as extraction
+where extraction.id in (
+  '73000000-0000-4000-8000-000000000076',
+  '73000000-0000-4000-8000-000000000077'
+)
+order by extraction.id;
+reset role;
+
+select set_config('request.jwt.claim.sub', '73000000-0000-4000-8000-000000000090', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select results_eq(
+  $$
+    select target, "targetContext", indicator, "evidenceId"
+    from public.get_security_candidate(
+      (select security_candidate_id
+       from pg_temp.phase_7a_extraction_security_candidates
+       where extraction_candidate_id = '73000000-0000-4000-8000-000000000076')
+    )
+  $$,
+  $$ values (
+    null::jsonb,
+    '{"projectId":"73000000-0000-4000-8000-000000000010","sourceId":"73000000-0000-4000-8000-000000000020"}'::jsonb,
+    null::jsonb,
+    null::uuid
+  ) $$,
+  'extraction detail exposes context while target, indicator, and Evidence remain reviewer-selected'
+);
+
+create temporary table phase_7a_extraction_attach_result (
+  version integer not null, "commandId" uuid not null, "candidateId" uuid not null,
+  "candidateVersion" bigint not null, "decisionId" uuid not null, state text not null,
+  "indicatorId" uuid null, "incidentId" uuid null, replayed boolean not null
+) on commit drop;
+grant select, insert on table pg_temp.phase_7a_extraction_attach_result to authenticated;
+
+insert into pg_temp.phase_7a_extraction_attach_result
+select * from public.execute_security_candidate_review(
+  (select security_candidate_id
+   from pg_temp.phase_7a_extraction_security_candidates
+   where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+  pg_catalog.jsonb_build_object(
+    'version', 1,
+    'candidateId', (select security_candidate_id::text
+      from pg_temp.phase_7a_extraction_security_candidates
+      where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+    'expectedCandidateVersion', 1,
+    'decision', 'accept_and_attach',
+    'reasonCode', 'evidence_verified',
+    'target', pg_catalog.jsonb_build_object(
+      'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+    ),
+    'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result),
+    'expectedIncidentVersion', 1,
+    'evidenceId', null,
+    'indicator', pg_catalog.jsonb_build_object(
+      'type', 'observed_behavior', 'value', 'confirmed phishing site'
+    ),
+    'note', null
+  ),
+  'phase-7a-extraction-attach'
+);
+
+insert into pg_temp.phase_7a_extraction_attach_result
+select * from public.execute_security_candidate_review(
+  (select security_candidate_id
+   from pg_temp.phase_7a_extraction_security_candidates
+   where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+  pg_catalog.jsonb_build_object(
+    'version', 1,
+    'candidateId', (select security_candidate_id::text
+      from pg_temp.phase_7a_extraction_security_candidates
+      where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+    'expectedCandidateVersion', 1,
+    'decision', 'accept_and_attach',
+    'reasonCode', 'evidence_verified',
+    'target', pg_catalog.jsonb_build_object(
+      'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+    ),
+    'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result),
+    'expectedIncidentVersion', 1,
+    'evidenceId', null,
+    'indicator', pg_catalog.jsonb_build_object(
+      'type', 'observed_behavior', 'value', 'confirmed phishing site'
+    ),
+    'note', null
+  ),
+  'phase-7a-extraction-attach'
+);
+
+select results_eq(
+  $$ select "candidateVersion", state, replayed
+     from pg_temp.phase_7a_extraction_attach_result order by replayed $$,
+  $$ values
+    (2::bigint, 'accepted'::text, false),
+    (2::bigint, 'accepted'::text, true) $$,
+  'extraction attach creates/reuses Evidence atomically and replays the exact receipt'
+);
+
+select throws_ok(
+  pg_catalog.format(
+    $command$
+      select * from public.execute_security_candidate_review(%L, %L::jsonb, %L)
+    $command$,
+    (select security_candidate_id
+     from pg_temp.phase_7a_extraction_security_candidates
+     where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'candidateId', (select security_candidate_id::text
+        from pg_temp.phase_7a_extraction_security_candidates
+        where extraction_candidate_id = '73000000-0000-4000-8000-000000000076'),
+      'expectedCandidateVersion', 1,
+      'decision', 'accept_and_attach',
+      'reasonCode', 'evidence_verified',
+      'target', pg_catalog.jsonb_build_object(
+        'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+      ),
+      'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result),
+      'expectedIncidentVersion', 1,
+      'evidenceId', null,
+      'indicator', pg_catalog.jsonb_build_object(
+        'type', 'observed_behavior', 'value', 'different grounded value'
+      ),
+      'note', null
+    )::text,
+    'phase-7a-extraction-attach'
+  ),
+  'AS107', 'security_idempotency_conflict',
+  'an exact idempotency key rejects a different accept-and-attach payload'
+);
+
+select throws_ok(
+  pg_catalog.format(
+    $command$
+      select * from public.execute_security_candidate_review(%L, %L::jsonb, %L)
+    $command$,
+    (select security_candidate_id
+     from pg_temp.phase_7a_extraction_security_candidates
+     where extraction_candidate_id = '73000000-0000-4000-8000-000000000077'),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'candidateId', (select security_candidate_id::text
+        from pg_temp.phase_7a_extraction_security_candidates
+        where extraction_candidate_id = '73000000-0000-4000-8000-000000000077'),
+      'expectedCandidateVersion', 1,
+      'decision', 'accept_and_attach',
+      'reasonCode', 'evidence_verified',
+      'target', pg_catalog.jsonb_build_object(
+        'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+      ),
+      'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result),
+      'expectedIncidentVersion', 1,
+      'evidenceId', null,
+      'indicator', pg_catalog.jsonb_build_object(
+        'type', 'observed_behavior', 'value', 'wallet drain behavior'
+      ),
+      'note', null
+    )::text,
+    'phase-7a-extraction-stale-attach'
+  ),
+  'AS106', 'security_version_conflict',
+  'accept-and-attach rejects a stale expected incident version after target-first locking'
+);
+reset role;
+
+select is(
+  (select count(*)::integer from public.evidence
+   where raw_item_id = '73000000-0000-4000-8000-000000000030'
+     and discovered_item_id = '73000000-0000-4000-8000-000000000074'
+     and normalized_quote_sha256 = public.evidence_quote_sha256_v1(
+       'The malicious domain phish.example is a confirmed phishing site.'
+     )),
+  1,
+  'extraction acceptance reuses the deterministic Evidence identity instead of duplicating it'
+);
+
+select is(
+  (select count(*)::integer from public.evidence
+   where raw_item_id = '73000000-0000-4000-8000-000000000030'
+     and discovered_item_id = '73000000-0000-4000-8000-000000000074'
+     and normalized_quote_sha256 = public.evidence_quote_sha256_v1(
+       'A second extracted warning says wallet drain behavior is confirmed.'
+     )),
+  0,
+  'a stale attach rolls back Evidence created before the incident-version check'
+);
+
+create temporary table phase_7a_phish_evidence_sha as
+select public.evidence_quote_sha256_v1(
+  'The malicious domain phish.example is a confirmed phishing site.'
+) as sha;
+grant select on table pg_temp.phase_7a_phish_evidence_sha to authenticated;
+
+select set_config('request.jwt.claim.sub', '73000000-0000-4000-8000-000000000090', true);
+select set_config('request.jwt.claim.role', 'authenticated', true);
+set local role authenticated;
+select throws_ok(
+  pg_catalog.format(
+    $command$
+      select * from public.execute_security_incident_command(%L, %L::jsonb, %L)
+    $command$,
+    (select "incidentId" from pg_temp.phase_7a_promotion_incident),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'action', 'adjust',
+      'incidentId', (select "incidentId"::text from pg_temp.phase_7a_promotion_incident),
+      'expectedIncidentVersion', 2,
+      'evidenceId', '73000000-0000-4000-8000-000000000042',
+      'resultingPosture', 'blocked',
+      'resultingSeverity', 'critical',
+      'publicSummary', 'A changed summary cannot disguise reuse of the current primary Evidence.',
+      'note', null,
+      'reasonCode', 'additional_evidence'
+    )::text,
+    'phase-7a-reused-primary-evidence'
+  ),
+  'AS108', 'security_command_invalid',
+  'same-posture adjustment requires genuinely new primary Evidence'
+);
+
+select throws_ok(
+  pg_catalog.format(
+    $command$
+      select * from public.execute_security_incident_command(%L, %L::jsonb, %L)
+    $command$,
+    (select "incidentId" from pg_temp.phase_7a_candidate_result),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'action', 'attach_indicator',
+      'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result),
+      'expectedIncidentVersion', 2,
+      'indicatorId', (select "indicatorId"::text
+        from pg_temp.phase_7a_extraction_attach_result where not replayed),
+      'evidenceId', (select sha::text from pg_temp.phase_7a_phish_evidence_sha),
+      'resultingPosture', 'blocked',
+      'resultingSeverity', 'critical',
+      'publicSummary', 'A grounded phishing domain requires a protective block.',
+      'note', null,
+      'reasonCode', 'additional_evidence'
+    )::text,
+    'phase-7a-duplicate-incident-indicator'
+  ),
+  'AS108', 'security_command_invalid',
+  'duplicate attach-indicator cannot append a no-op incident decision'
+);
+reset role;
+
+select throws_like(
+  pg_catalog.format(
+    $command$
+      insert into public.security_events (
+        event_type, aggregate_type, aggregate_id, aggregate_version,
+        candidate_id, incident_id, actor_kind, actor_service_name, payload
+      ) values (
+        'candidate_submitted', 'candidate', %L, 99, %L, %L,
+        'system', 'constraint-test', %L::jsonb
+      )
+    $command$,
+    (select "candidateId" from pg_temp.phase_7a_manual_result),
+    (select "candidateId" from pg_temp.phase_7a_manual_result),
+    (select "incidentId" from pg_temp.phase_7a_candidate_result),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'eventType', 'security.candidate.submitted.v1',
+      'candidateId', (select "candidateId"::text from pg_temp.phase_7a_manual_result),
+      'incidentId', (select "incidentId"::text from pg_temp.phase_7a_candidate_result)
+    )::text
+  ),
+  '%security_events_object_shape%',
+  'event type, aggregate, object references, and payload identity fail closed together'
+);
+
+select throws_like(
+  pg_catalog.format(
+    $command$
+      insert into public.security_review_commands (
+        reviewer_user_id, operation, aggregate_type, aggregate_id,
+        idempotency_key, input_hash, expected_candidate_version,
+        resulting_candidate_version, result_payload
+      ) values (%L, 'review_candidate', 'candidate', %L,
+        'phase-7a-invalid-receipt-shape', %L, 1, 2, '{}'::jsonb)
+    $command$,
+    '73000000-0000-4000-8000-000000000090',
+    (select "candidateId" from pg_temp.phase_7a_manual_result),
+    repeat('a', 64)
+  ),
+  '%security_review_commands_operation_shape%',
+  'operation-specific receipt versions and decision references fail closed'
+);
+
+select throws_like(
+  pg_catalog.format(
+    $command$
+      insert into public.outbox_events (
+        aggregate_type, aggregate_id, aggregate_version, event_type, payload,
+        occurred_at, created_at
+      ) values ('security_candidate', %L, 99, 'security.candidate.submitted.v1', %L::jsonb,
+        now(), now())
+    $command$,
+    (select "candidateId" from pg_temp.phase_7a_manual_result),
+    pg_catalog.jsonb_build_object(
+      'version', 1,
+      'eventType', 'security.candidate.submitted.v1',
+      'aggregateId', 'not-a-uuid',
+      'aggregateVersion', 99,
+      'target', pg_catalog.jsonb_build_object(
+        'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+      ),
+      'candidateId', (select "candidateId"::text from pg_temp.phase_7a_manual_result),
+      'occurredAt', '2026-08-26T00:00:00.000Z'
+    )::text
+  ),
+  '%outbox_events_payload_valid%',
+  'security outbox UUID, positive version, and timestamp formats fail closed'
+);
+
+select results_eq(
+  $$
+    select event.payload
+    from public.outbox_events as event
+    where event.aggregate_type = 'security_candidate'
+      and event.aggregate_id = (select "candidateId" from pg_temp.phase_7a_manual_result)
+      and event.aggregate_version = 1
+  $$,
+  $$
+    select pg_catalog.jsonb_build_object(
+      'version', 1,
+      'eventType', 'security.candidate.submitted.v1',
+      'aggregateId', event.aggregate_id,
+      'aggregateVersion', 1,
+      'target', pg_catalog.jsonb_build_object(
+        'type', 'project', 'id', '73000000-0000-4000-8000-000000000010'
+      ),
+      'candidateId', event.aggregate_id,
+      'occurredAt', pg_catalog.to_char(
+        event.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+      )
+    )
+    from public.outbox_events as event
+    where event.aggregate_type = 'security_candidate'
+      and event.aggregate_id = (select "candidateId" from pg_temp.phase_7a_manual_result)
+      and event.aggregate_version = 1
+  $$,
+  'candidate submission emits the exact safe outbox payload'
+);
+
+select ok(
+  pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.execute_security_incident_command(uuid,jsonb,text)'::regprocedure
+    ),
+    'security_target_lock_key_v1'
+  ) < pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.execute_security_incident_command(uuid,jsonb,text)'::regprocedure
+    ),
+    'for update'
+  ),
+  'incident commands acquire the target advisory lock before the incident row lock'
+);
+
+select ok(
+  pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.execute_security_candidate_review(uuid,jsonb,text)'::regprocedure
+    ),
+    'security_target_lock_key_v1'
+  ) < pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.execute_security_candidate_review(uuid,jsonb,text)'::regprocedure
+    ),
+    'where incident.id = requested_incident_id
+    for update'
+  ),
+  'candidate attach acquires the target advisory lock before the incident row lock'
 );
 
 select * from finish();

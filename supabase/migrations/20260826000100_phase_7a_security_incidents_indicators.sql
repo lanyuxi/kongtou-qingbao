@@ -394,6 +394,44 @@ create table public.security_events (
     (event_type = 'indicator_disclosure_changed' and indicator_id is not null and indicator_public_safe is not null)
     or (event_type <> 'indicator_disclosure_changed' and indicator_public_safe is null)
   ),
+  constraint security_events_object_shape check (
+    (event_type = 'candidate_submitted'
+      and aggregate_type = 'candidate' and candidate_id = aggregate_id
+      and indicator_id is null and incident_id is null and decision_id is null)
+    or (event_type = 'candidate_reviewed'
+      and aggregate_type = 'candidate' and candidate_id = aggregate_id
+      and decision_id is not null
+      and ((indicator_id is null and incident_id is null)
+        or (indicator_id is not null and incident_id is not null)))
+    or (event_type = 'indicator_accepted'
+      and aggregate_type = 'indicator' and indicator_id = aggregate_id
+      and candidate_id is null and incident_id is null and decision_id is null)
+    or (event_type = 'incident_opened'
+      and aggregate_type = 'incident' and incident_id = aggregate_id
+      and candidate_id is null and indicator_id is not null and decision_id is not null)
+    or (event_type = 'incident_changed'
+      and aggregate_type = 'incident' and incident_id = aggregate_id
+      and candidate_id is null and decision_id is not null)
+    or (event_type = 'indicator_disclosure_changed'
+      and aggregate_type = 'indicator' and indicator_id = aggregate_id
+      and candidate_id is null and incident_id is null and decision_id is null)
+  ),
+  constraint security_events_payload_identity check (
+    payload ->> 'version' = '1'
+    and payload ->> 'eventType' = 'security.' ||
+      case event_type
+        when 'candidate_submitted' then 'candidate.submitted.v1'
+        when 'candidate_reviewed' then 'candidate.reviewed.v1'
+        when 'indicator_accepted' then 'indicator.accepted.v1'
+        when 'incident_opened' then 'incident.opened.v1'
+        when 'incident_changed' then 'incident.changed.v1'
+        when 'indicator_disclosure_changed' then 'indicator.disclosure_changed.v1'
+      end
+    and (candidate_id is null or payload ->> 'candidateId' = candidate_id::text)
+    and (indicator_id is null or payload ->> 'indicatorId' = indicator_id::text)
+    and (incident_id is null or payload ->> 'incidentId' = incident_id::text)
+    and (decision_id is null or payload ->> 'decisionId' = decision_id::text)
+  ),
   constraint security_events_payload_object check (
     pg_catalog.jsonb_typeof(payload) = 'object'
   )
@@ -458,6 +496,47 @@ create table public.security_review_commands (
     and (resulting_incident_version is null or resulting_incident_version > 0)
     and (expected_indicator_version is null or expected_indicator_version > 0)
     and (resulting_indicator_version is null or resulting_indicator_version > 0)
+  ),
+  constraint security_review_commands_operation_shape check (
+    (operation = 'submit_manual_candidate'
+      and aggregate_type = 'candidate'
+      and expected_candidate_version is null and resulting_candidate_version = 1
+      and expected_incident_version is null and resulting_incident_version is null
+      and expected_indicator_version is null and resulting_indicator_version is null
+      and decision_id is null and indicator_id is null and incident_id is null)
+    or (operation = 'review_candidate'
+      and aggregate_type = 'candidate'
+      and expected_candidate_version is not null
+      and resulting_candidate_version = expected_candidate_version + 1
+      and expected_indicator_version is null and resulting_indicator_version is null
+      and decision_id is not null
+      and ((expected_incident_version is null and resulting_incident_version is null
+          and indicator_id is null and incident_id is null)
+        or (expected_incident_version is null and resulting_incident_version = 1
+          and indicator_id is not null and incident_id is not null)
+        or (expected_incident_version is not null
+          and resulting_incident_version = expected_incident_version + 1
+          and indicator_id is not null and incident_id is not null)))
+    or (operation = 'open_incident'
+      and aggregate_type = 'incident' and aggregate_id = incident_id
+      and expected_candidate_version is null and resulting_candidate_version is null
+      and expected_incident_version is null and resulting_incident_version = 1
+      and expected_indicator_version is null and resulting_indicator_version is null
+      and decision_id is not null and indicator_id is not null)
+    or (operation = 'incident_command'
+      and aggregate_type = 'incident' and aggregate_id = incident_id
+      and expected_candidate_version is null and resulting_candidate_version is null
+      and expected_incident_version is not null
+      and resulting_incident_version = expected_incident_version + 1
+      and expected_indicator_version is null and resulting_indicator_version is null
+      and decision_id is not null)
+    or (operation = 'set_indicator_disclosure'
+      and aggregate_type = 'indicator' and aggregate_id = indicator_id
+      and expected_candidate_version is null and resulting_candidate_version is null
+      and expected_incident_version is null and resulting_incident_version is null
+      and expected_indicator_version is not null
+      and resulting_indicator_version = expected_indicator_version + 1
+      and decision_id is null and incident_id is null)
   ),
   constraint security_review_commands_result_payload_object check (
     pg_catalog.jsonb_typeof(result_payload) = 'object'
@@ -590,9 +669,11 @@ revoke all on function public.security_target_lock_key_v1(text, uuid) from publi
 revoke all on function public.current_security_target_posture(text, uuid) from public;
 
 grant execute on function public.current_security_target_posture(text, uuid)
-to promotion_service, collection_worker, collection_queue_worker, collection_schedule_admin;
+to promotion_service, collection_worker, collection_queue_worker, collection_schedule_admin,
+  ai_stage_worker;
 grant execute on function public.security_target_lock_key_v1(text, uuid)
-to promotion_service, collection_worker, collection_queue_worker, collection_schedule_admin;
+to promotion_service, collection_worker, collection_queue_worker, collection_schedule_admin,
+  ai_stage_worker;
 
 -- Command parsing is deliberately kept in the database boundary. JSONB text
 -- has deterministic key order, so hashing the strict payload gives a stable
@@ -871,14 +952,37 @@ alter table public.outbox_events
         and pg_catalog.jsonb_typeof(payload -> 'eventType') = 'string'
         and payload ->> 'eventType' = event_type
         and pg_catalog.jsonb_typeof(payload -> 'aggregateId') = 'string'
+        and payload ->> 'aggregateId' ~
+          '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
         and pg_catalog.jsonb_typeof(payload -> 'aggregateVersion') = 'number'
+        and payload ->> 'aggregateVersion' ~ '^[1-9][0-9]*$'
         and pg_catalog.jsonb_typeof(payload -> 'target') = 'object'
         and payload -> 'target' ?& array['type', 'id']
         and (payload -> 'target') - array['type', 'id']::text[] = '{}'::jsonb
         and pg_catalog.jsonb_typeof(payload -> 'target' -> 'type') = 'string'
         and payload -> 'target' ->> 'type' in ('project', 'source')
         and pg_catalog.jsonb_typeof(payload -> 'target' -> 'id') = 'string'
+        and payload -> 'target' ->> 'id' ~
+          '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
         and pg_catalog.jsonb_typeof(payload -> 'occurredAt') = 'string'
+        and payload ->> 'occurredAt' ~
+          '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$'
+        and (not payload ? 'candidateId' or (
+          pg_catalog.jsonb_typeof(payload -> 'candidateId') = 'string'
+          and payload ->> 'candidateId' ~
+            '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'))
+        and (not payload ? 'decisionId' or (
+          pg_catalog.jsonb_typeof(payload -> 'decisionId') = 'string'
+          and payload ->> 'decisionId' ~
+            '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'))
+        and (not payload ? 'indicatorId' or (
+          pg_catalog.jsonb_typeof(payload -> 'indicatorId') = 'string'
+          and payload ->> 'indicatorId' ~
+            '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'))
+        and (not payload ? 'incidentId' or (
+          pg_catalog.jsonb_typeof(payload -> 'incidentId') = 'string'
+          and payload ->> 'incidentId' ~
+            '^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'))
         and (
           (event_type = 'security.candidate.submitted.v1'
             and payload ?& array['candidateId']
@@ -979,7 +1083,11 @@ begin
     'projectId', extraction_record.project_id,
     'sourceId', extraction_record.source_id,
     'summary', candidate_summary,
-    'target', pg_catalog.jsonb_build_object('type', target_type, 'id', target_id)
+    'targetContext', pg_catalog.jsonb_build_object(
+      'projectId', extraction_record.project_id,
+      'sourceId', extraction_record.source_id
+    ),
+    'routingTarget', pg_catalog.jsonb_build_object('type', target_type, 'id', target_id)
   );
 
   insert into public.security_indicator_candidates (
@@ -1305,6 +1413,9 @@ as $function$
 declare
   requested_reviewer_id uuid;
   candidate_record public.security_indicator_candidates%rowtype;
+  extraction_record public.extraction_candidates%rowtype;
+  discovered_record public.discovered_items%rowtype;
+  raw_record public.raw_items%rowtype;
   receipt_record public.security_review_commands%rowtype;
   current_candidate_state record;
   incident_record public.security_incidents%rowtype;
@@ -1322,6 +1433,12 @@ declare
   requested_severity text;
   requested_summary text;
   requested_incident_id uuid;
+  requested_expected_incident_version bigint;
+  resolved_raw_item_id uuid;
+  resolved_source_field text;
+  stored_quote text;
+  normalized_quote text;
+  normalized_source text;
   input_hash_value text;
   next_candidate_version bigint;
   next_incident_version bigint;
@@ -1390,7 +1507,7 @@ begin
       p_command_payload,
       array[
         'version', 'candidateId', 'expectedCandidateVersion', 'decision', 'reasonCode',
-        'evidenceId', 'indicator', 'category', 'resultingPosture', 'resultingSeverity',
+        'target', 'evidenceId', 'indicator', 'category', 'resultingPosture', 'resultingSeverity',
         'publicSummary', 'note'
       ]
     )
@@ -1401,7 +1518,7 @@ begin
       p_command_payload,
       array[
         'version', 'candidateId', 'expectedCandidateVersion', 'decision', 'reasonCode',
-        'incidentId', 'evidenceId', 'indicator', 'note'
+        'target', 'incidentId', 'expectedIncidentVersion', 'evidenceId', 'indicator', 'note'
       ]
     )
   )
@@ -1466,19 +1583,68 @@ begin
     raise exception 'security_candidate_not_found' using errcode = 'AS101';
   end if;
 
-  if pg_catalog.jsonb_typeof(candidate_record.payload -> 'target') <> 'object'
-    or not public.security_json_has_exact_keys(candidate_record.payload -> 'target', array['type', 'id'])
-    or pg_catalog.jsonb_typeof(candidate_record.payload -> 'target' -> 'type') <> 'string'
-    or candidate_record.payload -> 'target' ->> 'type' not in ('project', 'source')
-    or not public.security_json_uuid_is_valid(candidate_record.payload -> 'target', 'id')
-  then
+  if candidate_record.origin = 'reviewer_manual' then
+    if pg_catalog.jsonb_typeof(candidate_record.payload -> 'target') <> 'object'
+      or not public.security_json_has_exact_keys(candidate_record.payload -> 'target', array['type', 'id'])
+      or pg_catalog.jsonb_typeof(candidate_record.payload -> 'target' -> 'type') <> 'string'
+      or candidate_record.payload -> 'target' ->> 'type' not in ('project', 'source')
+      or not public.security_json_uuid_is_valid(candidate_record.payload -> 'target', 'id')
+    then
+      raise exception 'security_candidate_not_reviewable' using errcode = 'AS102';
+    end if;
+    requested_target_type := candidate_record.payload -> 'target' ->> 'type';
+    requested_target_id := (candidate_record.payload -> 'target' ->> 'id')::uuid;
+  elsif candidate_record.origin = 'extraction' then
+    if pg_catalog.jsonb_typeof(candidate_record.payload -> 'targetContext') <> 'object'
+      or not public.security_json_has_exact_keys(
+        candidate_record.payload -> 'targetContext', array['projectId', 'sourceId']
+      )
+      or not public.security_json_uuid_is_valid(candidate_record.payload -> 'targetContext', 'projectId')
+      or not public.security_json_uuid_is_valid(candidate_record.payload -> 'targetContext', 'sourceId')
+      or (candidate_record.payload -> 'targetContext' ->> 'projectId')::uuid <> candidate_record.project_id
+      or (candidate_record.payload -> 'targetContext' ->> 'sourceId')::uuid <> candidate_record.source_id
+      or pg_catalog.jsonb_typeof(candidate_record.payload -> 'routingTarget') <> 'object'
+      or not public.security_json_has_exact_keys(
+        candidate_record.payload -> 'routingTarget', array['type', 'id']
+      )
+      or candidate_record.payload -> 'routingTarget' ->> 'type' not in ('project', 'source')
+      or not public.security_json_uuid_is_valid(candidate_record.payload -> 'routingTarget', 'id')
+    then
+      raise exception 'security_candidate_not_reviewable' using errcode = 'AS102';
+    end if;
+
+    if requested_decision in ('accept_and_open', 'accept_and_attach') then
+      if pg_catalog.jsonb_typeof(p_command_payload -> 'target') <> 'object'
+        or not public.security_json_has_exact_keys(p_command_payload -> 'target', array['type', 'id'])
+        or pg_catalog.jsonb_typeof(p_command_payload -> 'target' -> 'type') <> 'string'
+        or p_command_payload -> 'target' ->> 'type' not in ('project', 'source')
+        or not public.security_json_uuid_is_valid(p_command_payload -> 'target', 'id')
+      then
+        raise exception 'security_command_invalid' using errcode = 'AS108';
+      end if;
+      requested_target_type := p_command_payload -> 'target' ->> 'type';
+      requested_target_id := (p_command_payload -> 'target' ->> 'id')::uuid;
+    else
+      requested_target_type := candidate_record.payload -> 'routingTarget' ->> 'type';
+      requested_target_id := (candidate_record.payload -> 'routingTarget' ->> 'id')::uuid;
+    end if;
+  else
     raise exception 'security_candidate_not_reviewable' using errcode = 'AS102';
   end if;
 
-  requested_target_type := candidate_record.payload -> 'target' ->> 'type';
-  requested_target_id := (candidate_record.payload -> 'target' ->> 'id')::uuid;
   if (requested_target_type = 'project' and requested_target_id <> candidate_record.project_id)
     or (requested_target_type = 'source' and requested_target_id <> candidate_record.source_id)
+  then
+    raise exception 'security_target_mismatch' using errcode = 'AS109';
+  end if;
+
+  if requested_decision in ('accept_and_open', 'accept_and_attach')
+    and candidate_record.origin = 'reviewer_manual'
+    and (
+      pg_catalog.jsonb_typeof(p_command_payload -> 'target') <> 'object'
+      or not public.security_json_has_exact_keys(p_command_payload -> 'target', array['type', 'id'])
+      or p_command_payload -> 'target' <> candidate_record.payload -> 'target'
+    )
   then
     raise exception 'security_target_mismatch' using errcode = 'AS109';
   end if;
@@ -1503,8 +1669,7 @@ begin
   );
 
   if requested_decision in ('accept_and_open', 'accept_and_attach') then
-    if not public.security_json_uuid_is_valid(p_command_payload, 'evidenceId')
-      or pg_catalog.jsonb_typeof(p_command_payload -> 'indicator') <> 'object'
+    if pg_catalog.jsonb_typeof(p_command_payload -> 'indicator') <> 'object'
       or not public.security_json_has_exact_keys(p_command_payload -> 'indicator', array['type', 'value'])
       or pg_catalog.jsonb_typeof(p_command_payload -> 'indicator' -> 'type') <> 'string'
       or p_command_payload -> 'indicator' ->> 'type' not in (
@@ -1516,7 +1681,6 @@ begin
       raise exception 'security_command_invalid' using errcode = 'AS108';
     end if;
 
-    requested_evidence_id := (p_command_payload ->> 'evidenceId')::uuid;
     requested_indicator_type := p_command_payload -> 'indicator' ->> 'type';
     requested_indicator_value := public.normalize_security_indicator_value_v1(
       p_command_payload -> 'indicator' ->> 'value'
@@ -1524,24 +1688,121 @@ begin
 
     if requested_indicator_value <> p_command_payload -> 'indicator' ->> 'value'
       or pg_catalog.char_length(requested_indicator_value) not between 1 and 500
-      or not public.security_evidence_matches_target(
-        requested_evidence_id, requested_target_type, requested_target_id
-      )
-      or not public.security_indicator_is_grounded(
-        requested_indicator_type, requested_indicator_value, requested_evidence_id,
-        requested_target_type, requested_target_id
-      )
-      or not exists (
-        select 1
-        from public.evidence as evidence_record
-        join public.raw_items as raw_item on raw_item.id = evidence_record.raw_item_id
-        where evidence_record.id = requested_evidence_id
-          and raw_item.project_id = candidate_record.project_id
-          and raw_item.source_id = candidate_record.source_id
-          and evidence_record.source_id = candidate_record.source_id
-      )
     then
       grounding_failed := true;
+    elsif candidate_record.origin = 'reviewer_manual' then
+      if not public.security_json_uuid_is_valid(p_command_payload, 'evidenceId') then
+        raise exception 'security_command_invalid' using errcode = 'AS108';
+      end if;
+      requested_evidence_id := (p_command_payload ->> 'evidenceId')::uuid;
+      grounding_failed := not public.security_evidence_matches_target(
+        requested_evidence_id, requested_target_type, requested_target_id
+      )
+        or not public.security_indicator_is_grounded(
+          requested_indicator_type, requested_indicator_value, requested_evidence_id,
+          requested_target_type, requested_target_id
+        )
+        or not exists (
+          select 1
+          from public.evidence as evidence_record
+          join public.raw_items as raw_item on raw_item.id = evidence_record.raw_item_id
+          where evidence_record.id = requested_evidence_id
+            and raw_item.project_id = candidate_record.project_id
+            and raw_item.source_id = candidate_record.source_id
+            and evidence_record.source_id = candidate_record.source_id
+        );
+    else
+      if pg_catalog.jsonb_typeof(p_command_payload -> 'evidenceId') <> 'null' then
+        raise exception 'security_command_invalid' using errcode = 'AS108';
+      end if;
+
+      select extraction.* into extraction_record
+      from public.extraction_candidates as extraction
+      where extraction.id = candidate_record.extraction_candidate_id;
+      if not found
+        or extraction_record.project_id <> candidate_record.project_id
+        or extraction_record.source_id <> candidate_record.source_id
+        or pg_catalog.jsonb_typeof(extraction_record.payload -> 'evidenceQuote') <> 'string'
+        or pg_catalog.char_length(extraction_record.payload ->> 'evidenceQuote') not between 10 and 500
+      then
+        grounding_failed := true;
+      else
+        stored_quote := extraction_record.payload ->> 'evidenceQuote';
+        normalized_quote := public.normalize_evidence_text_v1(stored_quote);
+        select discovered.* into discovered_record
+        from public.discovered_items as discovered
+        where discovered.id = extraction_record.discovered_item_id;
+
+        if not found
+          or discovered_record.project_id <> candidate_record.project_id
+          or discovered_record.source_id <> candidate_record.source_id
+        then
+          grounding_failed := true;
+        elsif extraction_record.raw_item_id is not null then
+          resolved_source_field := 'article_raw_text';
+          select raw_item.* into raw_record
+          from public.raw_items as raw_item
+          where raw_item.id = extraction_record.raw_item_id;
+          if not found
+            or raw_record.project_id <> candidate_record.project_id
+            or raw_record.source_id <> candidate_record.source_id
+          then
+            grounding_failed := true;
+          else
+            resolved_raw_item_id := raw_record.id;
+            normalized_source := public.normalize_evidence_text_v1(raw_record.raw_text);
+          end if;
+        else
+          resolved_source_field := 'discovered_summary';
+          select raw_item.* into raw_record
+          from public.raw_items as raw_item
+          where raw_item.id = discovered_record.feed_raw_item_id;
+          if not found
+            or raw_record.project_id <> candidate_record.project_id
+            or raw_record.source_id <> candidate_record.source_id
+            or discovered_record.summary is null
+          then
+            grounding_failed := true;
+          else
+            resolved_raw_item_id := raw_record.id;
+            normalized_source := public.normalize_evidence_text_v1(discovered_record.summary);
+          end if;
+        end if;
+
+        grounding_failed := grounding_failed
+          or pg_catalog.char_length(normalized_quote) not between 10 and 500
+          or pg_catalog.strpos(normalized_source, normalized_quote) = 0
+          or pg_catalog.strpos(
+            normalized_quote,
+            public.normalize_security_indicator_value_v1(requested_indicator_value)
+          ) = 0;
+
+        if not grounding_failed then
+          insert into public.evidence (
+            source_id, raw_item_id, discovered_item_id, source_field, quote_text,
+            normalized_quote_sha256, verified_at, created_at
+          ) values (
+            candidate_record.source_id, resolved_raw_item_id,
+            extraction_record.discovered_item_id, resolved_source_field,
+            normalized_quote, public.evidence_quote_sha256_v1(stored_quote),
+            created_at_value, created_at_value
+          )
+          on conflict do nothing
+          returning id into requested_evidence_id;
+
+          if requested_evidence_id is null then
+            select evidence_record.id into strict requested_evidence_id
+            from public.evidence as evidence_record
+            where evidence_record.raw_item_id = resolved_raw_item_id
+              and evidence_record.discovered_item_id is not distinct from extraction_record.discovered_item_id
+              and evidence_record.source_field = resolved_source_field
+              and evidence_record.normalized_quote_sha256 = public.evidence_quote_sha256_v1(stored_quote);
+          end if;
+        end if;
+      end if;
+    end if;
+
+    if grounding_failed then
       requested_decision := 'needs_review';
       requested_reason := 'grounding_failed';
     end if;
@@ -1646,10 +1907,16 @@ begin
       raise exception 'security_command_invalid' using errcode = 'AS108';
     end if;
   else
-    if not public.security_json_uuid_is_valid(p_command_payload, 'incidentId') then
+    if not public.security_json_uuid_is_valid(p_command_payload, 'incidentId')
+      or not public.security_json_positive_bigint_is_valid(
+        p_command_payload, 'expectedIncidentVersion'
+      )
+    then
       raise exception 'security_command_invalid' using errcode = 'AS108';
     end if;
     requested_incident_id := (p_command_payload ->> 'incidentId')::uuid;
+    requested_expected_incident_version :=
+      (p_command_payload ->> 'expectedIncidentVersion')::bigint;
     select incident.* into incident_record
     from public.security_incidents as incident
     where incident.id = requested_incident_id
@@ -1666,6 +1933,9 @@ begin
     from public.security_current_incident_decision(incident_record.id);
     if current_incident.decision_id is null or current_incident.resulting_posture is null then
       raise exception 'security_candidate_not_reviewable' using errcode = 'AS102';
+    end if;
+    if current_incident.incident_version <> requested_expected_incident_version then
+      raise exception 'security_version_conflict' using errcode = 'AS106';
     end if;
     next_incident_version := current_incident.incident_version + 1;
     requested_posture := current_incident.resulting_posture;
@@ -1862,12 +2132,15 @@ begin
   insert into public.security_review_commands (
     id, reviewer_user_id, operation, aggregate_type, aggregate_id,
     idempotency_key, input_hash, expected_candidate_version,
-    resulting_candidate_version, resulting_incident_version, decision_id,
+    resulting_candidate_version, expected_incident_version,
+    resulting_incident_version, decision_id,
     indicator_id, incident_id, result_payload, created_at
   ) values (
     command_id_value, requested_reviewer_id, 'review_candidate', 'candidate',
     candidate_record.id, p_idempotency_key, input_hash_value,
     current_candidate_state.state_version, next_candidate_version,
+    case when requested_decision = 'accept_and_attach'
+      then requested_expected_incident_version else null end,
     case when requested_decision = 'accept_and_open' then 1 else next_incident_version end,
     candidate_decision_id, indicator_id_value, incident_id_value,
     pg_catalog.jsonb_build_object(
@@ -2327,8 +2600,7 @@ begin
 
   select incident.* into incident_record
   from public.security_incidents as incident
-  where incident.id = p_incident_id
-  for update;
+  where incident.id = p_incident_id;
   if not found then
     raise exception 'security_incident_not_found' using errcode = 'AS103';
   end if;
@@ -2336,6 +2608,13 @@ begin
   perform pg_catalog.pg_advisory_xact_lock(
     public.security_target_lock_key_v1(incident_record.target_type, target_id_value)
   );
+  select incident.* into incident_record
+  from public.security_incidents as incident
+  where incident.id = p_incident_id
+  for update;
+  if not found then
+    raise exception 'security_incident_not_found' using errcode = 'AS103';
+  end if;
   select * into current_incident
   from public.security_current_incident_decision(incident_record.id);
   if current_incident.decision_id is null then
@@ -2366,6 +2645,12 @@ begin
             evidence_link.evidence_id, incident_record.target_type, target_id_value
           )
       )
+      or exists (
+        select 1
+        from public.security_incident_indicator_links as existing_link
+        where existing_link.incident_id = incident_record.id
+          and existing_link.indicator_id = requested_indicator_id
+      )
     then
       raise exception 'security_command_invalid' using errcode = 'AS108';
     end if;
@@ -2381,6 +2666,7 @@ begin
       or (requested_posture = current_incident.resulting_posture
         and (
           requested_summary = current_incident.public_summary
+          or requested_evidence_id = current_incident.evidence_id
           or requested_reason not in ('additional_evidence', 'mitigation_verified')
         ))
     ) then
@@ -2416,7 +2702,7 @@ begin
       incident_id, indicator_id, linked_by_decision_id, created_at
     ) values (
       incident_record.id, requested_indicator_id, decision_id_value, created_at_value
-    ) on conflict do nothing;
+    );
   end if;
 
   occurred_at_text := pg_catalog.to_char(
@@ -2746,7 +3032,8 @@ begin
     current_state.state,
     current_state.state_version,
     case
-      when pg_catalog.jsonb_typeof(candidate.payload -> 'target') = 'object'
+      when candidate.origin = 'reviewer_manual'
+        and pg_catalog.jsonb_typeof(candidate.payload -> 'target') = 'object'
         and candidate.payload -> 'target' ->> 'type' in ('project', 'source')
         and public.security_json_uuid_is_valid(candidate.payload -> 'target', 'id')
       then candidate.payload -> 'target'
@@ -2761,7 +3048,9 @@ begin
     and (p_state = 'all' or current_state.state = p_state)
     and (
       p_target_type = 'all'
-      or candidate.payload -> 'target' ->> 'type' = p_target_type
+      or (candidate.origin = 'reviewer_manual'
+        and candidate.payload -> 'target' ->> 'type' = p_target_type)
+      or (candidate.origin = 'extraction' and p_target_type in ('project', 'source'))
     )
     and (
       p_cursor_created_at is null
@@ -2780,6 +3069,7 @@ returns table (
   state text,
   "stateVersion" bigint,
   target jsonb,
+  "targetContext" jsonb,
   indicator jsonb,
   summary text,
   "evidenceId" uuid,
@@ -2812,12 +3102,14 @@ begin
     candidate.origin,
     current_state.state,
     current_state.state_version,
-    candidate.payload -> 'target',
-    candidate.payload -> 'indicator',
+    case when candidate.origin = 'reviewer_manual' then candidate.payload -> 'target' else null end,
+    case when candidate.origin = 'extraction' then candidate.payload -> 'targetContext' else null end,
+    case when candidate.origin = 'reviewer_manual' then candidate.payload -> 'indicator' else null end,
     candidate.payload ->> 'summary',
     coalesce(
       candidate.manual_evidence_id,
-      (candidate.payload ->> 'evidenceId')::uuid
+      case when candidate.origin = 'reviewer_manual'
+        then (candidate.payload ->> 'evidenceId')::uuid else null end
     ),
     candidate.payload ->> 'note',
     candidate.submitted_by_user_id,
@@ -3113,6 +3405,61 @@ as $function$
   );
 $function$;
 
+create or replace function public.current_score_citation_path_is_public(
+  p_project_score_id uuid,
+  p_signal_id uuid,
+  p_evidence_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $function$
+  select
+    (p_project_score_id is not null or p_signal_id is not null or p_evidence_id is not null)
+    and exists (
+      select 1
+      from public.project_scores as score
+      join public.projects as project on project.id = score.project_id
+      join public.score_signal_links as score_link on score_link.project_score_id = score.id
+      join public.signals as signal
+        on signal.id = score_link.signal_id and signal.project_id = score.project_id
+      join public.signal_evidence_links as evidence_link on evidence_link.signal_id = signal.id
+      join public.evidence as evidence_record on evidence_record.id = evidence_link.evidence_id
+      join public.raw_items as raw_item
+        on raw_item.id = evidence_record.raw_item_id
+        and raw_item.project_id = score.project_id
+        and raw_item.source_id = evidence_record.source_id
+      left join public.discovered_items as discovered_item
+        on discovered_item.id = evidence_record.discovered_item_id
+      join public.sources as source
+        on source.id = evidence_record.source_id and source.status = 'active'
+      join public.project_sources as project_source
+        on project_source.project_id = score.project_id
+        and project_source.source_id = evidence_record.source_id
+      where project.lifecycle = 'active'
+        and public.current_project_score_is_public(score.id)
+        and signal.lifecycle = 'published'
+        and public.signal_has_valid_evidence(signal.id)
+        and public.current_security_target_posture('source', evidence_record.source_id) <> 'blocked'
+        and (
+          evidence_record.discovered_item_id is null
+          or (
+            discovered_item.project_id = signal.project_id
+            and discovered_item.source_id = evidence_record.source_id
+            and (
+              evidence_record.source_field <> 'discovered_summary'
+              or discovered_item.feed_raw_item_id = evidence_record.raw_item_id
+            )
+          )
+        )
+        and (p_project_score_id is null or score.id = p_project_score_id)
+        and (p_signal_id is null or signal.id = p_signal_id)
+        and (p_evidence_id is null or evidence_record.id = p_evidence_id)
+    );
+$function$;
+
 create or replace function public.score_has_complete_evidence(p_project_score_id uuid)
 returns boolean
 language sql
@@ -3220,9 +3567,9 @@ to collection_queue_worker;
 grant execute on function public.load_source_collection_context(uuid, uuid)
 to collection_worker;
 
--- Public projections stay intentionally narrow. The invoker views use these
--- fixed-path helpers rather than opening any ledger table to browser roles;
--- each helper returns only fields admitted by the public contracts.
+-- Public projections stay invoker-safe. Browser roles receive only the exact
+-- base columns used by these views, and RLS admits catalog-visible incident
+-- rows plus individually approved indicator rows.
 create function public.security_indicator_currently_public_safe(p_indicator_id uuid)
 returns boolean
 language sql
@@ -3242,102 +3589,126 @@ as $function$
   ), false);
 $function$;
 
-create function public.security_public_safe_indicator_rows()
-returns table (
-  id uuid,
-  type text,
-  value text
-)
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, extensions
-as $function$
-  select indicator.id, indicator.indicator_type, indicator.value_text
-  from public.security_indicators as indicator
-  where public.security_indicator_currently_public_safe(indicator.id);
-$function$;
-
-create function public.security_public_incident_summary_rows()
-returns table (
-  version integer,
-  incident_id uuid,
-  target_type text,
-  target_id uuid,
-  category text,
-  severity text,
-  state text,
-  public_summary text,
-  first_observed_at timestamptz,
-  last_verified_at timestamptz,
-  indicators jsonb
-)
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, extensions
-as $function$
-  select
-    1,
-    incident.id,
-    incident.target_type,
-    coalesce(incident.project_id, incident.source_id),
-    incident.category,
-    current_decision.resulting_severity,
-    case when current_decision.resulting_posture is null then 'resolved' else 'active' end,
-    current_decision.public_summary,
-    incident.opened_at,
-    current_decision.created_at,
-    coalesce(safe_indicators.indicators, '[]'::jsonb)
-  from public.security_incidents as incident
-  cross join lateral public.security_current_incident_decision(incident.id) as current_decision
-  left join lateral (
-    select pg_catalog.jsonb_agg(
-      pg_catalog.jsonb_build_object(
-        'id', indicator.id,
-        'type', indicator.indicator_type,
-        'value', indicator.value_text
-      ) order by indicator.indicator_type asc, indicator.id asc
-    ) as indicators
-    from public.security_incident_indicator_links as link
-    join public.security_indicators as indicator
-      on indicator.id = link.indicator_id
-    where link.incident_id = incident.id
-      and public.security_indicator_currently_public_safe(indicator.id)
-  ) as safe_indicators on true;
-$function$;
-
-create function public.security_public_project_posture(p_project_id uuid)
-returns text
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, extensions
-as $function$
-  select public.current_security_target_posture('project', p_project_id);
-$function$;
-
 alter function public.security_indicator_currently_public_safe(uuid) owner to postgres;
-alter function public.security_public_safe_indicator_rows() owner to postgres;
-alter function public.security_public_incident_summary_rows() owner to postgres;
-alter function public.security_public_project_posture(uuid) owner to postgres;
-
 revoke all on function public.security_indicator_currently_public_safe(uuid) from public;
-revoke all on function public.security_public_safe_indicator_rows() from public;
-revoke all on function public.security_public_incident_summary_rows() from public;
-revoke all on function public.security_public_project_posture(uuid) from public;
-grant execute on function public.security_public_safe_indicator_rows()
+grant execute on function public.security_indicator_currently_public_safe(uuid)
 to anon, authenticated;
-grant execute on function public.security_public_incident_summary_rows()
-to anon, authenticated;
-grant execute on function public.security_public_project_posture(uuid)
-to anon, authenticated, service_role;
+
+create policy security_incidents_select_anon
+on public.security_incidents
+for select
+to anon
+using (
+  (target_type = 'project' and exists (
+    select 1 from public.projects as project
+    where project.id = security_incidents.project_id
+      and project.lifecycle in ('active', 'rumored')
+  ))
+  or (target_type = 'source' and exists (
+    select 1 from public.sources as source
+    where source.id = security_incidents.source_id and source.status = 'active'
+  ))
+);
+create policy security_incidents_select_authenticated
+on public.security_incidents for select to authenticated
+using (
+  (target_type = 'project' and exists (
+    select 1 from public.projects as project
+    where project.id = security_incidents.project_id
+      and project.lifecycle in ('active', 'rumored')
+  ))
+  or (target_type = 'source' and exists (
+    select 1 from public.sources as source
+    where source.id = security_incidents.source_id and source.status = 'active'
+  ))
+);
+
+create policy security_incident_decisions_select_anon
+on public.security_incident_decisions
+for select
+to anon
+using (exists (
+  select 1
+  from public.security_incidents as incident
+  where incident.id = security_incident_decisions.incident_id
+));
+create policy security_incident_decisions_select_authenticated
+on public.security_incident_decisions for select to authenticated
+using (exists (
+  select 1 from public.security_incidents as incident
+  where incident.id = security_incident_decisions.incident_id
+));
+
+create policy security_indicators_select_anon
+on public.security_indicators
+for select
+to anon
+using (public.security_indicator_currently_public_safe(id));
+create policy security_indicators_select_authenticated
+on public.security_indicators for select to authenticated
+using (public.security_indicator_currently_public_safe(id));
+
+create policy security_incident_indicator_links_select_anon
+on public.security_incident_indicator_links
+for select
+to anon
+using (
+  exists (
+    select 1 from public.security_incidents as incident
+    where incident.id = security_incident_indicator_links.incident_id
+  )
+  and exists (
+    select 1 from public.security_indicators as indicator
+    where indicator.id = security_incident_indicator_links.indicator_id
+  )
+);
+create policy security_incident_indicator_links_select_authenticated
+on public.security_incident_indicator_links for select to authenticated
+using (
+  exists (
+    select 1 from public.security_incidents as incident
+    where incident.id = security_incident_indicator_links.incident_id
+  )
+  and exists (
+    select 1 from public.security_indicators as indicator
+    where indicator.id = security_incident_indicator_links.indicator_id
+  )
+);
+
+comment on policy security_incidents_select_anon on public.security_incidents is
+  'Anonymous users may read safe columns for catalog-visible security targets.';
+comment on policy security_incidents_select_authenticated on public.security_incidents is
+  'Authenticated browser users may read safe columns for catalog-visible security targets.';
+comment on policy security_incident_decisions_select_anon on public.security_incident_decisions is
+  'Anonymous users may read current/public incident decision columns through visible incidents.';
+comment on policy security_incident_decisions_select_authenticated on public.security_incident_decisions is
+  'Authenticated browser users may read current/public incident decision columns through visible incidents.';
+comment on policy security_indicators_select_anon on public.security_indicators is
+  'Anonymous users may read only individually approved public-safe indicator rows.';
+comment on policy security_indicators_select_authenticated on public.security_indicators is
+  'Authenticated browser users may read only individually approved public-safe indicator rows.';
+comment on policy security_incident_indicator_links_select_anon on public.security_incident_indicator_links is
+  'Anonymous users may read only links between visible incidents and public-safe indicators.';
+comment on policy security_incident_indicator_links_select_authenticated on public.security_incident_indicator_links is
+  'Authenticated browser users may read only links between visible incidents and public-safe indicators.';
+
+grant select (id, target_type, project_id, source_id, category, opened_at)
+on public.security_incidents to anon, authenticated;
+grant select (
+  id, incident_id, incident_version, resulting_posture, resulting_severity,
+  public_summary, created_at
+)
+on public.security_incident_decisions to anon, authenticated;
+grant select (id, indicator_type, value_text)
+on public.security_indicators to anon, authenticated;
+grant select (incident_id, indicator_id)
+on public.security_incident_indicator_links to anon, authenticated;
 
 create view public.public_safe_security_indicators
 with (security_invoker = true, security_barrier = true)
 as
-select id, type, value
-from public.security_public_safe_indicator_rows();
+select indicator.id, indicator.indicator_type as type, indicator.value_text as value
+from public.security_indicators as indicator;
 
 create view public.public_security_incident_summaries
 with (security_invoker = true, security_barrier = true)
@@ -3354,7 +3725,39 @@ select
   first_observed_at,
   last_verified_at,
   indicators
-from public.security_public_incident_summary_rows();
+from (
+  select
+    1 as version,
+    incident.id as incident_id,
+    incident.target_type,
+    coalesce(incident.project_id, incident.source_id) as target_id,
+    incident.category,
+    current_decision.resulting_severity as severity,
+    case when current_decision.resulting_posture is null then 'resolved' else 'active' end as state,
+    current_decision.public_summary,
+    incident.opened_at as first_observed_at,
+    current_decision.created_at as last_verified_at,
+    coalesce(safe_indicators.indicators, '[]'::jsonb) as indicators
+  from public.security_incidents as incident
+  join lateral (
+    select decision.resulting_posture, decision.resulting_severity,
+      decision.public_summary, decision.created_at
+    from public.security_incident_decisions as decision
+    where decision.incident_id = incident.id
+    order by decision.incident_version desc, decision.id desc
+    limit 1
+  ) as current_decision on true
+  left join lateral (
+    select pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'id', indicator.id, 'type', indicator.indicator_type, 'value', indicator.value_text
+      ) order by indicator.indicator_type asc, indicator.id asc
+    ) as indicators
+    from public.security_incident_indicator_links as link
+    join public.security_indicators as indicator on indicator.id = link.indicator_id
+    where link.incident_id = incident.id
+  ) as safe_indicators on true
+) as public_summary;
 
 create view public.public_project_security_state
 with (security_invoker = true, security_barrier = true)
@@ -3362,9 +3765,23 @@ as
 select
   1 as version,
   project.id as project_id,
-  public.security_public_project_posture(project.id) as posture,
+  coalesce(project_posture.posture, 'clear') as posture,
   coalesce(active_incidents.incidents, '[]'::jsonb) as active_incidents
 from public.projects as project
+left join lateral (
+  select case pg_catalog.max(case latest.resulting_posture
+    when 'blocked' then 2 when 'caution' then 1 else 0 end)
+    when 2 then 'blocked' when 1 then 'caution' else 'clear' end as posture
+  from public.security_incidents as incident
+  join lateral (
+    select decision.resulting_posture
+    from public.security_incident_decisions as decision
+    where decision.incident_id = incident.id
+    order by decision.incident_version desc, decision.id desc
+    limit 1
+  ) as latest on latest.resulting_posture is not null
+  where incident.target_type = 'project' and incident.project_id = project.id
+) as project_posture on true
 left join lateral (
   select pg_catalog.jsonb_agg(
     pg_catalog.jsonb_build_object(
@@ -3380,7 +3797,7 @@ left join lateral (
       'indicators', summary.indicators
     ) order by summary.last_verified_at desc, summary.incident_id desc
   ) as incidents
-  from public.security_public_incident_summary_rows() as summary
+  from public.public_security_incident_summaries as summary
   where summary.target_type = 'project'
     and summary.target_id = project.id
     and summary.state = 'active'
@@ -3391,15 +3808,38 @@ with (security_invoker = true, security_barrier = true)
 as
 with ranked_restrictions as (
   select
-    summary.*,
+    incident.id as incident_id,
+    incident.project_id as target_id,
+    incident.category,
+    latest.resulting_severity as severity,
+    latest.public_summary,
+    incident.opened_at as first_observed_at,
+    latest.created_at as last_verified_at,
+    coalesce(safe_indicators.indicators, '[]'::jsonb) as indicators,
     pg_catalog.row_number() over (
-      partition by summary.target_id
-      order by summary.last_verified_at desc, summary.incident_id desc
+      partition by incident.project_id
+      order by latest.created_at desc, incident.id desc
     ) as restriction_rank
-  from public.security_public_incident_summary_rows() as summary
-  where summary.target_type = 'project'
-    and summary.state = 'active'
-    and public.security_public_project_posture(summary.target_id) = 'blocked'
+  from public.security_incidents as incident
+  join lateral (
+    select decision.resulting_posture, decision.resulting_severity,
+      decision.public_summary, decision.created_at
+    from public.security_incident_decisions as decision
+    where decision.incident_id = incident.id
+    order by decision.incident_version desc, decision.id desc
+    limit 1
+  ) as latest on latest.resulting_posture = 'blocked'
+  left join lateral (
+    select pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'id', indicator.id, 'type', indicator.indicator_type, 'value', indicator.value_text
+      ) order by indicator.indicator_type asc, indicator.id asc
+    ) as indicators
+    from public.security_incident_indicator_links as link
+    join public.security_indicators as indicator on indicator.id = link.indicator_id
+    where link.incident_id = incident.id
+  ) as safe_indicators on true
+  where incident.target_type = 'project'
 )
 select
   1 as version,
@@ -3420,6 +3860,7 @@ from ranked_restrictions as restricted
 join public.projects as project
   on project.id = restricted.target_id
 where restricted.restriction_rank = 1
+  and project.lifecycle in ('active', 'rumored')
 order by restricted.last_verified_at desc, project.id desc;
 
 comment on view public.public_safe_security_indicators is
@@ -3469,8 +3910,22 @@ select
   latest_score.input_version as score_input_version,
   latest_score.explanation as score_explanation,
   latest_score.id as project_score_id,
-  public.security_public_project_posture(project.id) as security_posture
+  coalesce(project_posture.posture, 'clear') as security_posture
 from public.projects as project
+left join lateral (
+  select case pg_catalog.max(case latest.resulting_posture
+    when 'blocked' then 2 when 'caution' then 1 else 0 end)
+    when 2 then 'blocked' when 1 then 'caution' else 'clear' end as posture
+  from public.security_incidents as incident
+  join lateral (
+    select decision.resulting_posture
+    from public.security_incident_decisions as decision
+    where decision.incident_id = incident.id
+    order by decision.incident_version desc, decision.id desc
+    limit 1
+  ) as latest on latest.resulting_posture is not null
+  where incident.target_type = 'project' and incident.project_id = project.id
+) as project_posture on true
 left join lateral (
   select
     score.id,

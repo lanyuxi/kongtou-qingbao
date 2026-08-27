@@ -42,6 +42,7 @@ describe('security projection contracts', () => {
       state: 'pending',
       stateVersion: 1,
       target: { type: 'project', id: projectId },
+      targetContext: null,
       indicator: { type: 'domain', value: 'claim.example' },
       summary: '该域名冒充项目领取页面。',
       evidenceId: indicatorId,

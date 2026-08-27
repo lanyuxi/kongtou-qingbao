@@ -91,20 +91,40 @@ export const reviewerSecurityCandidateListItemSchema = z.strictObject({
   reviewedAt: timestampSchema.nullable(),
 });
 
-export const reviewerSecurityCandidateDetailSchema = z.strictObject({
+const reviewerSecurityCandidateDetailBase = {
   version: z.literal(1),
   candidateId: uuidSchema,
-  origin: securityCandidateOriginSchema,
   state: securityCandidateStateSchema,
   stateVersion: nonNegativeVersionSchema,
-  target: securityTargetSchema,
-  indicator: securityIndicatorProposalSchema,
   summary: boundedText(10, 2000),
-  evidenceId: uuidSchema,
   note: internalNoteSchema,
   submittedByUserId: uuidSchema.nullable(),
   createdAt: timestampSchema,
-});
+};
+
+export const reviewerSecurityCandidateDetailSchema = z.discriminatedUnion('origin', [
+  z.strictObject({
+    ...reviewerSecurityCandidateDetailBase,
+    origin: z.literal('reviewer_manual'),
+    target: securityTargetSchema,
+    targetContext: z.null(),
+    indicator: securityIndicatorProposalSchema,
+    evidenceId: uuidSchema,
+  }),
+  z.strictObject({
+    ...reviewerSecurityCandidateDetailBase,
+    origin: z.literal('extraction'),
+    target: z.null(),
+    targetContext: z.strictObject({
+      projectId: uuidSchema,
+      sourceId: uuidSchema,
+    }),
+    indicator: z.null(),
+    evidenceId: z.null(),
+    note: z.null(),
+    submittedByUserId: z.null(),
+  }),
+]);
 
 export const securityCandidateReviewReceiptV1Schema = z.strictObject({
   version: z.literal(1),

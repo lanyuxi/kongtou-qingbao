@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   manualSecurityCandidateCommandV1Schema,
+  reviewerSecurityCandidateDetailSchema,
   securityCandidateListQuerySchema,
   securityTargetSchema,
 } from '../index.js';
@@ -75,5 +76,29 @@ describe('security candidate contracts', () => {
       expect(securityCandidateListQuerySchema.safeParse({ cursor: invalid }).success).toBe(false);
     }
     expect(securityCandidateListQuerySchema.safeParse({ cursor, extra: true }).success).toBe(false);
+  });
+
+  it('keeps extraction context explicit while leaving canonical target and Evidence unselected', () => {
+    const detail = {
+      version: 1,
+      candidateId: projectId,
+      origin: 'extraction',
+      state: 'pending',
+      stateVersion: 1,
+      target: null,
+      targetContext: { projectId, sourceId },
+      indicator: null,
+      summary: 'Extraction context requires reviewer target and Evidence selection.',
+      evidenceId: null,
+      note: null,
+      submittedByUserId: null,
+      createdAt: '2026-08-26T00:00:00.000Z',
+    } as const;
+
+    expect(reviewerSecurityCandidateDetailSchema.parse(detail)).toEqual(detail);
+    expect(reviewerSecurityCandidateDetailSchema.safeParse({
+      ...detail,
+      target: { type: 'project', id: projectId },
+    }).success).toBe(false);
   });
 });

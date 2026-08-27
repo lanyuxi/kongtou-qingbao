@@ -43,7 +43,8 @@ const acceptAndOpenCandidateCommandSchema = z.strictObject({
   ...candidateCommandBase,
   decision: z.literal('accept_and_open'),
   reasonCode: z.literal('evidence_verified'),
-  evidenceId: uuidSchema,
+  target: securityTargetSchema,
+  evidenceId: uuidSchema.nullable(),
   indicator: securityIndicatorProposalSchema,
   category: securityIncidentCategorySchema,
   resultingPosture: activeSecurityPostureSchema,
@@ -54,8 +55,10 @@ const acceptAndAttachCandidateCommandSchema = z.strictObject({
   ...candidateCommandBase,
   decision: z.literal('accept_and_attach'),
   reasonCode: z.literal('evidence_verified'),
+  target: securityTargetSchema,
   incidentId: uuidSchema,
-  evidenceId: uuidSchema,
+  expectedIncidentVersion: positiveVersionSchema,
+  evidenceId: uuidSchema.nullable(),
   indicator: securityIndicatorProposalSchema,
 });
 

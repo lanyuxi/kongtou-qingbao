@@ -1668,7 +1668,21 @@ export type Database = {
             foreignKeyName: "security_candidate_review_decisions_incident_fkey"
             columns: ["incident_id"]
             isOneToOne: false
+            referencedRelation: "public_security_incident_summaries"
+            referencedColumns: ["incident_id"]
+          },
+          {
+            foreignKeyName: "security_candidate_review_decisions_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
             referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_candidate_review_decisions_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
             referencedColumns: ["id"]
           },
           {
@@ -1761,7 +1775,21 @@ export type Database = {
             foreignKeyName: "security_events_incident_fkey"
             columns: ["incident_id"]
             isOneToOne: false
+            referencedRelation: "public_security_incident_summaries"
+            referencedColumns: ["incident_id"]
+          },
+          {
+            foreignKeyName: "security_events_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
             referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_events_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
             referencedColumns: ["id"]
           },
           {
@@ -1835,6 +1863,13 @@ export type Database = {
             foreignKeyName: "security_incident_decisions_incident_fkey"
             columns: ["incident_id"]
             isOneToOne: false
+            referencedRelation: "public_security_incident_summaries"
+            referencedColumns: ["incident_id"]
+          },
+          {
+            foreignKeyName: "security_incident_decisions_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
             referencedRelation: "security_incidents"
             referencedColumns: ["id"]
           },
@@ -1878,7 +1913,21 @@ export type Database = {
             foreignKeyName: "security_incident_indicator_links_incident_fkey"
             columns: ["incident_id"]
             isOneToOne: false
+            referencedRelation: "public_security_incident_summaries"
+            referencedColumns: ["incident_id"]
+          },
+          {
+            foreignKeyName: "security_incident_indicator_links_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
             referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incident_indicator_links_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
             referencedColumns: ["id"]
           },
           {
@@ -2133,6 +2182,13 @@ export type Database = {
             foreignKeyName: "security_indicator_evidence_links_indicator_fkey"
             columns: ["indicator_id"]
             isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_evidence_links_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
             referencedRelation: "security_indicators"
             referencedColumns: ["id"]
           },
@@ -2228,7 +2284,21 @@ export type Database = {
             foreignKeyName: "security_review_commands_incident_fkey"
             columns: ["incident_id"]
             isOneToOne: false
+            referencedRelation: "public_security_incident_summaries"
+            referencedColumns: ["incident_id"]
+          },
+          {
+            foreignKeyName: "security_review_commands_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
             referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_review_commands_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
             referencedColumns: ["id"]
           },
           {
@@ -3135,6 +3205,16 @@ export type Database = {
           type: string | null
           value: string | null
         }
+        Insert: {
+          id?: string | null
+          type?: string | null
+          value?: string | null
+        }
+        Update: {
+          id?: string | null
+          type?: string | null
+          value?: string | null
+        }
         Relationships: []
       }
       public_security_incident_summaries: {
@@ -3406,6 +3486,7 @@ export type Database = {
           submittedByUserId: string
           summary: string
           target: Json
+          targetContext: Json
           version: number
         }[]
       }
@@ -3661,34 +3742,6 @@ export type Database = {
       security_json_uuid_is_valid: {
         Args: { p_key: string; p_payload: Json }
         Returns: boolean
-      }
-      security_public_incident_summary_rows: {
-        Args: never
-        Returns: {
-          category: string
-          first_observed_at: string
-          incident_id: string
-          indicators: Json
-          last_verified_at: string
-          public_summary: string
-          severity: string
-          state: string
-          target_id: string
-          target_type: string
-          version: number
-        }[]
-      }
-      security_public_project_posture: {
-        Args: { p_project_id: string }
-        Returns: string
-      }
-      security_public_safe_indicator_rows: {
-        Args: never
-        Returns: {
-          id: string
-          type: string
-          value: string
-        }[]
       }
       security_target_lock_key_v1: {
         Args: { p_target_id: string; p_target_type: string }

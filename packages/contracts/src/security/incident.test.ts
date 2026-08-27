@@ -30,6 +30,25 @@ describe('security review and incident command contracts', () => {
       reasonCode: 'evidence_verified',
       note: null,
     }).success).toBe(false);
+
+    const attach = {
+      version: 1,
+      candidateId,
+      expectedCandidateVersion: 1,
+      decision: 'accept_and_attach',
+      reasonCode: 'evidence_verified',
+      target: { type: 'project', id: projectId },
+      incidentId,
+      expectedIncidentVersion: 2,
+      evidenceId,
+      indicator: { type: 'domain', value: 'phish.example' },
+      note: null,
+    } as const;
+    expect(securityCandidateReviewCommandV1Schema.parse(attach)).toEqual(attach);
+    expect(securityCandidateReviewCommandV1Schema.safeParse({
+      ...attach,
+      expectedIncidentVersion: undefined,
+    }).success).toBe(false);
   });
 
   it('accepts an evidence-grounded incident open and rejects incompatible action reasons', () => {
