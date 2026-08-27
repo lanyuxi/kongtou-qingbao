@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：Task 3 已完成并通过独立复审（8 Important + 5 Minor 全部 Resolved、0 新增、测试侧修复确认无弱化）；下一任务 Task 4 bearer repository；生产未访问
+> 当前状态：Task 4 已完成并通过 controller disposable 集成验证（focused integration 7/7、包内 225 passed / 51 gated skipped、根 verify exit 0）；待独立复审；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -23,7 +23,7 @@
 | 1 | Strict security contracts | 已完成（review clean） | 初始 RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；初始 GREEN：contracts 12 files / 128 tests。Fix Round 1 RED：`projections.test.ts incident.test.ts` 3 个具名状态/scope 矛盾断言失败；GREEN：contracts 12 files / 131 tests，lint、typecheck 均 exit 0；scoped re-review 3/3 ADDRESSED、无新 Critical/Important。无数据库或应用行为变更。 |
 | 2 | Pure posture/transition/indicator rules | 已完成（review clean） | 初始 RED/GREEN 同前。Fix Round 1 补强完整 reason matrix、length 和 composite identity，但未覆盖 every action×current-state pair；Fix Round 2 以 5×3 literal lifecycle table修复。state-gate mutation RED 精确失败，restored GREEN：domain 12 files / 375 tests，lint/typecheck、contracts 12 files / 131 tests，以及 `pnpm verify` 1,038 non-skipped / 46 skipped 均 exit 0；scoped re-review APPROVED。无生产代码、数据库、迁移、网络、生产或依赖改动。 |
 | 3 | Security Ledger migration、commands、RLS、pgTAP | **已完成（Fix Round 1 review clean）** | Commit `8134bf4`；初审 0 Critical / 8 Important，逐条对照规范与 SQL 后 8/8 Important、5/5 Minor 均成立，无拒绝/延期项。契约 RED：12 files 中 130 PASS / 2 个预期失败，分别锁定 extraction detail target/Evidence context 与 attach target/expected incident version。Fix Round 1 验证（2026-08-27，经用户授权的 disposable 栈）：同步修复版 migration/013/006 后 reset exit 0；focused 013 暴露三个测试侧缺陷并当场修复——authenticated 上下文直调被 revoke 的 `evidence_quote_sha256_v1`（改为 superuser 预计算 SHA 入 pg_temp）、outbox 约束测试缺省 occurred_at 先触发 NOT NULL（补合法时间列）、锁序断言的 SQL 字面量把 `\n` 当两个字符（改真实换行）；另将 outbox 总数断言过滤列表补入新增 caution incident 聚合（探针实测 candidate=2/indicator=3/incident=1+新 incident=1 = 7）。终态：focused 013 224/224 PASS、full pgTAP 13 files / 1,338 PASS；typegen 双次 SHA `61e8829c…` 一致并以生成产物替换手工 types（93 行 FK→视图关系差异归位）；database 包内单测 180 passed / 44 gated skipped、lint/typecheck exit 0；fresh 全仓 `pnpm verify` exit 0。生产未访问。 |
-| 4 | Bearer-scoped security review repositories + races | 待执行 | — |
+| 4 | Bearer-scoped security review repositories + races | 已实现（待复审 + 数据库集成） | RED：`env -u NODE_OPTIONS pnpm run test src/tests/security-review-repository.test.ts` exit 1，suite 级 `Cannot find module '../security/security-review-repository.js'` 精确指向缺失模块。GREEN：database 包内 test 225 passed / 51 environment-gated skipped（新增 security-review-repository.test.ts 44 用例与 entrypoints browser-deny 断言）、lint exit 0、typecheck exit 0。新增 `src/security/security-review-repository.ts`（9 方法、per-call bearer client、contracts strict parse 先于映射、AS101–AS199 仅映射稳定枚举码、canonical key-order payload、cursor (createdAt desc, id desc)、无 reviewer/timestamp 注入）、entry.ts、browser-denied.ts；package.json 增加 `./security-review` 条件导出（browser → deny）。integration 文件按惯例环境门控：缺 env 整文件 skip，存在时四变量齐全 + loopback 16432/16433 fail-closed 校验 + fixed paused marker 存在后才允许 INSERT，fixture 全部 randomUUID 自有 id，teardown 为单事务 bulk 清理且不逐行删除他人 append-only 历史。本轮未连接数据库，真实集成由 controller 执行。 |
 | 5 | Security extraction routing + ordinary Promotion guards | 待执行 | — |
 | 6 | Collection/scoring protect-first gates | 待执行 | — |
 | 7 | Public security repositories/project projections | 待执行 | — |

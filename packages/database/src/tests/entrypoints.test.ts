@@ -42,4 +42,18 @@ describe('@airdrop/database entry points', () => {
     );
     expect(result.stderr).not.toMatch(/postgres(?:\.js)?/i);
   });
+
+  it('rejects the security review package export under browser module resolution', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['--conditions=browser', '--import=tsx', '--eval', "import('@airdrop/database/security-review')"],
+      { encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '@airdrop/database/security-review is unavailable in browser code.',
+    );
+    expect(result.stderr).not.toMatch(/supabase|bearer|token/i);
+  });
 });
