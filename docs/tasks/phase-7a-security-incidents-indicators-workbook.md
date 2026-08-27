@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：Task 3 本地验收完成、待提交；expanded focused 013 193/193、full pgTAP 13 files / 1,307、stable typegen 与 fresh `pnpm verify` 1,038 non-skipped / 46 skipped 全绿；未 reset，生产未访问
+> 当前状态：Task 3 已提交 `8134bf4`、独立评审中；expanded focused 013 193/193、full pgTAP 13 files / 1,307、stable typegen 与 fresh `pnpm verify` 1,038 non-skipped / 46 skipped 全绿；最终扩展验证未 reset，生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -22,7 +22,7 @@
 |---|---|---|---|
 | 1 | Strict security contracts | 已完成（review clean） | 初始 RED：`CI=true pnpm --filter @airdrop/contracts test -- security` exit 1，20 个新增断言均因根入口缺少 security schema 导出而失败；初始 GREEN：contracts 12 files / 128 tests。Fix Round 1 RED：`projections.test.ts incident.test.ts` 3 个具名状态/scope 矛盾断言失败；GREEN：contracts 12 files / 131 tests，lint、typecheck 均 exit 0；scoped re-review 3/3 ADDRESSED、无新 Critical/Important。无数据库或应用行为变更。 |
 | 2 | Pure posture/transition/indicator rules | 已完成（review clean） | 初始 RED/GREEN 同前。Fix Round 1 补强完整 reason matrix、length 和 composite identity，但未覆盖 every action×current-state pair；Fix Round 2 以 5×3 literal lifecycle table修复。state-gate mutation RED 精确失败，restored GREEN：domain 12 files / 375 tests，lint/typecheck、contracts 12 files / 131 tests，以及 `pnpm verify` 1,038 non-skipped / 46 skipped 均 exit 0；scoped re-review APPROVED。无生产代码、数据库、迁移、网络、生产或依赖改动。 |
-| 3 | Security Ledger migration、commands、RLS、pgTAP | **已完成（待提交）** | Expanded focused 013 193/193、full pgTAP 001–013 / 1,307、stable typegen SHA `f8eb56cd…e76e53`、database package 与 fresh full `pnpm verify` 1,038 non-skipped / 46 skipped 全绿。Step 6 行为矩阵已实测；未 reset、未访问生产。 |
+| 3 | Security Ledger migration、commands、RLS、pgTAP | **已提交（独立评审中）** | Commit `8134bf4`；expanded focused 013 193/193、full pgTAP 001–013 / 1,307、stable typegen SHA `f8eb56cd…e76e53`、database package 与 fresh full `pnpm verify` 1,038 non-skipped / 46 skipped 全绿。Step 6 行为矩阵已实测；最终扩展验证未 reset、未访问生产。 |
 | 4 | Bearer-scoped security review repositories + races | 待执行 | — |
 | 5 | Security extraction routing + ordinary Promotion guards | 待执行 | — |
 | 6 | Collection/scoring protect-first gates | 待执行 | — |

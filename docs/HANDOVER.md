@@ -748,6 +748,8 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-27 Phase 7A Task 3（local acceptance complete / ready to commit）**：窄门禁 `pnpm check:placeholders` 修复后 exit 0；随后 fresh 完整 `pnpm verify` exit 0。最终本地门禁为 lint/typecheck/build/placeholder 全绿，contracts 131 + domain 375 + database 180 + worker 212 + web 140 = 1,038 non-skipped，46 environment-gated skips。数据库最终证据为 expanded focused 013 193/193 PASS、full pgTAP 13 files / 1,307 PASS，stable typegen SHA `f8eb56cd…e76e53`；整个扩展验证无 reset、无生产或 54321/54322 访问。Task 3 已满足本地验收，下一步仅为最终 diff 静态复核与提交 `feat(db): add phase 7a security ledger`；不得开始 Task 4。
 
+**2026-08-27 Phase 7A Task 3（implementation committed / independent review）**：Controller 复核工作区范围、九个预期文件、generated-type SHA 与 `git diff --check` 后，将不变实现机械提交为 `8134bf4 feat(db): add phase 7a security ledger`（相对 BASE `3b7ec7e`）。该提交包含 forward migration、013 pgTAP、006/012 intentional column expectations、稳定 generated types，以及 generated-row consumer 的最小类型收窄；不包含生产部署或远端凭据。下一步仅对 `3b7ec7e..8134bf4` 做独立规格与质量审查，Task 4 尚未开始。
+
 ---
 
 ## 9. 其他
