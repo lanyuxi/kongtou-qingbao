@@ -7,7 +7,7 @@ import {
 } from '../repositories/project-repository.js';
 import type { Database } from '../generated/database.types.js';
 
-const rows: readonly OpportunityListRow[] = [
+const rows: readonly Omit<OpportunityListRow, 'security_posture'>[] = [
   {
     project_id: '10000000-0000-4000-8000-000000000003',
     slug: 'active-later-id',
@@ -314,7 +314,7 @@ function createSignalClient(
 }
 
 function createSupabaseClient(
-  fixtureRows: readonly OpportunityListRow[],
+  fixtureRows: readonly Omit<OpportunityListRow, 'security_posture'>[],
 ): SupabaseClient<Database> & {
   readonly orders: readonly [string, { readonly ascending: boolean }][];
   readonly orFilters: readonly string[];
@@ -332,10 +332,15 @@ function createSupabaseClient(
       return query;
     },
     range: () => query,
-    then: <TResult1 = { data: readonly OpportunityListRow[]; error: null }>(
+    then: <
+      TResult1 = {
+        data: readonly Omit<OpportunityListRow, 'security_posture'>[];
+        error: null;
+      },
+    >(
       onfulfilled?:
         | ((value: {
-            data: readonly OpportunityListRow[];
+            data: readonly Omit<OpportunityListRow, 'security_posture'>[];
             error: null;
           }) => TResult1 | PromiseLike<TResult1>)
         | null,

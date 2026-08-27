@@ -272,7 +272,9 @@ function validateOpportunityCursor(input: {
   return { afterScore: input.afterScore, afterProjectId: input.afterProjectId };
 }
 
-function mapOpportunityListRow(row: OpportunityListRow): OpportunityListItem {
+function mapOpportunityListRow(
+  row: Omit<OpportunityListRow, 'security_posture'>,
+): OpportunityListItem {
   const lifecycle = requiredString(row.lifecycle, 'lifecycle');
   if (lifecycle !== 'active' && lifecycle !== 'rumored') {
     throw new TypeError('Opportunity list returned an unsupported lifecycle.');

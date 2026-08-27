@@ -211,7 +211,8 @@ select columns_are(
     'score_model_version',
     'score_input_version',
     'score_explanation',
-    'project_score_id'
+    'project_score_id',
+    'security_posture'
   ],
   'project_current_state has the exact project-detail state columns'
 );
@@ -230,7 +231,8 @@ select columns_are(
     'confidence',
     'recommendation',
     'calculated_at',
-    'latest_published_signal_at'
+    'latest_published_signal_at',
+    'security_posture'
   ],
   'opportunity_list has only the explicit browser-safe opportunity columns'
 );

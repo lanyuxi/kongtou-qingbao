@@ -125,9 +125,10 @@ select columns_are(
     'score_model_version',
     'score_input_version',
     'score_explanation',
-    'project_score_id'
+    'project_score_id',
+    'security_posture'
   ],
-  'project current state appends only the immutable score ID'
+  'project current state appends the immutable score ID and security posture'
 );
 select columns_are(
   'public',

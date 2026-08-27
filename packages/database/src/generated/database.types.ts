@@ -388,6 +388,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "collection_attempts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "collection_attempts_raw_item_identity_fkey"
             columns: ["raw_item_id", "project_id", "source_id"]
             isOneToOne: false
@@ -520,6 +541,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "discovered_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "discovered_items_source_id_fkey"
@@ -862,6 +904,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "extraction_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "extraction_candidates_raw_item_fkey"
             columns: ["raw_item_id"]
             isOneToOne: false
@@ -1032,6 +1095,27 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
         ]
       }
       project_sources: {
@@ -1083,6 +1167,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_sources_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "project_sources_source_id_fkey"
@@ -1383,6 +1488,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "raw_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "raw_items_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
@@ -1489,6 +1615,634 @@ export type Database = {
             columns: ["signal_id"]
             isOneToOne: false
             referencedRelation: "signals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_candidate_review_decisions: {
+        Row: {
+          candidate_id: string
+          candidate_version: number
+          created_at: string
+          decision: string
+          id: string
+          incident_id: string | null
+          indicator_id: string | null
+          note: string | null
+          reason_code: string
+          reviewer_user_id: string
+        }
+        Insert: {
+          candidate_id: string
+          candidate_version: number
+          created_at?: string
+          decision: string
+          id?: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          note?: string | null
+          reason_code: string
+          reviewer_user_id: string
+        }
+        Update: {
+          candidate_id?: string
+          candidate_version?: number
+          created_at?: string
+          decision?: string
+          id?: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          note?: string | null
+          reason_code?: string
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_candidate_review_decisions_candidate_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicator_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_candidate_review_decisions_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_candidate_review_decisions_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_candidate_review_decisions_reviewer_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_events: {
+        Row: {
+          actor_kind: string
+          actor_service_name: string | null
+          actor_user_id: string | null
+          aggregate_id: string
+          aggregate_type: string
+          aggregate_version: number
+          candidate_id: string | null
+          created_at: string
+          decision_id: string | null
+          event_type: string
+          id: string
+          incident_id: string | null
+          indicator_id: string | null
+          indicator_public_safe: boolean | null
+          occurred_at: string
+          payload: Json
+        }
+        Insert: {
+          actor_kind: string
+          actor_service_name?: string | null
+          actor_user_id?: string | null
+          aggregate_id: string
+          aggregate_type: string
+          aggregate_version: number
+          candidate_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_type: string
+          id?: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          indicator_public_safe?: boolean | null
+          occurred_at?: string
+          payload: Json
+        }
+        Update: {
+          actor_kind?: string
+          actor_service_name?: string | null
+          actor_user_id?: string | null
+          aggregate_id?: string
+          aggregate_type?: string
+          aggregate_version?: number
+          candidate_id?: string | null
+          created_at?: string
+          decision_id?: string | null
+          event_type?: string
+          id?: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          indicator_public_safe?: boolean | null
+          occurred_at?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_events_actor_user_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_events_candidate_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicator_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_events_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_events_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_incident_decisions: {
+        Row: {
+          action: string
+          created_at: string
+          evidence_id: string
+          id: string
+          incident_id: string
+          incident_version: number
+          note: string | null
+          public_summary: string
+          reason_code: string
+          resulting_posture: string | null
+          resulting_severity: string
+          reviewer_user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          evidence_id: string
+          id?: string
+          incident_id: string
+          incident_version: number
+          note?: string | null
+          public_summary: string
+          reason_code: string
+          resulting_posture?: string | null
+          resulting_severity: string
+          reviewer_user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          evidence_id?: string
+          id?: string
+          incident_id?: string
+          incident_version?: number
+          note?: string | null
+          public_summary?: string
+          reason_code?: string
+          resulting_posture?: string | null
+          resulting_severity?: string
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_incident_decisions_evidence_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incident_decisions_evidence_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "security_incident_decisions_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incident_decisions_reviewer_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_incident_indicator_links: {
+        Row: {
+          created_at: string
+          incident_id: string
+          indicator_id: string
+          linked_by_decision_id: string
+        }
+        Insert: {
+          created_at?: string
+          incident_id: string
+          indicator_id: string
+          linked_by_decision_id: string
+        }
+        Update: {
+          created_at?: string
+          incident_id?: string
+          indicator_id?: string
+          linked_by_decision_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_incident_indicator_links_decision_fkey"
+            columns: ["linked_by_decision_id"]
+            isOneToOne: false
+            referencedRelation: "security_incident_decisions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incident_indicator_links_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incident_indicator_links_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_incidents: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          opened_at: string
+          project_id: string | null
+          source_id: string | null
+          target_type: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          project_id?: string | null
+          source_id?: string | null
+          target_type: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          opened_at?: string
+          project_id?: string | null
+          source_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "security_incidents_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_indicator_candidates: {
+        Row: {
+          created_at: string
+          extraction_candidate_id: string | null
+          id: string
+          manual_evidence_id: string | null
+          origin: string
+          payload: Json
+          project_id: string
+          source_id: string
+          submitted_by_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          extraction_candidate_id?: string | null
+          id?: string
+          manual_evidence_id?: string | null
+          origin: string
+          payload: Json
+          project_id: string
+          source_id: string
+          submitted_by_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          extraction_candidate_id?: string | null
+          id?: string
+          manual_evidence_id?: string | null
+          origin?: string
+          payload?: Json
+          project_id?: string
+          source_id?: string
+          submitted_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_indicator_candidates_extraction_candidate_fkey"
+            columns: ["extraction_candidate_id"]
+            isOneToOne: true
+            referencedRelation: "extraction_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_manual_evidence_fkey"
+            columns: ["manual_evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_manual_evidence_fkey"
+            columns: ["manual_evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_project_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["source_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_source_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_candidates_submitted_by_user_fkey"
+            columns: ["submitted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_indicator_evidence_links: {
+        Row: {
+          created_at: string
+          evidence_id: string
+          indicator_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_id: string
+          indicator_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence_id?: string
+          indicator_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_indicator_evidence_links_evidence_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_indicator_evidence_links_evidence_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "security_indicator_evidence_links_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_indicators: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_type: string
+          normalized_value_sha256: string
+          value_text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_type: string
+          normalized_value_sha256: string
+          value_text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_type?: string
+          normalized_value_sha256?: string
+          value_text?: string
+        }
+        Relationships: []
+      }
+      security_review_commands: {
+        Row: {
+          aggregate_id: string
+          aggregate_type: string
+          created_at: string
+          decision_id: string | null
+          expected_candidate_version: number | null
+          expected_incident_version: number | null
+          expected_indicator_version: number | null
+          id: string
+          idempotency_key: string
+          incident_id: string | null
+          indicator_id: string | null
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_candidate_version: number | null
+          resulting_incident_version: number | null
+          resulting_indicator_version: number | null
+          reviewer_user_id: string
+        }
+        Insert: {
+          aggregate_id: string
+          aggregate_type: string
+          created_at?: string
+          decision_id?: string | null
+          expected_candidate_version?: number | null
+          expected_incident_version?: number | null
+          expected_indicator_version?: number | null
+          id?: string
+          idempotency_key: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_candidate_version?: number | null
+          resulting_incident_version?: number | null
+          resulting_indicator_version?: number | null
+          reviewer_user_id: string
+        }
+        Update: {
+          aggregate_id?: string
+          aggregate_type?: string
+          created_at?: string
+          decision_id?: string | null
+          expected_candidate_version?: number | null
+          expected_incident_version?: number | null
+          expected_indicator_version?: number | null
+          id?: string
+          idempotency_key?: string
+          incident_id?: string | null
+          indicator_id?: string | null
+          input_hash?: string
+          operation?: string
+          result_payload?: Json
+          resulting_candidate_version?: number | null
+          resulting_incident_version?: number | null
+          resulting_indicator_version?: number | null
+          reviewer_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_review_commands_incident_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "security_incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_review_commands_indicator_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_review_commands_reviewer_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1607,6 +2361,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "signals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "signals_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "signals_supersedes_signal_same_project_fkey"
@@ -1870,6 +2645,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "user_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "user_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "user_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "user_projects_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -1980,6 +2776,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "user_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "user_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "user_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "user_tasks_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -2025,6 +2842,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "watchlist_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "watchlist_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "watchlist_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "watchlist_projects_watchlist_id_fkey"
@@ -2084,6 +2922,7 @@ export type Database = {
           project_id: string | null
           recommendation: Database["public"]["Enums"]["recommendation"] | null
           risk_score: number | null
+          security_posture: string | null
           slug: string | null
           summary: string | null
         }
@@ -2130,6 +2969,27 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "score_signal_links_project_score_fkey"
@@ -2180,6 +3040,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_scores_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+          {
             foreignKeyName: "score_factors_project_score_fkey"
             columns: ["project_score_id"]
             isOneToOne: false
@@ -2214,13 +3095,70 @@ export type Database = {
           score_explanation: string | null
           score_input_version: string | null
           score_model_version: string | null
+          security_posture: string | null
           slug: string | null
           summary: string | null
         }
         Relationships: []
       }
+      public_blocked_projects: {
+        Row: {
+          category: string | null
+          first_observed_at: string | null
+          indicators: Json | null
+          last_verified_at: string | null
+          posture: string | null
+          project_id: string | null
+          project_name: string | null
+          project_slug: string | null
+          public_summary: string | null
+          restricted_at: string | null
+          severity: string | null
+          target_id: string | null
+          target_type: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
+      public_project_security_state: {
+        Row: {
+          active_incidents: Json | null
+          posture: string | null
+          project_id: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
+      public_safe_security_indicators: {
+        Row: {
+          id: string | null
+          type: string | null
+          value: string | null
+        }
+        Relationships: []
+      }
+      public_security_incident_summaries: {
+        Row: {
+          category: string | null
+          first_observed_at: string | null
+          incident_id: string | null
+          indicators: Json | null
+          last_verified_at: string | null
+          public_summary: string | null
+          severity: string | null
+          state: string | null
+          target_id: string | null
+          target_type: string | null
+          version: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      actor_has_active_security_role: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       assert_collection_job_fence: {
         Args: {
           job_id: string
@@ -2333,6 +3271,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_security_target_posture: {
+        Args: { p_target_id: string; p_target_type: string }
+        Returns: string
+      }
       dead_letter_collection_job: {
         Args: {
           detail: string
@@ -2386,6 +3328,41 @@ export type Database = {
           version: number
         }[]
       }
+      execute_security_candidate_review: {
+        Args: {
+          p_candidate_id: string
+          p_command_payload: Json
+          p_idempotency_key: string
+        }
+        Returns: {
+          candidateId: string
+          candidateVersion: number
+          commandId: string
+          decisionId: string
+          incidentId: string
+          indicatorId: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
+      execute_security_incident_command: {
+        Args: {
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_incident_id: string
+        }
+        Returns: {
+          commandId: string
+          decisionId: string
+          incidentId: string
+          incidentVersion: number
+          posture: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
       execute_source_schedule_command: {
         Args: {
           p_actor_id: string
@@ -2412,6 +3389,32 @@ export type Database = {
           decisions: Json
           input: Json
           run: Json
+          version: number
+        }[]
+      }
+      get_security_candidate: {
+        Args: { p_candidate_id: string }
+        Returns: {
+          candidateId: string
+          createdAt: string
+          evidenceId: string
+          indicator: Json
+          note: string
+          origin: string
+          state: string
+          stateVersion: number
+          submittedByUserId: string
+          summary: string
+          target: Json
+          version: number
+        }[]
+      }
+      get_security_incident: {
+        Args: { p_incident_id: string }
+        Returns: {
+          decisions: Json
+          incident: Json
+          indicatorIds: string[]
           version: number
         }[]
       }
@@ -2457,6 +3460,49 @@ export type Database = {
           candidate_version: number
         }[]
       }
+      list_security_candidates: {
+        Args: {
+          p_cursor_created_at: string
+          p_cursor_id: string
+          p_limit: number
+          p_origin: string
+          p_state: string
+          p_target_type: string
+        }
+        Returns: {
+          candidateId: string
+          createdAt: string
+          origin: string
+          reviewedAt: string
+          state: string
+          stateVersion: number
+          summary: string
+          target: Json
+          version: number
+        }[]
+      }
+      list_security_incidents: {
+        Args: {
+          p_cursor_created_at: string
+          p_cursor_id: string
+          p_limit: number
+          p_state: string
+          p_target_type: string
+        }
+        Returns: {
+          category: string
+          currentPosture: string
+          currentSeverity: string
+          incidentId: string
+          incidentVersion: number
+          lastDecisionAt: string
+          openedAt: string
+          publicSummary: string
+          state: string
+          target: Json
+          version: number
+        }[]
+      }
       load_source_collection_context: {
         Args: { requested_project_id: string; requested_source_id: string }
         Returns: {
@@ -2469,6 +3515,23 @@ export type Database = {
       normalize_evidence_text_v1: {
         Args: { input_text: string }
         Returns: string
+      }
+      normalize_security_indicator_value_v1: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      open_security_incident: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          commandId: string
+          decisionId: string
+          incidentId: string
+          incidentVersion: number
+          posture: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
       }
       promote_extraction_candidate: {
         Args: { p_actor: string; p_candidate_id: string }
@@ -2527,13 +3590,140 @@ export type Database = {
           retried_job_id: string
         }[]
       }
+      route_security_extraction_candidate: {
+        Args: { p_extraction_candidate_id: string }
+        Returns: string
+      }
       score_has_complete_evidence: {
         Args: { p_project_score_id: string }
         Returns: boolean
       }
+      security_command_input_hash_v1: {
+        Args: { p_payload: Json }
+        Returns: string
+      }
+      security_current_candidate_state: {
+        Args: { p_candidate_id: string }
+        Returns: {
+          decision_id: string
+          reviewed_at: string
+          state: string
+          state_version: number
+        }[]
+      }
+      security_current_incident_decision: {
+        Args: { p_incident_id: string }
+        Returns: {
+          action: string
+          created_at: string
+          decision_id: string
+          evidence_id: string
+          incident_version: number
+          public_summary: string
+          resulting_posture: string
+          resulting_severity: string
+        }[]
+      }
+      security_evidence_matches_target: {
+        Args: {
+          p_evidence_id: string
+          p_target_id: string
+          p_target_type: string
+        }
+        Returns: boolean
+      }
+      security_indicator_currently_public_safe: {
+        Args: { p_indicator_id: string }
+        Returns: boolean
+      }
+      security_indicator_is_grounded: {
+        Args: {
+          p_evidence_id: string
+          p_indicator_type: string
+          p_target_id: string
+          p_target_type: string
+          p_value_text: string
+        }
+        Returns: boolean
+      }
+      security_indicator_value_sha256_v1: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      security_json_has_exact_keys: {
+        Args: { p_keys: string[]; p_payload: Json }
+        Returns: boolean
+      }
+      security_json_positive_bigint_is_valid: {
+        Args: { p_key: string; p_payload: Json }
+        Returns: boolean
+      }
+      security_json_uuid_is_valid: {
+        Args: { p_key: string; p_payload: Json }
+        Returns: boolean
+      }
+      security_public_incident_summary_rows: {
+        Args: never
+        Returns: {
+          category: string
+          first_observed_at: string
+          incident_id: string
+          indicators: Json
+          last_verified_at: string
+          public_summary: string
+          severity: string
+          state: string
+          target_id: string
+          target_type: string
+          version: number
+        }[]
+      }
+      security_public_project_posture: {
+        Args: { p_project_id: string }
+        Returns: string
+      }
+      security_public_safe_indicator_rows: {
+        Args: never
+        Returns: {
+          id: string
+          type: string
+          value: string
+        }[]
+      }
+      security_target_lock_key_v1: {
+        Args: { p_target_id: string; p_target_type: string }
+        Returns: number
+      }
+      set_security_indicator_disclosure: {
+        Args: {
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_indicator_id: string
+        }
+        Returns: {
+          commandId: string
+          decision: string
+          indicatorId: string
+          indicatorVersion: number
+          publicSafe: boolean
+          replayed: boolean
+          version: number
+        }[]
+      }
       signal_has_valid_evidence: {
         Args: { p_signal_id: string }
         Returns: boolean
+      }
+      submit_manual_security_candidate: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          candidateId: string
+          candidateVersion: number
+          commandId: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
       }
       update_user_task: {
         Args: { expected_version: number; patch: Json; task_id: string }
