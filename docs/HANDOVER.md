@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-27（Phase 7A Task 3 经独立复审 **Approved** 正式闭环——8 Important + 5 Minor 全部 Resolved、0 新增问题；WorkBuddy 本轮自 codex 中断点接手完成 Fix Round 1 全部数据库验证并提交 `daf6d40`/`6b990fd`；下一步 Task 4 bearer repository；全程未访问生产）
+> 最近更新：2026-08-27（Phase 7A Task 3 与 Task 4 均已闭环并复审 Approved；WorkBuddy 本轮完成 Task 3 Fix Round 1 数据库验证与 Task 4 repository 全流程 TDD + disposable 集成，worktree 提交链 `daf6d40`→`6b990fd`→`287f677`→`2d2c29b`；下一步 Task 5 extraction routing + Promotion guards；全程未访问生产）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-27 接续执行）**：Phase 0–6B 与详情页功能仍在主线（HEAD `c102df6`，含已批准的 Phase 7A spec/plan/workbook 提交）；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行：Task 1 contracts、Task 2 domain 纯规则均已完成并通过复审（review clean），Task 3 Security Ledger migration 实现提交 `8134bf4` 后独立评审 NEEDS_FIXES（0 Critical / 8 Important / 5 Minor），Fix Round 1 全部修复并经 disposable 栈验证（focused 013 224/224、full pgTAP 13 files / 1,338、typegen 双次一致替换手工 types、fresh `pnpm verify` exit 0），修复提交 `daf6d40`。生产仍为 19 个迁移，第 20–22 个 migration 均 production unapplied；下一任务是 Task 4（bearer-scoped security review repositories + races），随后 Task 5–11；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-27 接续执行）**：Phase 0–6B 与详情页功能仍在主线（HEAD `c102df6`，含已批准的 Phase 7A spec/plan/workbook 提交）；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行：Task 1 contracts、Task 2 domain 纯规则均已完成并通过复审（review clean），Task 3 Security Ledger migration 实现提交 `8134bf4` 后独立评审 NEEDS_FIXES（0 Critical / 8 Important / 5 Minor），Fix Round 1 全部修复并经 disposable 栈验证（focused 013 224/224、full pgTAP 13 files / 1,338、typegen 双次一致替换手工 types、fresh `pnpm verify` exit 0），修复提交 `daf6d40`。Phase 7A 进度：Task 1–4 已闭环，剩余 Task 5–11。Task 4 产出 SecurityReviewRepository（9 方法 per-call bearer、strict parse-before-map、AS101–AS199 稳定错误映射、browser deny 三层隔离），openIncident 双路由与数据库设计精确对齐，list 分页 clamp 至 RPC 上限 100；focused integration 7/7 于 marker-verified disposable 栈通过，database 包内 225 passed / 51 gated skipped，根 verify exit 0；复审八项安全核查全 Pass、0C/0I、3 Minor 当轮闭环。生产仍为 19 个迁移，第 20–22 个 migration 均 production unapplied；下一任务是 Task 5（security extraction routing + ordinary Promotion guards），随后 Task 6–11；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
 ### 2026-08-26 本轮接续复核进度
 
@@ -27,6 +27,14 @@
 2. **当前生产阶段**：不能把本地完成写成已上线。最后可信生产快照仍是 2026-08-22 的 19 个已应用迁移；第 20 个 failed-AI-run review migration 和第 21 个 score/Evidence detail migration 均继续按未应用处理。
 3. **下一产品开发任务**：先对 **Phase 7A Security incidents + indicators** 做架构设计和用户审批，定义 protect-first 状态机、追加式历史、Evidence/Source/Raw Item 追溯、Promotion/audit/outbox 边界和最小授权；再单独设计 **Phase 7B verified allowlisted references**。两者完成后才进入 tutorials。
 4. **若下一目标是生产上线而不是继续开发**：先由项目所有者指定真实 human reviewer，恢复生产 Auth 并现场确认 health 200，建立并演练迁移前备份，再明确授权 rollout；之后重新只读 preflight，按顺序受控应用/登记第 20、21 个迁移并执行 reviewer 与匿名读路径 smoke/拒绝矩阵。
+
+### 2026-08-27 本轮执行记录（WorkBuddy 接手：Task 3 收口 + Task 4 完成）
+
+**Task 3 Fix Round 1 disposable validation（经用户授权）**：按 6B 同款流程同步修复版 migration/013/006 至 authorized disposable 路径并 reset（22 migrations exit 0）；focused 013 暴露三个测试侧缺陷（authenticated 块直调被 revoke 的 `evidence_quote_sha256_v1`、outbox 约束 INSERT 缺省 occurred_at、锁序断言 SQL 字面量 `\n` 非换行）均测试侧最小修复；探针实测 outbox 分布后补入新 caution incident 聚合使 want=7 成立。终态 focused 013 **224/224**、full pgTAP **13 files / 1,338 PASS**、typegen 双次 SHA `61e8829c…` 一致并以生成产物替换手工 types（93 行 FK→视图漂移归位）、根 verify exit 0。提交 `daf6d40`。scoped re-review **Approved**（8 Important + 5 Minor 全部 Resolved、0 新增），Task 3 于 `6b990fd` 闭环。
+
+**Task 4 bearer-scoped security review repository（完成）**：TDD 实现 `packages/database/src/security/`（repository/entry/browser-denied）、`./security-review` 条件导出、44 个新单测与环境门控集成测试（四变量 loopback fail-closed、marker 先验、randomUUID 自有资产 teardown 单事务 bulk 清理）。RED 具名缺失模块失败；GREEN database 包内 test **225 passed / 51 gated skipped**、lint/typecheck exit 0。controller 推导集成变量（值不打印、远程无副本）并以精确 IPv4 绑定隧道于 disposable 栈跑 focused integration：首轮暴露两处测试缺陷（teardown 以不存在的 project_id 查 indicators、相邻模板插值生成 `$7$8`）与一处实现缺陷（`limit+1` 越界 RPC 上限 AS108），修复后 **7/7 PASS**（授权矩阵/幂等重放冲突/版本冲突/双 incident 并发与独立解除），根 verify exit 0。提交 `287f677`；scoped re-review 八项安全核查全 Pass、**Approved**、0C/0I，3 个 Minor 当轮闭环后提交 `2d2c29b`。期间曾误建指向生产端口的短命隧道并即时拆除核验为唯一正确目标。全程生产零访问。下一任务 Task 5。
+
+---
 
 ### 2026-08-26 Phase 7A 设计进度
 
