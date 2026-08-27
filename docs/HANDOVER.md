@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-26（用户已选择方案 1：Subagent-Driven；正在建立隔离 worktree、执行账本与 declared-runtime 基线，随后直接开始 Task 1）
+> 最近更新：2026-08-27（Phase 7A Task 1–2 已完成并复审通过、Task 3 实现提交且 Fix Round 1 全部验证完成并提交 `daf6d40`，待独立复审后进入 Task 4；全程未访问生产）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-26 仓库复核）**：Phase 0–6B Task 1–8 与详情页 score factors + 经审核 Evidence 引用功能均已在主线 `codex/phase-0-1-foundation`；当前 HEAD `74f0e6c`，功能锚点 `a372880`。仓库含 21 个迁移，但生产仍只能按 2026-08-22 的最后证据视为已应用 19 个；第 20/21 个 migration 均为 **production unapplied**。下一产品开发入口是安全事件/指标与 verified allowlisted references 的前置架构设计，不是直接开发教程；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-27 接续执行）**：Phase 0–6B 与详情页功能仍在主线（HEAD `c102df6`，含已批准的 Phase 7A spec/plan/workbook 提交）；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行：Task 1 contracts、Task 2 domain 纯规则均已完成并通过复审（review clean），Task 3 Security Ledger migration 实现提交 `8134bf4` 后独立评审 NEEDS_FIXES（0 Critical / 8 Important / 5 Minor），Fix Round 1 全部修复并经 disposable 栈验证（focused 013 224/224、full pgTAP 13 files / 1,338、typegen 双次一致替换手工 types、fresh `pnpm verify` exit 0），修复提交 `daf6d40`。生产仍为 19 个迁移，第 20–22 个 migration 均 production unapplied；下一动作是对 fix 范围做独立复审再进入 Task 4 bearer repository；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
 ### 2026-08-26 本轮接续复核进度
 
@@ -35,7 +35,7 @@
 | 1. 现状与边界研究 | **完成** | 当前仓库已预留 `security_reviewer` 角色、`security_risk` / `scam_indicator` AI 候选类型、`paused` project lifecycle 与 `blocked` recommendation 枚举；但没有 security incident/indicator 的 canonical 表、契约、命令、repository、API 或 UI。现有确定性评分器只产生 `act_now/watch/research/avoid`，不会产生 `blocked`。 |
 | 2. 产品范围澄清 | **完成** | 已确认独立 posture、两级作用域、三档状态、最严格合成、权限/候选入口、source/project 门禁、完整 reviewer/public UI 与逐 indicator 公共披露审批。 |
 | 3. 架构方案与分节设计 | **完成** | **已确认**采用追加式 Security Ledger，不采用可变 incident 聚合或复用 signal/catalog；总体架构与数据边界、命令/状态/事务、读模型/门禁/UI、安全测试/验收/不做项四节均已逐节确认。 |
-| 4. Spec / plan / TDD 实施 | **进行中** | 正式 spec 已批准；实施计划 `docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md` 与 workbook `docs/tasks/phase-7a-security-incidents-indicators-workbook.md` 已完成并自审，拆成 11 个独立 RED/GREEN/review/commit 任务。用户已选择方案 1：Subagent-Driven；当前按强制流程封存规划基线、建立 `codex/phase-7a-security-ledger` 隔离 worktree、创建 SDD ledger 并重跑 declared-runtime baseline，随后直接从 Task 1 contracts 进入 RED → GREEN。尚未写 Phase 7A 业务代码或 migration。 |
+| 4. Spec / plan / TDD 实施 | **进行中（Task 3/11 完成，Fix Round 1 闭环）** | 正式 spec 已批准；实施计划与 workbook 已固化，拆成 11 个任务。隔离 worktree `codex/phase-7a-security-ledger` 就绪：Task 1 contracts（commit 锚点经 fix round `5ac6f76`，review clean）、Task 2 domain 纯规则（至 `a6ac4b0`，review clean）已完成；Task 3 ledger migration 实现 `8134bf4` 后独立评审 NEEDS_FIXES（0C/8I/5M），Fix Round 1 于 2026-08-27 经用户授权在 marker-verified disposable 栈完成全部验证（focused 013 224/224、full pgTAP 1,338、双次 typegen SHA `61e8829c…` 替换手工 types、database 包内单测 180/gated skip 44、fresh 根 `pnpm verify` exit 0）并提交 `daf6d40`。下一步对 `edd9077..daf6d40` 做独立复审，随后进入 Task 4 bearer repository。生产未访问。 |
 
 Phase 7A 设计铁律：安全态与 opportunity/risk/confidence/score recommendation 保持独立；AI/collector 只能提交候选数据，不能写 canonical incident、最终 security decision 或解除封锁；事件、指标、决策和解除历史必须追加保留并追溯到 Evidence、Raw Item 与 Source；先施加最小相关预防措施，再调查；本阶段不包含 verified links、tutorials、notifications、自动交易或绕过类功能。
 
