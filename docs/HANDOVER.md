@@ -36,6 +36,50 @@
 
 ---
 
+### Phase 7A 全景看板与剩余任务计划（2026-08-27 更新）
+
+#### 任务看板总览
+
+| Task | 交付物 | 状态 | 复审 | 关键提交 |
+|---|---|---|---|---|
+| 1 | Strict security contracts（五模块） | ✅ 完成 | Approved（fix round 后 clean） | 至 `5ac6f76` |
+| 2 | Pure posture/transition/indicator rules（domain） | ✅ 完成 | Approved（两轮 fix 后 clean） | 至 `a6ac4b0` |
+| 3 | Security Ledger migration + protected commands + RLS 矩阵 | ✅ 完成 | 初审 NEEDS_FIXES(0C/8I/5M) → Fix Round 1 → re-review **Approved** | `8134bf4`/`daf6d40`/`6b990fd` |
+| 4 | Bearer-scoped security review repository + race 集成 | ✅ 完成 | re-review **Approved**（0C/0I） | `287f677`/`2d2c29b` |
+| 5 | Route security extraction candidates and harden ordinary Promotion | ⬜ 未开始 | — | — |
+| 6 | Enforce protect-first collection and scoring races | ⬜ 未开始 | — | — |
+| 7 | Strict public security repositories + project projections | ⬜ 未开始 | — | — |
+| 8 | Authenticated security BFF routes + browser client | ⬜ 未开始 | — | — |
+| 9 | Reviewer security workflow UI（`/review/security`） | ⬜ 未开始 | — | — |
+| 10 | Public blocked opportunities + project security presentation | ⬜ 未开始 | — | — |
+| 11 | Golden Dataset、E2E、runbook、full verification 收口 | ⬜ 未开始 | — | — |
+
+worktree 提交链（Task 1–4）：`fbf49d2..2d2c29b` 共 14 commits；全部位于 `codex/phase-7a-security-ledger`，未合并主线。
+
+#### Task 5–11 范围摘要（依据已批准实施计划）
+
+- **Task 5（下一步，从 BASE `2d2c29b` 开始）**：extraction 事务按批调用 `route_security_extraction_candidate` 把 `security_risk` / `scam_indicator` 候选从普通 Promotion 路由进专用 security review queue（仍是候选数据、不得写 canonical）；Promotion CLI/repository 映射受保护命令结果且不泄漏 SQL；被 gate 的普通 Promotion 路径在 DB guard（Task 3 已 RED/GREEN）之上做 regression 断言。RED 来自缺失 routing/mapping 行为。
+- **Task 6**：collection/scoring protect-first——collection 结局新增安全终态并按 posture 在调度、请求前多点重检；`caution` 强制 active security reviewer 才能 Promotion 新 canonical intelligence、`blocked` 除 ledger 命令外拒绝；评分输入与持久化在 caution/blocked 目标前暂停；真实双会话竞态集成。
+- **Task 7**：anon 安全仓库严格映射四个 public 视图（blocked 列表游标、posture、获批 incident 摘要、逐条 public_safe indicator 惰性文本），immutable score ID 作组合锚点，禁止 base-table fallback。
+- **Task 8**：thin `/api/v1/review/security/*` handlers 与 `/api/v1/security/blocked-projects` 公共端点 + strict browser API client（fresh token/idempotency key、expected version）；bundle isolation 证明。
+- **Task 9**：reviewer 安全工作流 UI（候选队列/详情/incident 创建与调整/历史/解除/披露），高影响命令显式确认、409 刷新不覆盖；惰性渲染测试。
+- **Task 10**：公共侧 blocked 机会独立视图与项目详情安全呈现（caution 保留排序+警示、blocked 退出统计但详情可访问、既有评分为安全事件前历史快照）。
+- **Task 11**：Golden Dataset 增补（明确/否定/错实体/prompt injection/locator 校验）、最终授权矩阵扩展、runbook 补章节、fresh 全仓 verify 与整分支收口复审。
+
+#### 执行方式与决策点
+
+1. 沿用 Subagent-Driven 流程：每任务 controller 写 brief（plan 章节 + RPC 速查 + fixture 惯例）→ 实现 agent TDD（RED 具名失败 → 最小 GREEN → 包内门禁）→ controller 代提交并在 disposable 栈跑真实验证（需 SSH 推导四变量至本地 0600 env 文件 + 显式 IPv4 绑定隧道）→ scoped independent review → Approved 后记录闭环。连续执行无需逐 task 请示（用户先前选定方案 1 并以“继续”推进），但任何超出既有授权的远程动作（如向 disposable 栈同步新文件）须重新确认。
+2. 数据库守则不变：仅 marker fail-closed 后 reset disposable 栈（固定 marker 见 seed.sql；013 pgTAP 与 integration 测试的 marker 行均由 seed 提供）；生产栈与 54321/54322 端口绝不允许访问。
+3. 已知工程坑位延续 §6（重点：包内跑 database 测试否则 browser-resolution 假失败；postgres.js 相邻模板插值产生 `$n$m`；隧道先核监听目标再连库）。
+
+#### 完成定义与遗留边界
+
+- Phase 7A 完成条件（spec §验收）：Evidence→Raw Item→Source 追溯、protect-first 原子性、即时门禁、公共零泄漏、clear 无回归、完整数据库与仓库门禁全绿并同步文档后，再做整分支 finishing review 与主线合并决策。
+- 本阶段明确不做：verified allowlisted references（Phase 7B 单独设计）、tutorials、notifications、钱包/交易、第三方威胁情报源、AI 自动 canonical 决策、scope 自动升级、实时推送、生产 rollout。
+- 生产 rollout 冻结依旧：四前置（human reviewer 供给、Auth 恢复 200、迁移前备份演练、显式授权）齐备并重新 preflight 前，第 20–22 个 migration 不应用。
+
+---
+
 ### 2026-08-26 Phase 7A 设计进度
 
 | 步骤 | 状态 | 结论 / 后续动作 |
@@ -138,7 +182,12 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6B Task 7 E2E/授权矩阵（DONE）**（2026-08-22） | 真实 reviewer 全流程（list 三状态、safe detail、`needs_investigation` + 精确 replay + 下一版 `dismiss`、两版不可变历史）、七主体授权矩阵、两类独立 client race、malformed repository detail → 规范化 500 的 HTTP 回归；fix round 1 将 Auth signup 返回的 user ID 在 confirmation/sign-in 前写入共享 Set，teardown 复用经测试的 `presentFixtureUserIds` | Codex 原始门禁：focused 6/6、full 40/40、pgTAP 1031/1031；WorkBuddy 验收：disposable focused 6/6（Node 22.22.2）、fixture 5/5、full `test:integration` 40/40；scoped re-review 无 Critical/Important 破坏；提交 `b2f104b`、`e9b3e52`、`bcbbe7c` |
 | **Phase 6B Task 8 runbook/安全审查/仓库门禁（DONE）**（2026-08-22） | runbook 新增「Failed AI run review (Phase 6B)」操作节（flat-SQL 审核人供给、`revoked_at` 即时失效语义、`/review/sign-in` 流程、focused 测试命令、disposable-only 集成变量、迁移前向安全、failed-run retry 明确排除；UI 不建账号/角色）；全分支 secret/unsafe-field 扫描逐条人工分类；本地与远端产物 SHA 一致 | 扫描命中全部归类为测试 fixture/禁令/服务端 bearer 管道/既有 schema 列/ACL revoke（grant 仅 `execute` 给 `authenticated` 且函数内复核）；migration SHA `5150c830…`、011 SHA `e9158648…` 本地=远端；disposable reset exit 0 + full pgTAP 11 files / 1031 PASS；Node 22 根 `pnpm verify` exit 0（798 非跳过）；`git diff --check` 清洁；生产未访问 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下主线合并后 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），861 个非跳过测试、46 个 environment-gated skips，exit 0（contracts 107 / domain 222 / database 180+44 skipped / worker 212+2 skipped / web 140）。详情页功能在 disposable 栈的最终执行报告记录 full pgTAP 1114/1114 与 anonymous repository integration 44/44；这些远端/数据库证据未在本次本地合并步骤重放，生产仍未访问或应用第 21 个 migration。
+| **Phase 7A Task 1 strict security contracts（DONE）**（2026-08-26/27，隔离 worktree `codex/phase-7a-security-ledger`） | `packages/contracts/src/security/` 五模块：enums（target/posture/severity/indicator/category/state/reason/disclosure/error/outbox 事件枚举）、candidate（ingress/manual/list/detail discriminated union + targetContext）、incident（review 命令含 accept_and_open/attach、incident 命令 open·adjust·resolve·reopen+expectedIncidentVersion、disclosure publish/withdraw）、projections（public 安全四投影 + blocked 游标）、events（安全 outbox payload 联合）；全部 additionalProperties:false；contracts 132 tests | 实现 fix round 后 review clean；reviewer 三项 Important（active 公共集合接受 resolved incident、blocked-project 目标错配、reviewer 状态矛盾组合）全部 Resolved。提交锚点至 `5ac6f76` |
+| **Phase 7A Task 2 domain 纯规则（DONE）**（2026-08-27，review clean） | `packages/domain/src/security/`：posture 合成（blocked>caution>clear 多 incident 推导）、reason/lifecycle/disclosure 兼容矩阵、indicator 值约束与跨类型同 UUID 锁身份等纯规则；无 Next/DB/OpenAI/HTTP 依赖；domain 375 tests | 经两轮 fix 达成穷举矩阵覆盖；提交锚点至 `a6ac4b0` |
+| **Phase 7A Task 3 Security Ledger migration（DONE）**（2026-08-27，Fix Round 1 + re-review Approved 后闭环） | 单一 forward migration（3,988 行，SHA `24d4b763…`）：九张追加式 ledger 表 + append-only/reject-update 触发器；`current_security_target_posture` / `security_target_lock_key_v1` / eligibility helpers；protected RPC（extraction ingress 路由、manual submit、candidate review、open_security_incident、execute_security_incident_command attach/adjust/resolve/reopen、set_indicator_disclosure、list×2/get×2）；blocked-source Evidence fail-closed 过滤 helper；普通 Promotion security gate trigger；四个 public 安全视图（invoker/barrier + 列级最小授权）与独立 RLS policy 矩阵；outbox 事件类型扩展与安全 payload 校验；pgTAP 013 约 2,000 行断言（224 tests） | 初版 focused 193/193 → 独立评审 NEEDS_FIXES（0C/8I/5M 全部成立修复）；disposable reset exit 0、focused 013 **224/224**、full pgTAP **13 files / 1,338 PASS**、typegen 双次 SHA `61e8829c…` 替换手工 types；根 verify exit 0；复审 Approved（8I+5M 全部 Resolved）。提交链 `8134bf4`→(fix)→`daf6d40`→`6b990fd` |
+| **Phase 7A Task 4 bearer-scoped security review repository（DONE）**（2026-08-27，re-review Approved 后闭环） | `packages/database/src/security/`（security-review-repository/entry/browser-denied）：SecurityReviewRepository 九方法（per-call bearer 非持久 client、strict parse-before-map、AS101–AS199 到 `securityErrorCodeSchema` 的稳定映射且不透传 response 文本、cursor (createdAt desc, id desc) 与 RPC order 一致、openIncident 双路由精确对齐数据库设计、list 分页 clamp 至 RPC 上限 100）；package.json 新增 `./security-review` 条件导出（browser 先 throw 再构造）；44 个新单测与环境门控集成测试（loopback-only fail-closed、fixed marker 先验、randomUUID 自有资产 teardown 单事务 bulk 清理） | RED 具名缺失模块失败；GREEN database 包内 **225 passed / 51 gated skipped**、lint/typecheck exit 0；focused integration **7/7 PASS** 于 marker-verified disposable 栈（授权矩阵/幂等重放冲突/版本冲突/双 incident 并发与独立解除）；根 verify exit 0；复审八项安全核查全 Pass（0C/0I，3 Minor 当轮闭环）。提交链 `287f677`→`2d2c29b` |
+
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下主线合并后 `pnpm verify` 全绿**（lint / typecheck / test / build / placeholders），**Node 22.22.2 / pnpm 11.16.0 下 Phase 7A worktree（HEAD `2d2c29b`）fresh `pnpm verify` exit 0**：contracts 132 + domain 375 + database 225+51 skipped + worker 212+2 skipped + web 140 = **1,084 个非跳过测试**，53 个 environment-gated skips，lint/typecheck/build/placeholders 全绿（mainline pre-Phase-7A 记录值仍为 861 non-skipped / 46 skipped；两者差异全部来自 Phase 7A 新增测试）。数据库层：disposable 栈 full pgTAP 13 files / 1,338 PASS、security review focused integration 7/7。。详情页功能在 disposable 栈的最终执行报告记录 full pgTAP 1114/1114 与 anonymous repository integration 44/44；这些远端/数据库证据未在本次本地合并步骤重放，生产仍未访问或应用第 21 个 migration。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -159,7 +208,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
 7. 通知系统（alerts、偏好）
-8. 安全风控（incidents、indicators、protect-first 工作流）
+8. ~~安全风控（incidents、indicators、protect-first 工作流）~~ **🔄 Phase 7A 进行中**：spec/plan/workbook 已批准固化；Task 1 contracts、Task 2 domain 纯规则、Task 3 Security Ledger migration、Task 4 bearer repository 均已闭环并复审 Approved（见上表）；剩余 Task 5–11（extraction routing/Promotion guards、collection·scoring gates、public repositories、BFF/client、reviewer UI、public UI、Golden/E2E/runbook/full verify）
 9. 用户认证与私有数据（profiles、RLS user_id 场景目前未启用）
 10. 运营/审核后台界面（目前只有 API）；详情页 score factors / reviewed Evidence 的本地实现已完成，生产未应用
 11. 多源扩展：X/Twitter、项目方公告页结构化解析等
@@ -211,9 +260,11 @@ packages/
     src/intelligence/       #   ⭐ Phase 6A：evidence-grounding.ts（归一化+精确包含+SHA-256 纯函数）
   database/                 # repository、迁移产物、outbox；src/generated/ 为生成类型
     src/promotion/          #   ⭐ Phase 6A 治理仓库（server-only 导出，browser 入口 fail-closed）
+    src/security/           # ⭐ Phase 7A SecurityReviewRepository（per-call bearer；./security-review
+                            #    browser 入口 fail-closed；Task 5 起待加 public anon 仓库）
 supabase/
   migrations/               # 20 个 forward-only 迁移（勿改已应用者；
-                           #   生产库应用前 19 个，第 20 个仅 disposable 验证）
+                           #   生产应用前 19 个；第 20–22 个均 production unapplied）
   fixtures/                 #   demo-projects.sql（12 个虚构中文项目 + 显式虚构 Evidence，幂等可重放）
                            #   real-sources.sql（Ethereum + EF 博客 + airdrops.io）
 scripts/                    # check-placeholders、verify-env
@@ -425,15 +476,19 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 > 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后用 Node 22.22.2 / pnpm 11.16.0 执行 `pnpm verify`，确认 798 个非跳过测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
 
-### 8.1 当前状态快照（2026-08-24 主线集成后）
+### 8.1 当前状态快照（2026-08-27 Phase 7A Task 4 闭环后）
 
 | 维度 | 状态 |
 |------|------|
-| 代码 | Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation`；Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（§8.5）；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地 |
-| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 798 个非跳过测试全绿，exit 0；lint/typecheck/build/placeholder 全部通过。Task 7 fix round 1 后 disposable 复验：focused integration 6/6、fixture 5/5、full repository integration 40/40；011 focused 87/87、full pgTAP 1031/1031。 |
-| 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
-| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康（auth/db/kong 均 healthy）；20 migrations reset exit 0，updated focused pgTAP 87/87、full 1031/1031；**fix round 1 后复验**：focused integration 6/6（4.05s）、full repository integration 40/40（74.19s），cleanup 经 marker 校验且仅删精确 fixture；`errorDetail` 与 revoked-role mutation 均命中具名回归。**只允许对它 reset**；生产未访问。 |
-| 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
+| 主线 | `codex/phase-0-1-foundation`，HEAD `0d16ecf`（docs: record phase 7a task 4 completion）；Phase 0–6B + 详情页 score/Evidence 功能全部在主线；仓库无 remote，纯本地 |
+| Phase 7A | 隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger`，HEAD `2d2c29b`，工作区干净；spec `Approved`；11 任务中 Task 1–4 已闭环且复审 Approved，剩余 Task 5–11；SDD ledger 与 workbook 随 worktree 维护 |
+| 数据迁移台账 | 仓库 22 个 forward-only migration（最高 `20260826000100_phase_7a_security_incidents_indicators`，SHA `24d4b763…`）；生产最后可信快照仍为 2026-08-22 的 19 个已应用；第 20/21/22 个均 production unapplied |
+| 测试基线 | Node 22.22.2 / pnpm 11.16.0，worktree 上 fresh root `pnpm verify` exit 0（各包计数见 §2 测试基线段的新增记录行）；lint/typecheck/build/placeholders 全绿 |
+| disposable 栈 | `airdrop-intelligence-governance-test`（API 64321 / DB 64322）healthy；22 migrations + seed reset 通过；**只允许对它 reset**；本地隧道惯例 `16432→64322`、`16433→64321`（建隧道务必显式 `-L 127.0.0.1:…` 并逐条核验监听目标——本轮曾发现残留旧隧道目标不明并清理，且曾短暂误建指向生产端口的隧道后即刻拆除） |
+| 生产库 `airdrop-intelligence-os` | 未访问（维持 2026-08-22 最后证据）；Auth 容器缺失问题未修（任何浏览器会话功能 rollout 的前置缺口，见 §8.5）|
+| 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 |
+
+
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）
 
