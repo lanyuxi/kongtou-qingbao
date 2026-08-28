@@ -812,6 +812,10 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-28 Phase 7A Task 7（Fix Round 1 marker-verified integration GREEN）**：citation request split 后 controller 重新通过 Auth 与 disposable marker gate。真实匿名 `project-repository.integration.test.ts` 为 **1 file / 9 tests PASS**，总时长 11.83s（tests 11.39s）；fixture 的 transactional exact-ID residue assertion 通过。未 reset、未访问生产。controller 已关闭隧道，并确认 16432/16433 无 listener；因此 timeout 修复与完整 cleanup 真实覆盖均已验证。未在本记录中创建提交。
 
+**2026-08-28 Phase 7A Task 7（Fix Round 1 final independent review）**：独立复审范围 `3f0e906..7b8c329`，Assessment **Approved**。此前 3 个 Important 全部 Resolved：公开 `ProjectRepository` strict raw-row/error sanitization、transactional exact fixture cleanup 与 source-Evidence security composition 覆盖，以及 accepted 的 signal strict boundary。citation HEAD count/data split 经核对保留分页完整性与 fail-safe handling。新增 Critical / Important / Minor 均为 0。reviewer focused 为 3 files / 53 tests，database lint/typecheck 通过；reviewer 未访问 DB/network。Task 7 Fix Round 1/5：3 addressed、0 open，commits `3f0e906..7b8c329`；**Task 7 complete**。
+
+**2026-08-28 Phase 7A Task 7（fresh root gate）**：Fix Round 1 已提交为 `7b8c329 fix(database): close public security projection review gaps`。Controller 随后在 Node 22.22.2 / pnpm 11.16.0 下 fresh `pnpm verify` exit 0：contracts 133、domain 376、database 257、worker 221、web 140，共 **1,127 non-skipped / 68 gated skips**；lint、typecheck、build、placeholder 全绿。Task 7 保持 review clean / complete；下一任务为 Task 8（authenticated security BFF/routes/browser client）。生产仍未访问。
+
 ---
 
 ## 9. 其他

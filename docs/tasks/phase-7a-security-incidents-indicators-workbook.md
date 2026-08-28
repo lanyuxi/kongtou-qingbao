@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：Task 7 Fix Round 1 marker-verified integration GREEN；生产未访问
+> 当前状态：Task 7 complete；Fix Round 1 independent review Approved；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -56,6 +56,8 @@
 | 2026-08-28 | Task 7 Fix Round 1 signal boundary follow-up | 单独新增 signal extra-field RED，基线 exit 1 且直接返回含私有字段的 raw row 映射结果。最小 parser 对全部七个 selected signal fields 做 exact-key、非空字符串、verification enum、finite confidence 与 nullable ISO timestamp 校验后才 camel-case mapping；已保留稳定 code/通用 message 脱敏。focused 与 database full 13 files / 257 PASS、66 gated skips，lint/typecheck/diff check exit 0。未连接数据库/reset/生产，未创建提交。 |
 | 2026-08-28 | Task 7 Fix Round 1 citation request split | Marker-verified integration 的 test-only diagnostic 确认稳定 code `57014` statement timeout；controller DB 日志将根因定位为同一 PostgREST citation 请求中的 payload + `count=exact` 双评估安全 public-view chain。未重连数据库。先新增 recorder RED，exit 1 且 5 个具名预期失败：1,001-row pagination 仅发 2 个 combined 请求，而每页契约要求 HEAD exact-count probe 与 ordered/ranged data 共 4 个请求；count missing/changed fixtures 也锁定独立 probe。最小 repository 改动令每页先以同一 project/immutable-score filters 的 `head: true` exact-count `project_id` query，再运行原精确安全 projection/order/range data query；count consistency、page length、duplicate、strict parse 与 safe error wrapping 保留。focused project-score-evidence + project-repository、database full 均 257 PASS / 66 skips，lint/typecheck/diff check exit 0；保留 test-only integration code rethrow。未 DB/reset/生产/提交；controller 待 marker-verified 重跑。 |
 | 2026-08-28 | Task 7 Fix Round 1 marker-verified integration GREEN | Controller 重过 Auth 与 disposable marker gate；真实匿名 `project-repository.integration.test.ts` 为 1 file / 9 tests PASS，Duration 11.83s（tests 11.39s），并通过 transactional exact-ID fixture residue assertion。未 reset、未访问生产；隧道已关闭，16432/16433 无 listener。 |
+| 2026-08-28 | Task 7 Fix Round 1 final independent review | 复审 `3f0e906..7b8c329` 为 **Approved**。前三个 Important 全部 Resolved：strict/sanitized public boundary、fixture cleanup 与 source-Evidence security coverage、accepted signal strict boundary；HEAD count/data split 保留 pagination completeness/fail-safe。新增 Critical/Important/Minor 均为 0。reviewer focused 3 files / 53 tests、database lint/typecheck 均通过，未访问 DB/network。Task 7 Fix Round 1/5：3 addressed / 0 open，commits `3f0e906..7b8c329`；Task 7 complete。 |
+| 2026-08-28 | Task 7 fresh root gate | Fix commit `7b8c329` 后，Node 22.22.2 / pnpm 11.16.0 下 fresh `pnpm verify` exit 0：contracts 133、domain 376、database 257（66 gated skips）、worker 221（2 gated skips）、web 140，共 1,127 non-skipped / 68 gated skips；lint/typecheck/build/placeholders 全绿。Task 7 保持 review clean / complete；下一任务 Task 8 authenticated security BFF/routes/browser client。生产未访问。 |
 | 2026-08-26 | 产品范围逐项确认 | 完成：独立 posture、project/source scope、角色、门禁、披露和完整纵切片均确认。 |
 | 2026-08-26 | 架构选型与四节设计 | 完成：采用追加式 Security Ledger；数据边界、命令事务、读模型/UI、测试/不做项均确认。 |
 | 2026-08-26 | 正式设计规范 | 完成：规范获用户批准，状态 `Approved`。 |
