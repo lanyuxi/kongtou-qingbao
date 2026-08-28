@@ -826,6 +826,10 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-28 Phase 7A Task 8（declared-runtime controller revalidation）**：Controller 使用仓库声明的 Node 22.22.2 / pnpm 11.16.0 完成复验：focused handler/client/bundle 与 full Web 均为 11 files / 167 tests PASS，lint、顺序执行的 typecheck、Next 16.3.0 build、`git diff --check` 全部 exit 0。首次将 typecheck 与 build 并行启动时，build 重建 `.next/types` 导致 typecheck 临时缺失 `routes.js`；随后单独 typecheck 无源码修改即通过，确认是 generated-artifact race，不是实现类型错误。未连接数据库、未 reset、未访问生产。下一步精确暂存并提交 Task 8，再进行独立 code review。
 
+**2026-08-28 Phase 7A Task 8（first independent review）**：实现提交为 `0f303d9 feat(web): add security review bff`。独立审查结论 **Needs fixes**，Critical 0 / Important 3 / Minor 0：candidate manual-submit 与 review endpoint 共用 union receipt schema，未满足 operation-strict response boundary；client/handler 测试尚未覆盖全部操作的 fresh token/key、严格 envelope 与 authenticated malformed body；bundle isolation 尚未显式拒绝 promotion/worker env 名及 `createSecurityPublicRepository`。下一步由原实现代理按 TDD 完成 Fix Round 1 后做 scoped re-review；未连接数据库、未 reset、未访问生产。
+
+**2026-08-28 Phase 7A Task 8（Fix Round 1 RED→GREEN / controller revalidation）**：针对独立审查的三项 Important，先在精确 Node 22.22.2 / pnpm 11.16.0 下新增 cross-kind candidate receipt、非法 manual state、五条 mutation authenticated malformed body、九个 client operation strict-envelope/fresh-token、五个 mutation fresh-key/typed-409 no-retry 与 promotion/worker/server-constructor bundle marker 覆盖。focused RED exit 1：2 failed / 181 passed，manual submit 错接 review receipt、handler union schema 均错误接受对方 receipt。最小修复拆分 manual/review success schemas，manual state 使用 shared candidate-state schema，并将 client receipts 收紧为精确类型。实现代理 GREEN 后，Controller 顺序复验 focused/full Web 均为 11 files / 189 tests PASS，lint、typecheck、Next 16.3.0 build、`git diff --check` 全部 exit 0。未访问 DB/network/reset/production；下一步提交 Fix Round 1 并做 scoped re-review。
+
 ---
 
 ## 9. 其他

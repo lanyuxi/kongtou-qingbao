@@ -9,6 +9,7 @@ import {
   securityCandidateListQuerySchema,
   securityCandidateReviewCommandV1Schema,
   securityCandidateReviewReceiptV1Schema,
+  securityCandidateStateSchema,
   securityIncidentCommandReceiptV1Schema,
   securityIncidentCommandV1Schema,
   securityIncidentListQuerySchema,
@@ -21,20 +22,23 @@ import {
   type ReviewerSecurityIncidentListItem,
   type SecurityCandidateListQuery,
   type SecurityCandidateReviewCommandV1,
+  type SecurityCandidateReviewReceiptV1,
   type SecurityIncidentCommandReceiptV1,
   type SecurityIncidentCommandV1,
   type SecurityIncidentListQuery,
   type SecurityIndicatorDisclosureCommandV1,
+  type SecurityIndicatorDisclosureReceiptV1,
 } from '@airdrop/contracts';
 import { z } from 'zod';
 
 import type { ReviewSessionController } from './review-session.js';
 
 const uuidSchema = z.uuid();
-const manualReceiptSchema = z.strictObject({ version: z.literal(1), commandId: uuidSchema, candidateId: uuidSchema, candidateVersion: z.number().int().positive(), state: z.string(), replayed: z.boolean() });
+const manualReceiptSchema = z.strictObject({ version: z.literal(1), commandId: uuidSchema, candidateId: uuidSchema, candidateVersion: z.number().int().positive(), state: securityCandidateStateSchema, replayed: z.boolean() });
 const candidateListResponseSchema = createApiSuccessSchema(z.strictObject({ version: z.literal(1), items: z.array(reviewerSecurityCandidateListItemSchema) }));
 const candidateDetailResponseSchema = createApiSuccessSchema(reviewerSecurityCandidateDetailSchema);
-const candidateMutationResponseSchema = createApiSuccessSchema(z.union([manualReceiptSchema, securityCandidateReviewReceiptV1Schema]));
+const manualCandidateResponseSchema = createApiSuccessSchema(manualReceiptSchema);
+const candidateReviewResponseSchema = createApiSuccessSchema(securityCandidateReviewReceiptV1Schema);
 const incidentListResponseSchema = createApiSuccessSchema(z.strictObject({ version: z.literal(1), items: z.array(reviewerSecurityIncidentListItemSchema) }));
 const incidentDetailResponseSchema = createApiSuccessSchema(reviewerSecurityIncidentDetailSchema);
 const incidentMutationResponseSchema = createApiSuccessSchema(securityIncidentCommandReceiptV1Schema);
@@ -47,16 +51,17 @@ export type SecurityReviewApiFailure =
   | { readonly ok: false; readonly state: 'conflict'; readonly code: 'security_version_conflict' | 'security_idempotency_conflict' }
   | { readonly ok: false; readonly state: 'request_failed' };
 export type SecurityReviewApiSuccess<T> = { readonly ok: true; readonly data: T; readonly nextCursor: string | null };
+export type SecurityManualCandidateSubmissionReceipt = z.infer<typeof manualReceiptSchema>;
 export interface SecurityReviewApiClient {
   listCandidates(query: SecurityCandidateListQuery): Promise<SecurityReviewApiSuccess<{ version: 1; items: ReviewerSecurityCandidateListItem[] }> | SecurityReviewApiFailure>;
   getCandidate(candidateId: string): Promise<SecurityReviewApiSuccess<ReviewerSecurityCandidateDetail> | SecurityReviewApiFailure>;
-  submitManualCandidate(command: ManualSecurityCandidateCommandV1): Promise<SecurityReviewApiSuccess<unknown> | SecurityReviewApiFailure>;
-  reviewCandidate(candidateId: string, command: SecurityCandidateReviewCommandV1): Promise<SecurityReviewApiSuccess<unknown> | SecurityReviewApiFailure>;
+  submitManualCandidate(command: ManualSecurityCandidateCommandV1): Promise<SecurityReviewApiSuccess<SecurityManualCandidateSubmissionReceipt> | SecurityReviewApiFailure>;
+  reviewCandidate(candidateId: string, command: SecurityCandidateReviewCommandV1): Promise<SecurityReviewApiSuccess<SecurityCandidateReviewReceiptV1> | SecurityReviewApiFailure>;
   listIncidents(query: SecurityIncidentListQuery): Promise<SecurityReviewApiSuccess<{ version: 1; items: ReviewerSecurityIncidentListItem[] }> | SecurityReviewApiFailure>;
   getIncident(incidentId: string): Promise<SecurityReviewApiSuccess<ReviewerSecurityIncidentDetail> | SecurityReviewApiFailure>;
   openIncident(command: Extract<SecurityIncidentCommandV1, { action: 'open' }>): Promise<SecurityReviewApiSuccess<SecurityIncidentCommandReceiptV1> | SecurityReviewApiFailure>;
   commandIncident(incidentId: string, command: Exclude<SecurityIncidentCommandV1, { action: 'open' }>): Promise<SecurityReviewApiSuccess<SecurityIncidentCommandReceiptV1> | SecurityReviewApiFailure>;
-  setIndicatorDisclosure(indicatorId: string, command: SecurityIndicatorDisclosureCommandV1): Promise<SecurityReviewApiSuccess<unknown> | SecurityReviewApiFailure>;
+  setIndicatorDisclosure(indicatorId: string, command: SecurityIndicatorDisclosureCommandV1): Promise<SecurityReviewApiSuccess<SecurityIndicatorDisclosureReceiptV1> | SecurityReviewApiFailure>;
 }
 type Dependencies = { readonly session: ReviewSessionController; readonly fetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>; readonly ids: { generate(): string } };
 
@@ -64,8 +69,8 @@ export function createSecurityReviewApiClient(deps: Dependencies): SecurityRevie
   return {
     async listCandidates(query) { const parsed = securityCandidateListQuerySchema.safeParse(query); return !parsed.success ? failed() : get(deps, `/api/v1/review/security/candidates?${search(parsed.data).toString()}`, candidateListResponseSchema); },
     async getCandidate(id) { return uuidSchema.safeParse(id).success ? get(deps, `/api/v1/review/security/candidates/${id}`, candidateDetailResponseSchema) : failed(); },
-    async submitManualCandidate(command) { const parsed = manualSecurityCandidateCommandV1Schema.safeParse(command); return !parsed.success ? failed() : mutation(deps, '/api/v1/review/security/candidates', parsed.data, candidateMutationResponseSchema); },
-    async reviewCandidate(id, command) { const parsedId = uuidSchema.safeParse(id); const parsed = securityCandidateReviewCommandV1Schema.safeParse(command); return !parsedId.success || !parsed.success ? failed() : mutation(deps, `/api/v1/review/security/candidates/${parsedId.data}/decisions`, parsed.data, candidateMutationResponseSchema); },
+    async submitManualCandidate(command) { const parsed = manualSecurityCandidateCommandV1Schema.safeParse(command); return !parsed.success ? failed() : mutation(deps, '/api/v1/review/security/candidates', parsed.data, manualCandidateResponseSchema); },
+    async reviewCandidate(id, command) { const parsedId = uuidSchema.safeParse(id); const parsed = securityCandidateReviewCommandV1Schema.safeParse(command); return !parsedId.success || !parsed.success ? failed() : mutation(deps, `/api/v1/review/security/candidates/${parsedId.data}/decisions`, parsed.data, candidateReviewResponseSchema); },
     async listIncidents(query) { const parsed = securityIncidentListQuerySchema.safeParse(query); return !parsed.success ? failed() : get(deps, `/api/v1/review/security/incidents?${search(parsed.data).toString()}`, incidentListResponseSchema); },
     async getIncident(id) { return uuidSchema.safeParse(id).success ? get(deps, `/api/v1/review/security/incidents/${id}`, incidentDetailResponseSchema) : failed(); },
     async openIncident(command) { const parsed = securityIncidentCommandV1Schema.safeParse(command); return !parsed.success || parsed.data.action !== 'open' ? failed() : mutation(deps, '/api/v1/review/security/incidents', parsed.data, incidentMutationResponseSchema); },

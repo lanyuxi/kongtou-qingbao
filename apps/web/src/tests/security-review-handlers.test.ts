@@ -17,8 +17,10 @@ import { describe, expect, it } from 'vitest';
 import {
   createSecurityCandidateDetailHandler,
   createSecurityCandidateListHandler,
+  createSecurityCandidateSubmitHandler,
   createSecurityCandidateReviewHandler,
   createSecurityIncidentDetailHandler,
+  createSecurityIncidentCommandHandler,
   createSecurityIncidentListHandler,
   createSecurityIncidentOpenHandler,
   createSecurityIndicatorDisclosureHandler,
@@ -65,6 +67,10 @@ const disclosureCommand: SecurityIndicatorDisclosureCommandV1 = {
   decision: 'publish',
   reasonCode: 'safe_for_public_warning',
   note: null,
+};
+const manualCommand: ManualSecurityCandidateCommandV1 = {
+  version: 1, target: { type: 'project', id: candidateId }, evidenceId,
+  indicator: { type: 'domain', value: 'unsafe.example' }, summary: 'Verified unsafe project domain.', note: null,
 };
 
 describe('security review BFF handlers', () => {
@@ -159,6 +165,28 @@ describe('security review BFF handlers', () => {
   });
 
   it.each([
+    ['manual submission', () => candidateSubmitHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', { malformed: true }))],
+    ['candidate review', () => candidateReviewHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', { malformed: true }), context(candidateId))],
+    ['incident open', () => incidentOpenHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', { malformed: true }))],
+    ['incident command', () => incidentCommandHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', { malformed: true }), context(incidentId))],
+    ['indicator disclosure', () => indicatorDisclosureHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', { malformed: true }), context(indicatorId))],
+  ])('rejects an authenticated malformed body for %s before repository access', async (_name, invoke) => {
+    await expectError(await invoke(), 400, 'invalid_request', 'The request is invalid.');
+  });
+
+  it('rejects cross-kind candidate mutation receipts rather than exposing them', async () => {
+    const manual = await candidateSubmitHandler(new StaticAuth({ userId: candidateId }), new RecordingSecurityReviews())(mutationRequest('/x', manualCommand));
+    const invalidReviewRepository = new RecordingSecurityReviews();
+    Object.assign(invalidReviewRepository, { reviewCandidate: async () => manualReceipt });
+    const review = await candidateReviewHandler(
+      new StaticAuth({ userId: candidateId }),
+      invalidReviewRepository as unknown as SecurityReviewRepository,
+    )(mutationRequest('/x', candidateCommand), context(candidateId));
+    expect(manual.status).toBe(500);
+    expect(review.status).toBe(500);
+  });
+
+  it.each([
     ['security_reviewer_required', 403, 'security_reviewer_required'],
     ['security_candidate_not_reviewable', 400, 'invalid_request'],
     ['security_version_conflict', 409, 'security_version_conflict'],
@@ -191,14 +219,17 @@ describe('security review BFF handlers', () => {
 });
 
 const candidateReceipt = { version: 1, commandId, candidateId, candidateVersion: 2, decisionId, state: 'rejected', indicatorId: null, incidentId: null, replayed: false } as const;
+const manualReceipt = { version: 1, commandId, candidateId, candidateVersion: 1, state: 'pending', replayed: false } as const;
 const incidentReceipt = { version: 1, commandId, incidentId, incidentVersion: 1, decisionId, state: 'active', posture: 'blocked', replayed: false } as const;
 const disclosureReceipt = { version: 1, commandId, indicatorId, indicatorVersion: 2, decision: 'publish', publicSafe: true, replayed: false } as const;
 
 function candidateListHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityCandidateListHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function candidateDetailHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityCandidateDetailHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function candidateReviewHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityCandidateReviewHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
+function candidateSubmitHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityCandidateSubmitHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function incidentListHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityIncidentListHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function incidentOpenHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityIncidentOpenHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
+function incidentCommandHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityIncidentCommandHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function incidentDetailHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityIncidentDetailHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function indicatorDisclosureHandler(auth: AuthenticatedUserVerifier, reviews: SecurityReviewRepository) { return createSecurityIndicatorDisclosureHandler({ auth, reviews, publicSecurity: new RecordingPublicSecurity(), ids: { generate: () => requestId } }); }
 function request(path: string, method: string, authorization: string | null = `Bearer ${accessToken}`) { const headers = new Headers(); if (authorization !== null) headers.set('authorization', authorization); return new Request(`http://local${path}`, { method, headers }); }

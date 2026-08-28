@@ -24,6 +24,8 @@ const apiRuntimeMarker = 'review_version_conflict';
 const securityApiRuntimeMarker = 'security_version_conflict';
 const forbiddenServiceMarker = 'forbidden-service-role-bundle-marker';
 const forbiddenDatabaseMarker = 'postgresql://forbidden-database-bundle-marker';
+const forbiddenPromotionMarker = 'forbidden-promotion-env-bundle-marker';
+const forbiddenWorkerMarker = 'forbidden-worker-env-bundle-marker';
 
 describe('review browser client production bundle', () => {
   it('bundles the review runtime with only public Supabase values and preserves a sibling', () => {
@@ -47,6 +49,8 @@ describe('review browser client production bundle', () => {
             NEXT_PUBLIC_SUPABASE_ANON_KEY: publicAnonMarker,
             SUPABASE_SERVICE_ROLE_KEY: forbiddenServiceMarker,
             AIRDROP_DATABASE_URL: forbiddenDatabaseMarker,
+            AIRDROP_PROMOTION_SERVICE_URL: forbiddenPromotionMarker,
+            AIRDROP_WORKER_QUEUE_SECRET: forbiddenWorkerMarker,
           },
           timeout: 25_000,
         });
@@ -68,8 +72,10 @@ describe('review browser client production bundle', () => {
       }).toEqual({ sessionRuntime: true, apiRuntime: true, securityApiRuntime: true });
       expect(bundle?.includes(forbiddenServiceMarker)).toBe(false);
       expect(bundle?.includes(forbiddenDatabaseMarker)).toBe(false);
-      expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL/);
-      expect(bundle).not.toMatch(/createSecurityReviewRepository|postgres|internalNote|evidenceLocator|rawPayload/);
+      expect(bundle?.includes(forbiddenPromotionMarker)).toBe(false);
+      expect(bundle?.includes(forbiddenWorkerMarker)).toBe(false);
+      expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL|AIRDROP_PROMOTION_SERVICE_URL|AIRDROP_WORKER_QUEUE_SECRET/);
+      expect(bundle).not.toMatch(/createSecurityReviewRepository|createSecurityPublicRepository|postgres|internalNote|evidenceLocator|rawPayload/);
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }

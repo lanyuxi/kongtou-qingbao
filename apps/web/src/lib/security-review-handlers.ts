@@ -43,9 +43,8 @@ const candidateListResponseSchema = createApiSuccessSchema(z.strictObject({
   version: z.literal(1), items: z.array(reviewerSecurityCandidateListItemSchema),
 }));
 const candidateDetailResponseSchema = createApiSuccessSchema(reviewerSecurityCandidateDetailSchema);
-const candidateMutationResponseSchema = createApiSuccessSchema(z.union([
-  manualReceiptSchema, securityCandidateReviewReceiptV1Schema,
-]));
+const manualCandidateResponseSchema = createApiSuccessSchema(manualReceiptSchema);
+const candidateReviewResponseSchema = createApiSuccessSchema(securityCandidateReviewReceiptV1Schema);
 const incidentListResponseSchema = createApiSuccessSchema(z.strictObject({
   version: z.literal(1), items: z.array(reviewerSecurityIncidentListItemSchema),
 }));
@@ -80,7 +79,7 @@ export function createSecurityCandidateSubmitHandler(deps: SecurityReviewHandler
     if (key === null || command === null) return errorResponse(400, 'invalid_request', requestId);
     try {
       const result = await deps.reviews.submitManualCandidate({ accessToken: token, idempotencyKey: key, command });
-      return Response.json(candidateMutationResponseSchema.parse({ ok: true, data: result, meta: { requestId, nextCursor: null } }));
+      return Response.json(manualCandidateResponseSchema.parse({ ok: true, data: result, meta: { requestId, nextCursor: null } }));
     } catch (error) { return repositoryError(error, requestId, 'security_persistence_failed'); }
   };
 }
@@ -100,7 +99,7 @@ export function createSecurityCandidateReviewHandler(deps: SecurityReviewHandler
     if (key === null || !id.success || command === null) return errorResponse(400, 'invalid_request', requestId);
     try {
       const result = await deps.reviews.reviewCandidate({ accessToken: token, candidateId: id.data, idempotencyKey: key, command });
-      return Response.json(candidateMutationResponseSchema.parse({ ok: true, data: result, meta: { requestId, nextCursor: null } }));
+      return Response.json(candidateReviewResponseSchema.parse({ ok: true, data: result, meta: { requestId, nextCursor: null } }));
     } catch (error) { return repositoryError(error, requestId, 'security_persistence_failed'); }
   };
 }
