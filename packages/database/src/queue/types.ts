@@ -36,7 +36,7 @@ export interface DurableCollectionQueueRepository {
   deadLetter(fence: LeaseFence, result: QueueFailure, now: Date): Promise<void>;
   cancel(
     fence: LeaseFence,
-    resultCode: 'source_ineligible',
+    resultCode: 'source_ineligible' | 'source_security_blocked',
     now: Date,
   ): Promise<void>;
   health(now: Date): Promise<QueueHealthSnapshot>;

@@ -45,6 +45,7 @@ describe('collect source contracts', () => {
     'timeout',
     'http_error',
     'invalid_feed',
+    'security_blocked',
     'persistence_failed',
   ])('accepts stable outcome %s', (outcome) => {
     expect(collectionOutcomeSchema.parse(outcome)).toBe(outcome);

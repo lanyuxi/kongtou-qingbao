@@ -35,6 +35,7 @@ export const collectionJobTriggerSchema = z.enum(['scheduled', 'manual']);
 export const queueResultCodeSchema = z.enum([
   ...collectionOutcomeSchema.options,
   'source_ineligible',
+  'source_security_blocked',
   'queue_persistence_failed',
   'lease_fence_lost',
   'invalid_queue_runtime_configuration',

@@ -113,6 +113,7 @@ describe('durable collection queue contracts', () => {
     expect(sourceScheduleCommandTypeSchema.parse('resume')).toBe('resume');
     expect(collectionJobTriggerSchema.parse('manual')).toBe('manual');
     expect(queueResultCodeSchema.parse('source_ineligible')).toBe('source_ineligible');
+    expect(queueResultCodeSchema.parse('source_security_blocked')).toBe('source_security_blocked');
     expect(durableJobStateSchema.safeParse('running').success).toBe(false);
     expect(queueResultCodeSchema.safeParse('unexpected').success).toBe(false);
 

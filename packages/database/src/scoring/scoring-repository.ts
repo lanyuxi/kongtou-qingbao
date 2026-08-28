@@ -1,5 +1,5 @@
 import type { Recommendation, ScoringProvenance, SignalVerification } from '@airdrop/contracts';
-import type { Sql } from 'postgres';
+import type { Sql, TransactionSql } from 'postgres';
 
 export interface ScoringSignalRecord {
   readonly signalId: string;
@@ -38,10 +38,22 @@ export interface RecordProjectScoreInput {
   readonly linkedSignalIds: readonly string[];
 }
 
-export interface RecordProjectScoreResult {
-  readonly projectScoreId: string;
-  readonly created: boolean;
-}
+export type RecordProjectScoreResult =
+  | {
+      readonly projectScoreId: string;
+      readonly created: true;
+      readonly skippedReason: null;
+    }
+  | {
+      readonly projectScoreId: string;
+      readonly created: false;
+      readonly skippedReason: null;
+    }
+  | {
+      readonly projectScoreId: null;
+      readonly created: false;
+      readonly skippedReason: 'security_restricted';
+    };
 
 export class ScoringPersistenceError extends Error {
   readonly code = 'scoring_persistence_failed' as const;
@@ -78,7 +90,35 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
           join public.projects as project on project.id = signal.project_id
           where signal.lifecycle = 'published'
             and project.lifecycle in ('active', 'rumored')
+            and public.current_security_target_posture('project', signal.project_id) = 'clear'
             and public.signal_has_valid_evidence(signal.id)
+            and not exists (
+              select 1
+              from public.signal_evidence_links as security_link
+              join public.evidence as security_evidence
+                on security_evidence.id = security_link.evidence_id
+              join public.raw_items as security_raw
+                on security_raw.id = security_evidence.raw_item_id
+                and security_raw.project_id = signal.project_id
+                and security_raw.source_id = security_evidence.source_id
+              left join public.discovered_items as security_discovery
+                on security_discovery.id = security_evidence.discovered_item_id
+              where security_link.signal_id = signal.id
+                and public.current_security_target_posture(
+                  'source', security_evidence.source_id
+                ) = 'caution'
+                and (
+                  security_evidence.discovered_item_id is null
+                  or (
+                    security_discovery.project_id = signal.project_id
+                    and security_discovery.source_id = security_evidence.source_id
+                    and (
+                      security_evidence.source_field <> 'discovered_summary'
+                      or security_discovery.feed_raw_item_id = security_evidence.raw_item_id
+                    )
+                  )
+                )
+            )
           group by signal.project_id, project.lifecycle
           order by min(signal.created_at) asc, signal.project_id asc
           limit ${limit}
@@ -108,7 +148,35 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
             and relation.source_id = candidate.source_id
           where signal.project_id = any(${projectIds})
             and signal.lifecycle = 'published'
+            and public.current_security_target_posture('project', signal.project_id) = 'clear'
             and public.signal_has_valid_evidence(signal.id)
+            and not exists (
+              select 1
+              from public.signal_evidence_links as security_link
+              join public.evidence as security_evidence
+                on security_evidence.id = security_link.evidence_id
+              join public.raw_items as security_raw
+                on security_raw.id = security_evidence.raw_item_id
+                and security_raw.project_id = signal.project_id
+                and security_raw.source_id = security_evidence.source_id
+              left join public.discovered_items as security_discovery
+                on security_discovery.id = security_evidence.discovered_item_id
+              where security_link.signal_id = signal.id
+                and public.current_security_target_posture(
+                  'source', security_evidence.source_id
+                ) = 'caution'
+                and (
+                  security_evidence.discovered_item_id is null
+                  or (
+                    security_discovery.project_id = signal.project_id
+                    and security_discovery.source_id = security_evidence.source_id
+                    and (
+                      security_evidence.source_field <> 'discovered_summary'
+                      or security_discovery.feed_raw_item_id = security_evidence.raw_item_id
+                    )
+                  )
+                )
+            )
           order by signal.project_id asc, signal.published_at desc nulls last, signal.id asc
         `;
 
@@ -136,6 +204,71 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
     async recordProjectScore(input) {
       return run(async () => {
         return sql.begin(async (tx) => {
+          await lockSecurityTarget(tx, 'project', input.projectId);
+          const evidenceRows = await tx<readonly { signal_id: string; source_id: string }[]>`
+            select distinct signal.id as signal_id, evidence_record.source_id
+            from public.signals as signal
+            join public.signal_evidence_links as evidence_link
+              on evidence_link.signal_id = signal.id
+            join public.evidence as evidence_record
+              on evidence_record.id = evidence_link.evidence_id
+            join public.raw_items as raw_item
+              on raw_item.id = evidence_record.raw_item_id
+              and raw_item.project_id = signal.project_id
+              and raw_item.source_id = evidence_record.source_id
+            left join public.discovered_items as discovered_item
+              on discovered_item.id = evidence_record.discovered_item_id
+            where signal.project_id = ${input.projectId}::uuid
+              and signal.id = any(${input.linkedSignalIds}::uuid[])
+              and signal.lifecycle = 'published'
+              and (
+                evidence_record.discovered_item_id is null
+                or (
+                  discovered_item.project_id = signal.project_id
+                  and discovered_item.source_id = evidence_record.source_id
+                  and (
+                    evidence_record.source_field <> 'discovered_summary'
+                    or discovered_item.feed_raw_item_id = evidence_record.raw_item_id
+                  )
+                )
+              )
+            order by signal.id asc, evidence_record.source_id asc
+          `;
+          const requiredSignalIds = new Set(input.linkedSignalIds);
+          const sourceIds = [...new Set(evidenceRows.map((row) => row.source_id))].sort();
+          for (const sourceId of sourceIds) {
+            await lockSecurityTarget(tx, 'source', sourceId);
+          }
+          const projectPosture = await loadSecurityPosture(tx, 'project', input.projectId);
+          const sourcePostureEntries = await Promise.all(
+            sourceIds.map(async (sourceId) => [
+              sourceId,
+              await loadSecurityPosture(tx, 'source', sourceId),
+            ] as const),
+          );
+          const sourcePostures = new Map(sourcePostureEntries);
+          const evidenceSourcesBySignal = new Map<string, Set<string>>();
+          for (const row of evidenceRows) {
+            const sources = evidenceSourcesBySignal.get(row.signal_id) ?? new Set<string>();
+            sources.add(row.source_id);
+            evidenceSourcesBySignal.set(row.signal_id, sources);
+          }
+          const evidenceRestricted = [...requiredSignalIds].some((signalId) => {
+            const postures = [...(evidenceSourcesBySignal.get(signalId) ?? [])]
+              .map((sourceId) => sourcePostures.get(sourceId));
+            return !postures.includes('clear') || postures.includes('caution');
+          });
+          if (
+            projectPosture !== 'clear'
+            || evidenceRestricted
+          ) {
+            return {
+              projectScoreId: null,
+              created: false,
+              skippedReason: 'security_restricted',
+            };
+          }
+
           const inserted = await tx`
             insert into public.project_scores (
               project_id, model_version, input_version,
@@ -162,7 +295,7 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
             if (existingRow === undefined) {
               throw new ScoringPersistenceError();
             }
-            return { projectScoreId: existingRow.id, created: false };
+            return { projectScoreId: existingRow.id, created: false, skippedReason: null };
           }
 
           const projectScoreId = insertedRow.id;
@@ -183,11 +316,41 @@ export function createScoringRepository(sql: Sql): ScoringRepository {
               values (${projectScoreId}, ${signalId})
             `;
           }
-          return { projectScoreId, created: true };
+          return { projectScoreId, created: true, skippedReason: null };
         });
       });
     },
   };
+}
+
+type SecurityTargetType = 'project' | 'source';
+type SecurityPosture = 'clear' | 'caution' | 'blocked';
+
+async function lockSecurityTarget(
+  sql: TransactionSql,
+  targetType: SecurityTargetType,
+  targetId: string,
+): Promise<void> {
+  await sql`
+    select pg_catalog.pg_advisory_xact_lock(
+      public.security_target_lock_key_v1(${targetType}, ${targetId}::uuid)
+    )
+  `;
+}
+
+async function loadSecurityPosture(
+  sql: TransactionSql,
+  targetType: SecurityTargetType,
+  targetId: string,
+): Promise<SecurityPosture> {
+  const rows = await sql<readonly { posture: string }[]>`
+    select public.current_security_target_posture(${targetType}, ${targetId}::uuid) as posture
+  `;
+  const posture = rows[0]?.posture;
+  if (posture !== 'clear' && posture !== 'caution' && posture !== 'blocked') {
+    throw new ScoringPersistenceError();
+  }
+  return posture;
 }
 
 type ScoringSignalRow = Record<string, unknown>;

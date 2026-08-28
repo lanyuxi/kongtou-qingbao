@@ -62,6 +62,11 @@ async function settle(
   resultCode: CollectionOutcome,
 ): Promise<void> {
   const now = deps.clock.now();
+  if (resultCode === 'security_blocked') {
+    await deps.repository.cancel(fence, 'source_security_blocked', now);
+    deps.logger.info({ event: 'collection_job_canceled', jobId: job.jobId, resultCode: 'source_security_blocked' });
+    return;
+  }
   const failure: QueueFailure = { resultCode, detail: null };
   const classification = classifyCollectionOutcome(resultCode);
   if (classification === 'succeeded') {

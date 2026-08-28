@@ -16,6 +16,7 @@ import type {
   SourceCollectionContext,
   SourceCollectionRepository,
 } from '@airdrop/database/collection-worker';
+import { SourceSecurityBlockedError } from '@airdrop/database/collection-worker';
 import {
   CollectionContentPolicyError,
   CollectionNetworkPolicyError,
@@ -341,8 +342,11 @@ export function createCollectSource(
         rawItem,
         storageOutcome === 'unchanged_content' ? latest?.id ?? null : null,
       );
-    } catch {
+    } catch (error) {
       attemptId ??= dependencies.ids.generate();
+      if (error instanceof SourceSecurityBlockedError) {
+        return buildResult(job, attemptId, 'security_blocked', null);
+      }
       return buildResult(job, attemptId, 'persistence_failed', null);
     }
   };
@@ -521,7 +525,10 @@ async function collectArticle(input: {
   };
   try {
     await input.dependencies.repository.commitArticleOutcome({ attempt, rawItem, discovery: successor });
-  } catch {
+  } catch (error) {
+    if (error instanceof SourceSecurityBlockedError) {
+      throw error;
+    }
     const persistenceAttempt: CollectionAttemptInput = {
       ...attempt,
       id: input.dependencies.ids.generate(),
@@ -547,7 +554,10 @@ async function collectArticle(input: {
         rawItem: null,
         discovery: persistenceSuccessor,
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof SourceSecurityBlockedError) {
+        throw error;
+      }
       // Persistence itself can fail; the next article still proceeds.
     }
   }
@@ -603,7 +613,10 @@ async function commitArticlePersistenceFailure(
         articleRawItemId: null,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof SourceSecurityBlockedError) {
+      throw error;
+    }
     // Persistence itself failed; the next article still proceeds.
   }
 }

@@ -20,7 +20,7 @@ function createMockRepository(projects: readonly ScoringProjectInput[]): {
     },
     async recordProjectScore(input) {
       recorded.push(input);
-      return { projectScoreId: 'aaaaaaaa-0000-4000-8000-000000000000', created: true };
+      return { projectScoreId: 'aaaaaaaa-0000-4000-8000-000000000000', created: true, skippedReason: null };
     },
   };
   return { repository, recorded };
@@ -53,7 +53,7 @@ describe('runScoringOnce', () => {
       now: () => new Date('2026-08-15T00:00:00.000Z'),
     });
 
-    expect(summary).toEqual({ projectsScored: 1, projectsSkipped: 0, duplicatesSkipped: 0 });
+    expect(summary).toEqual({ projectsScored: 1, projectsSkipped: 0, duplicatesSkipped: 0, securitySkipped: 0 });
     expect(recorded).toHaveLength(1);
     const record = recorded[0];
     expect(record?.modelVersion).toBe(SCORING_MODEL_VERSION);
@@ -113,7 +113,7 @@ describe('runScoringOnce', () => {
         ];
       },
       async recordProjectScore() {
-        return { projectScoreId: 'aaaaaaaa-0000-4000-8000-000000000000', created: false };
+        return { projectScoreId: 'aaaaaaaa-0000-4000-8000-000000000000', created: false, skippedReason: null };
       },
     };
 
@@ -123,7 +123,43 @@ describe('runScoringOnce', () => {
       now: () => new Date('2026-08-15T00:00:00.000Z'),
     });
 
-    expect(summary).toEqual({ projectsScored: 0, projectsSkipped: 0, duplicatesSkipped: 1 });
+    expect(summary).toEqual({ projectsScored: 0, projectsSkipped: 0, duplicatesSkipped: 1, securitySkipped: 0 });
+  });
+
+  it('counts a security-restricted persistence race separately', async () => {
+    const fixture = createMockRepository([
+      {
+        projectId,
+        projectLifecycle: 'active',
+        signals: [
+          {
+            signalId: '11111111-1111-4111-8111-111111111111',
+            verification: 'unverified',
+            confidence: 80,
+            publishedAt: '2026-08-10T00:00:00.000Z',
+            expiresAt: null,
+            provenance: 'third_party',
+          },
+        ],
+      },
+    ]);
+    fixture.repository.recordProjectScore = async () => ({
+      projectScoreId: null,
+      created: false,
+      skippedReason: 'security_restricted',
+    });
+
+    const summary = await runScoringOnce({
+      repository: fixture.repository,
+      now: () => new Date('2026-08-15T00:00:00.000Z'),
+    });
+
+    expect(summary).toEqual({
+      projectsScored: 0,
+      projectsSkipped: 0,
+      duplicatesSkipped: 0,
+      securitySkipped: 1,
+    });
   });
 
   it('passes the project limit through to the repository', async () => {

@@ -13,6 +13,7 @@ export interface ScoringRunSummary {
   readonly projectsScored: number;
   readonly projectsSkipped: number;
   readonly duplicatesSkipped: number;
+  readonly securitySkipped: number;
 }
 
 export const DEFAULT_MAX_SCORING_PROJECTS = 25;
@@ -26,6 +27,7 @@ export async function runScoringOnce(ports: ScoringRunnerPorts): Promise<Scoring
     projectsScored: 0,
     projectsSkipped: 0,
     duplicatesSkipped: 0,
+    securitySkipped: 0,
   };
 
   for (const input of inputs) {
@@ -73,7 +75,9 @@ export async function runScoringOnce(ports: ScoringRunnerPorts): Promise<Scoring
       linkedSignalIds: result.linkedSignalIds,
     });
 
-    if (record.created) {
+    if (record.skippedReason === 'security_restricted') {
+      summary.securitySkipped += 1;
+    } else if (record.created) {
       summary.projectsScored += 1;
     } else {
       summary.duplicatesSkipped += 1;

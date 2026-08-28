@@ -276,6 +276,20 @@ describe('DurableCollectionQueueRepository', () => {
     ).rejects.toBeInstanceOf(DurableQueuePersistenceError);
   });
 
+  it('forwards the sanitized source-security cancellation code', async () => {
+    const client = new RecordingClient([[{ canceled_job_id: jobId }]]);
+    const repository = createDurableCollectionQueueRepositoryFromClient(client);
+
+    await repository.cancel(fence, 'source_security_blocked', now);
+
+    expect(client.calls).toEqual([
+      {
+        functionName: 'cancel_collection_job',
+        args: { ...fenceArgs(), result_code: 'source_security_blocked' },
+      },
+    ]);
+  });
+
   it('strictly maps queue health and eligibility results', async () => {
     const client = new RecordingClient([[
       {

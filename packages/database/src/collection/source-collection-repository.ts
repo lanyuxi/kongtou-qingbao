@@ -1,4 +1,9 @@
-import { collectSourceResultSchema, type CollectSourceResult } from '@airdrop/contracts';
+import {
+  collectSourceResultSchema,
+  type CollectSourceResult,
+  type SecurityPosture,
+  type SecurityTargetType,
+} from '@airdrop/contracts';
 import type { Sql, TransactionSql } from 'postgres';
 
 import type { Database } from '../generated/database.types.js';
@@ -18,6 +23,8 @@ type CollectionAttemptRow = Database['public']['Tables']['collection_attempts'][
 
 export interface CollectionTransaction {
   setCollectionWorkerRole(): Promise<void>;
+  lockSecurityTarget(targetType: SecurityTargetType, targetId: string): Promise<void>;
+  loadSecurityPosture(targetType: SecurityTargetType, targetId: string): Promise<SecurityPosture>;
   lockIdempotencyKey(idempotencyKey: string): Promise<void>;
   loadContext(projectId: string, sourceId: string): Promise<SourceCollectionContext | null>;
   findCommitted(idempotencyKey: string): Promise<CollectSourceResult | null>;
@@ -37,6 +44,15 @@ export class SourceCollectionPersistenceError extends Error {
   constructor(message: 'persistence_failed') {
     super(message);
     this.name = 'SourceCollectionPersistenceError';
+  }
+}
+
+export class SourceSecurityBlockedError extends Error {
+  readonly code = 'source_security_blocked' as const;
+
+  constructor() {
+    super('source_security_blocked');
+    this.name = 'SourceSecurityBlockedError';
   }
 }
 
@@ -62,6 +78,9 @@ export function createSourceCollectionRepositoryFromTransactions(
         return work(transaction);
       });
     } catch (cause) {
+      if (cause instanceof SourceSecurityBlockedError) {
+        throw cause;
+      }
       if (process.env.AIRDROP_COLLECTION_DEBUG === '1') {
         console.error('collection_persistence_error', cause);
       }
@@ -84,6 +103,7 @@ export function createSourceCollectionRepositoryFromTransactions(
     commitEndpoint,
     commitFeed: (input) =>
       run(async (transaction) => {
+        await assertSourceSecurityWritable(transaction, input.attempt.sourceId);
         const committed = await findForCommit(transaction, input.attempt);
         if (committed !== null) {
           if (committed.rawItemId === null) {
@@ -110,6 +130,7 @@ export function createSourceCollectionRepositoryFromTransactions(
     commitArticleOutcome: (input) =>
       run(async (transaction) => {
         validateArticleRawItemReference(input);
+        await assertSourceSecurityWritable(transaction, input.attempt.sourceId);
         const committed = await findForCommit(transaction, input.attempt);
         if (committed !== null) {
           return;
@@ -152,6 +173,7 @@ async function commitAttempt(
   existingRawItemId: string | null,
 ): Promise<CollectSourceResult> {
   validateEndpointRawItemReference(attempt, rawItem, existingRawItemId);
+  await assertSourceSecurityWritable(transaction, attempt.sourceId);
   const committed = await findForCommit(transaction, attempt);
   if (committed !== null) {
     return committed;
@@ -159,6 +181,16 @@ async function commitAttempt(
   const rawItemId = rawItem === null ? existingRawItemId : await transaction.insertRawItem(rawItem);
   await transaction.insertAttempt(attempt, rawItemId);
   return buildResult(attempt, rawItemId);
+}
+
+async function assertSourceSecurityWritable(
+  transaction: CollectionTransaction,
+  sourceId: string,
+): Promise<void> {
+  await transaction.lockSecurityTarget('source', sourceId);
+  if (await transaction.loadSecurityPosture('source', sourceId) === 'blocked') {
+    throw new SourceSecurityBlockedError();
+  }
 }
 
 function validateEndpointRawItemReference(
@@ -209,6 +241,25 @@ function createPostgresTransaction(sql: TransactionSql): CollectionTransaction {
   return {
     setCollectionWorkerRole: async () => {
       await sql`set local role collection_worker`;
+    },
+    lockSecurityTarget: async (targetType, targetId) => {
+      await sql`
+        select pg_catalog.pg_advisory_xact_lock(
+          public.security_target_lock_key_v1(${targetType}, ${targetId}::uuid)
+        )
+      `;
+    },
+    loadSecurityPosture: async (targetType, targetId) => {
+      const rows = await sql<readonly { posture: string }[]>`
+        select public.current_security_target_posture(
+          ${targetType}, ${targetId}::uuid
+        ) as posture
+      `;
+      const posture = rows[0]?.posture;
+      if (posture !== 'clear' && posture !== 'caution' && posture !== 'blocked') {
+        throw new Error('invalid_security_posture');
+      }
+      return posture;
     },
     lockIdempotencyKey: async (idempotencyKey) => {
       await sql`select pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${idempotencyKey}, 0))`;

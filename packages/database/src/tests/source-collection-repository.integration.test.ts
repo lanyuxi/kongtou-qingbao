@@ -17,6 +17,12 @@ const discoveryId = '81000000-0000-4000-8000-000000000003';
 const successorId = '81000000-0000-4000-8000-000000000004';
 const articleAttemptId = '81000000-0000-4000-8000-000000000005';
 const articleRawItemId = '81000000-0000-4000-8000-000000000006';
+const securityEvidenceRawItemId = '81000000-0000-4000-8000-000000000007';
+const securityEvidenceId = '81000000-0000-4000-8000-000000000008';
+const projectIncidentId = '81000000-0000-4000-8000-000000000030';
+const sourceCautionIncidentId = '81000000-0000-4000-8000-000000000031';
+const sourceBlockIncidentId = '81000000-0000-4000-8000-000000000032';
+const sourceRaceIncidentId = '81000000-0000-4000-8000-000000000033';
 const workerRole = 'source_collection_repository_test_worker';
 const workerPassword = 'source-collection-repository-test-only';
 
@@ -28,6 +34,9 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
   const worker = integrationDatabaseUrl === undefined
     ? null
     : postgres(integrationDatabaseUrl, { max: 1, user: workerRole, password: workerPassword });
+  const blocker = integrationDatabaseUrl === undefined
+    ? null
+    : postgres(integrationDatabaseUrl, { max: 1 });
   const repository = worker === null ? null : createSourceCollectionRepository(worker);
 
   beforeAll(async () => {
@@ -70,12 +79,13 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
   });
 
   afterAll(async () => {
-    if (owner === null || worker === null) return;
+    if (owner === null || worker === null || blocker === null) return;
     try {
       await removeFixtures(owner);
     } finally {
       await worker.end({ timeout: 5 });
       try {
+        await blocker.end({ timeout: 5 });
         await dropWorkerRole(owner);
       } finally {
         await owner.end({ timeout: 5 });
@@ -223,6 +233,110 @@ describeIntegration('SourceCollectionRepository PostgreSQL integration', () => {
       await sql`update public.raw_items set raw_text = 'changed' where id = ${rawItemId}::uuid`;
     })).rejects.toThrow();
   });
+
+  it('allows project blocks and source caution, resumes after clear, and blocks source writes', async () => {
+    if (repository === null || owner === null) throw new Error('Database integration environment is unavailable.');
+    await insertSecurityEvidence(owner);
+    await insertIncident(owner, {
+      incidentId: projectIncidentId,
+      decisionId: '81000000-0000-4000-8000-000000000040',
+      targetType: 'project',
+      targetId: projectId,
+      posture: 'blocked',
+    });
+
+    await expect(repository.commitEndpoint(securityEndpoint('041'))).resolves.toMatchObject({
+      outcome: 'stored_new_content',
+    });
+
+    await insertIncident(owner, {
+      incidentId: sourceCautionIncidentId,
+      decisionId: '81000000-0000-4000-8000-000000000042',
+      targetType: 'source',
+      targetId: sourceId,
+      posture: 'caution',
+    });
+    await expect(repository.commitEndpoint(securityEndpoint('043'))).resolves.toMatchObject({
+      outcome: 'stored_new_content',
+    });
+    await resolveIncident(owner, sourceCautionIncidentId, '81000000-0000-4000-8000-000000000044');
+    await expect(repository.commitEndpoint(securityEndpoint('045'))).resolves.toMatchObject({
+      outcome: 'stored_new_content',
+    });
+
+    await insertIncident(owner, {
+      incidentId: sourceBlockIncidentId,
+      decisionId: '81000000-0000-4000-8000-000000000046',
+      targetType: 'source',
+      targetId: sourceId,
+      posture: 'blocked',
+    });
+    await expect(repository.commitEndpoint(securityEndpoint('047'))).rejects.toMatchObject({
+      code: 'source_security_blocked',
+    });
+    const blockedRows = await owner`
+      select id from public.raw_items
+      where id = ${securityRawId('047')}::uuid
+    `;
+    expect(blockedRows).toHaveLength(0);
+  });
+
+  it('loses a real persistence race when a source block commits before its lock is released', async () => {
+    if (repository === null || owner === null || blocker === null) {
+      throw new Error('Database integration environment is unavailable.');
+    }
+    await resolveIncident(owner, sourceBlockIncidentId, '81000000-0000-4000-8000-000000000048');
+    await blocker.unsafe('begin');
+    let transactionOpen = true;
+    let pendingCommit: ReturnType<typeof repository.commitEndpoint> | null = null;
+    try {
+      await blocker`
+        select pg_catalog.pg_advisory_xact_lock(
+          public.security_target_lock_key_v1('source', ${sourceId}::uuid)
+        )
+      `;
+      pendingCommit = repository.commitEndpoint(securityEndpoint('049'));
+      await insertIncident(blocker, {
+        incidentId: sourceRaceIncidentId,
+        decisionId: '81000000-0000-4000-8000-000000000050',
+        targetType: 'source',
+        targetId: sourceId,
+        posture: 'blocked',
+      });
+      await blocker.unsafe('commit');
+      transactionOpen = false;
+      await expect(pendingCommit).rejects.toMatchObject({ code: 'source_security_blocked' });
+    } catch (error) {
+      if (transactionOpen) await blocker.unsafe('rollback');
+      throw error;
+    } finally {
+      await pendingCommit?.catch(() => undefined);
+    }
+
+    const blockedRows = await owner`
+      select id from public.raw_items
+      where id = ${securityRawId('049')}::uuid
+    `;
+    expect(blockedRows).toHaveLength(0);
+  });
+
+  it('retains an ordinary write that committed before a later source block', async () => {
+    if (repository === null || owner === null) throw new Error('Database integration environment is unavailable.');
+    await resolveIncident(owner, sourceRaceIncidentId, '81000000-0000-4000-8000-000000000051');
+    const committed = await repository.commitEndpoint(securityEndpoint('052'));
+    await insertIncident(owner, {
+      incidentId: '81000000-0000-4000-8000-000000000053',
+      decisionId: '81000000-0000-4000-8000-000000000054',
+      targetType: 'source',
+      targetId: sourceId,
+      posture: 'blocked',
+    });
+
+    const rows = await owner`
+      select id::text from public.raw_items where id = ${committed.rawItemId}::uuid
+    `;
+    expect(rows).toEqual([{ id: committed.rawItemId }]);
+  });
 });
 
 function endpointAttempt(): CollectionAttemptInput {
@@ -260,9 +374,120 @@ function discoveryInput(feedRawItemId: string): DiscoveredItemInput {
   };
 }
 
+function securityEndpoint(suffix: string) {
+  const attempt = `81000000-0000-4000-8000-${suffix.padStart(12, '0')}`;
+  const raw = securityRawId(suffix);
+  const second = String(Number(suffix) % 60).padStart(2, '0');
+  return {
+    attempt: {
+      ...endpointAttempt(),
+      id: attempt,
+      idempotencyKey: `repository:security:${suffix}`,
+      completedAt: `2026-08-12T00:01:${second}.000Z`,
+      collectedAt: `2026-08-12T00:01:${second}.000Z`,
+    },
+    rawItem: {
+      ...rawItem(),
+      id: raw,
+      sha256: suffix.padEnd(64, 'a'),
+      collectedAt: `2026-08-12T00:01:${second}.000Z`,
+    },
+    existingRawItemId: null,
+  } satisfies Parameters<ReturnType<typeof createSourceCollectionRepository>['commitEndpoint']>[0];
+}
+
+function securityRawId(suffix: string): string {
+  return `81000000-0000-4000-8001-${suffix.padStart(12, '0')}`;
+}
+
+async function insertSecurityEvidence(sql: postgres.Sql): Promise<void> {
+  await sql`
+    insert into public.raw_items (
+      id, project_id, source_id, logical_url, final_url, content_kind,
+      media_type, raw_text, sha256, collected_at
+    ) values (
+      ${securityEvidenceRawItemId}::uuid, ${projectId}::uuid, ${sourceId}::uuid,
+      'https://repository-collection.example/security-evidence',
+      'https://repository-collection.example/security-evidence',
+      'official_html', 'text/html', 'Repository security evidence fixture text.',
+      ${'d'.repeat(64)}, '2026-08-12T00:00:10.000Z'
+    )
+  `;
+  await sql`
+    insert into public.evidence (
+      id, source_id, raw_item_id, source_field, quote_text,
+      normalized_quote_sha256, verified_at, created_at
+    ) values (
+      ${securityEvidenceId}::uuid, ${sourceId}::uuid, ${securityEvidenceRawItemId}::uuid,
+      'article_raw_text', 'Repository security evidence fixture text.',
+      public.evidence_quote_sha256_v1('Repository security evidence fixture text.'),
+      '2026-08-12T00:00:11.000Z', '2026-08-12T00:00:11.000Z'
+    )
+  `;
+}
+
+async function insertIncident(sql: postgres.Sql, input: {
+  readonly incidentId: string;
+  readonly decisionId: string;
+  readonly targetType: 'project' | 'source';
+  readonly targetId: string;
+  readonly posture: 'caution' | 'blocked';
+}): Promise<void> {
+  if (input.targetType === 'project') {
+    await sql`
+      insert into public.security_incidents (id, target_type, project_id, category)
+      values (${input.incidentId}::uuid, 'project', ${input.targetId}::uuid, 'source_compromise')
+    `;
+  } else {
+    await sql`
+      insert into public.security_incidents (id, target_type, source_id, category)
+      values (${input.incidentId}::uuid, 'source', ${input.targetId}::uuid, 'source_compromise')
+    `;
+  }
+  await sql`
+    insert into public.security_incident_decisions (
+      id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+      resulting_posture, resulting_severity, public_summary, evidence_id
+    ) values (
+      ${input.decisionId}::uuid, ${input.incidentId}::uuid, 1, ${reviewerId}::uuid,
+      'open', 'precautionary_evidence', ${input.posture}, 'high',
+      'Repository security restriction fixture.', ${securityEvidenceId}::uuid
+    )
+  `;
+}
+
+async function resolveIncident(
+  sql: postgres.Sql,
+  incidentId: string,
+  decisionId: string,
+): Promise<void> {
+  await sql`
+    insert into public.security_incident_decisions (
+      id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+      resulting_posture, resulting_severity, public_summary, evidence_id
+    ) values (
+      ${decisionId}::uuid, ${incidentId}::uuid, 2, ${reviewerId}::uuid,
+      'resolve', 'mitigation_verified', null, 'low',
+      'Repository security restriction resolved.', ${securityEvidenceId}::uuid
+    )
+  `;
+}
+
 async function removeFixtures(sql: postgres.Sql): Promise<void> {
   await sql.begin(async (transaction) => {
     await transaction`set local session_replication_role = replica`;
+    await transaction`
+      delete from public.security_incident_decisions
+      where incident_id in (
+        select id from public.security_incidents
+        where project_id = ${projectId}::uuid or source_id = ${sourceId}::uuid
+      )
+    `;
+    await transaction`
+      delete from public.security_incidents
+      where project_id = ${projectId}::uuid or source_id = ${sourceId}::uuid
+    `;
+    await transaction`delete from public.evidence where source_id = ${sourceId}::uuid`;
     await transaction`delete from public.discovered_items where project_id = ${projectId}::uuid`;
     await transaction`delete from public.collection_attempts where project_id = ${projectId}::uuid`;
     await transaction`delete from public.raw_items where project_id = ${projectId}::uuid`;
