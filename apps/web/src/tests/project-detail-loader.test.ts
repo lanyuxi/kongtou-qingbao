@@ -22,6 +22,7 @@ const projectWithScore: ProjectDetail = {
   primaryChain: 'Ethereum',
   officialWebsiteUrl: 'https://demo.example.test',
   updatedAt: '2026-08-24T00:00:00.000Z',
+  securityPosture: 'clear',
   latestScore: {
     id: scoreId,
     modelVersion: 'score-model-v1',

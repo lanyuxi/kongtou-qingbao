@@ -1,6 +1,12 @@
 export { createBrowserSupabaseClient, type BrowserSupabaseClientOptions } from './client.js';
 export type { Database, Json } from './generated/database.types.js';
 export {
+  createSecurityPublicRepository,
+  SecurityPublicProjectionQueryError,
+  type PublicBlockedProjectQuery,
+  type SecurityPublicRepository,
+} from './repositories/security-public-repository.js';
+export {
   createExtractionRepository,
   ExtractionPersistenceError,
   type ExtractionCandidateInput,
@@ -31,6 +37,7 @@ export {
   type ProjectSignal,
   type SignalRow,
   type SignalVerification,
+  type SecurityPosture,
 } from './repositories/project-repository.js';
 export {
   createScoringRepository,

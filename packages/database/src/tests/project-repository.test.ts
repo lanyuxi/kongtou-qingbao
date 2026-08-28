@@ -7,7 +7,7 @@ import {
 } from '../repositories/project-repository.js';
 import type { Database } from '../generated/database.types.js';
 
-const rows: readonly Omit<OpportunityListRow, 'security_posture'>[] = [
+const rows: readonly OpportunityListRow[] = [
   {
     project_id: '10000000-0000-4000-8000-000000000003',
     slug: 'active-later-id',
@@ -21,6 +21,7 @@ const rows: readonly Omit<OpportunityListRow, 'security_posture'>[] = [
     recommendation: 'act_now',
     calculated_at: '2026-08-09T00:00:00.000Z',
     latest_published_signal_at: '2026-08-08T00:00:00.000Z',
+    security_posture: 'clear',
   },
   {
     project_id: '10000000-0000-4000-8000-000000000001',
@@ -35,6 +36,7 @@ const rows: readonly Omit<OpportunityListRow, 'security_posture'>[] = [
     recommendation: 'watch',
     calculated_at: '2026-08-08T00:00:00.000Z',
     latest_published_signal_at: null,
+    security_posture: 'caution',
   },
 ];
 
@@ -62,6 +64,7 @@ describe('ProjectRepository.listOpportunities', () => {
         recommendation: 'act_now',
         calculatedAt: '2026-08-09T00:00:00.000Z',
         latestPublishedSignalAt: '2026-08-08T00:00:00.000Z',
+        securityPosture: 'clear',
       },
       {
         projectId: '10000000-0000-4000-8000-000000000001',
@@ -76,11 +79,15 @@ describe('ProjectRepository.listOpportunities', () => {
         recommendation: 'watch',
         calculatedAt: '2026-08-08T00:00:00.000Z',
         latestPublishedSignalAt: null,
+        securityPosture: 'caution',
       },
     ]);
     expect(client.orders).toEqual([
       ['opportunity_score', { ascending: false }],
       ['project_id', { ascending: true }],
+    ]);
+    expect(client.selections).toEqual([
+      'project_id,slug,name,summary,lifecycle,primary_chain,opportunity_score,risk_score,confidence,recommendation,calculated_at,latest_published_signal_at,security_posture',
     ]);
   });
 
@@ -137,6 +144,7 @@ const projectDetailRow = {
   score_input_version: 'seed-2026-08-14',
   score_explanation: 'Fixture sample score.',
   score_calculated_at: '2026-08-13T00:00:00.000Z',
+  security_posture: 'blocked',
 } as const;
 
 const signalRows: readonly {
@@ -174,6 +182,7 @@ describe('ProjectRepository.getProjectBySlug', () => {
       primaryChain: 'Ethereum',
       officialWebsiteUrl: 'https://demo.example.dev',
       updatedAt: '2026-08-10T00:00:00.000Z',
+      securityPosture: 'blocked',
       latestScore: {
         id: '20000000-0000-4000-8000-000000000002',
         modelVersion: 'seed-fixture-v1',
@@ -195,7 +204,7 @@ describe('ProjectRepository.getProjectBySlug', () => {
 
     expect(client.relationCalls).toEqual(['project_current_state']);
     expect(client.selections).toEqual([
-      'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at',
+      'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at,security_posture',
     ]);
   });
 
@@ -215,6 +224,17 @@ describe('ProjectRepository.getProjectBySlug', () => {
 
     expect(result?.latestScore).toBeNull();
   });
+
+  it.each(['clear', 'caution', 'blocked'] as const)(
+    'prevents the %s security posture from being omitted from a current project projection',
+    async (securityPosture) => {
+      const result = await createProjectRepository(
+        createProjectLookupClient({ ...projectDetailRow, security_posture: securityPosture }),
+      ).getProjectBySlug('demo-project');
+
+      expect(result?.securityPosture).toBe(securityPosture);
+    },
+  );
 
   it('rejects a malformed slug', async () => {
     await expect(
@@ -255,7 +275,10 @@ describe('ProjectRepository.listProjectSignals', () => {
 });
 
 function createProjectLookupClient(
-  fixtureRow: typeof projectDetailRow | { readonly opportunity_score: null } | null,
+  fixtureRow:
+    | (Omit<typeof projectDetailRow, 'security_posture'> & { readonly security_posture: string })
+    | { readonly opportunity_score: null; readonly security_posture: string }
+    | null,
 ): SupabaseClient<Database> & {
   readonly relationCalls: string[];
   readonly selections: string[];
@@ -314,15 +337,20 @@ function createSignalClient(
 }
 
 function createSupabaseClient(
-  fixtureRows: readonly Omit<OpportunityListRow, 'security_posture'>[],
+  fixtureRows: readonly OpportunityListRow[],
 ): SupabaseClient<Database> & {
   readonly orders: readonly [string, { readonly ascending: boolean }][];
   readonly orFilters: readonly string[];
+  readonly selections: readonly string[];
 } {
   const orders: [string, { readonly ascending: boolean }][] = [];
   const orFilters: string[] = [];
+  const selections: string[] = [];
   const query = {
-    select: () => query,
+    select: (columns: string) => {
+      selections.push(columns);
+      return query;
+    },
     order: (column: string, options: { readonly ascending: boolean }) => {
       orders.push([column, options]);
       return query;
@@ -334,13 +362,13 @@ function createSupabaseClient(
     range: () => query,
     then: <
       TResult1 = {
-        data: readonly Omit<OpportunityListRow, 'security_posture'>[];
+        data: readonly OpportunityListRow[];
         error: null;
       },
     >(
       onfulfilled?:
         | ((value: {
-            data: readonly Omit<OpportunityListRow, 'security_posture'>[];
+            data: readonly OpportunityListRow[];
             error: null;
           }) => TResult1 | PromiseLike<TResult1>)
         | null,
@@ -350,9 +378,11 @@ function createSupabaseClient(
   return {
     orders,
     orFilters,
+    selections,
     from: () => query,
   } as unknown as SupabaseClient<Database> & {
     readonly orders: readonly [string, { readonly ascending: boolean }][];
     readonly orFilters: readonly string[];
+    readonly selections: readonly string[];
   };
 }

@@ -16,6 +16,7 @@ export type SignalRow = Database['public']['Tables']['signals']['Row'];
 
 export type ProjectLifecycle = Database['public']['Enums']['project_lifecycle'];
 export type SignalVerification = Database['public']['Enums']['signal_verification'];
+export type SecurityPosture = 'clear' | 'caution' | 'blocked';
 
 export interface ProjectScore {
   readonly id: string;
@@ -38,6 +39,7 @@ export interface ProjectDetail {
   readonly primaryChain: string | null;
   readonly officialWebsiteUrl: string | null;
   readonly updatedAt: string;
+  readonly securityPosture: SecurityPosture;
   readonly latestScore: ProjectScore | null;
 }
 
@@ -64,6 +66,7 @@ export interface OpportunityListItem {
   readonly recommendation: Database['public']['Enums']['recommendation'];
   readonly calculatedAt: string;
   readonly latestPublishedSignalAt: string | null;
+  readonly securityPosture: SecurityPosture;
 }
 
 export interface ProjectRepository {
@@ -91,7 +94,7 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
       const query = client
         .from('opportunity_list')
         .select(
-          'project_id,slug,name,summary,lifecycle,primary_chain,opportunity_score,risk_score,confidence,recommendation,calculated_at,latest_published_signal_at',
+          'project_id,slug,name,summary,lifecycle,primary_chain,opportunity_score,risk_score,confidence,recommendation,calculated_at,latest_published_signal_at,security_posture',
         )
         .order('opportunity_score', { ascending: false })
         .order('project_id', { ascending: true });
@@ -118,7 +121,7 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
       const response = await client
         .from('project_current_state')
         .select(
-          'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at',
+          'project_id,project_score_id,slug,name,summary,lifecycle,primary_chain,official_website_url,project_updated_at,opportunity_score,risk_score,score_confidence,recommendation,score_model_version,score_input_version,score_explanation,score_calculated_at,security_posture',
         )
         .eq('slug', slug)
         .maybeSingle();
@@ -141,6 +144,7 @@ export function createProjectRepository(client: SupabaseClient<Database>): Proje
         primaryChain: row.primary_chain,
         officialWebsiteUrl: row.official_website_url,
         updatedAt: requiredString(row.project_updated_at, 'project_updated_at'),
+        securityPosture: requiredSecurityPosture(row.security_posture),
         latestScore:
           row.opportunity_score === null || row.score_calculated_at === null
             ? null
@@ -272,9 +276,7 @@ function validateOpportunityCursor(input: {
   return { afterScore: input.afterScore, afterProjectId: input.afterProjectId };
 }
 
-function mapOpportunityListRow(
-  row: Omit<OpportunityListRow, 'security_posture'>,
-): OpportunityListItem {
+function mapOpportunityListRow(row: OpportunityListRow): OpportunityListItem {
   const lifecycle = requiredString(row.lifecycle, 'lifecycle');
   if (lifecycle !== 'active' && lifecycle !== 'rumored') {
     throw new TypeError('Opportunity list returned an unsupported lifecycle.');
@@ -293,6 +295,7 @@ function mapOpportunityListRow(
     recommendation: requiredRecommendation(row.recommendation),
     calculatedAt: requiredString(row.calculated_at, 'calculated_at'),
     latestPublishedSignalAt: row.latest_published_signal_at,
+    securityPosture: requiredSecurityPosture(row.security_posture),
   };
 }
 
@@ -317,4 +320,11 @@ function requiredRecommendation(
     throw new TypeError('Opportunity list returned an invalid recommendation.');
   }
   return value;
+}
+
+function requiredSecurityPosture(value: string | null): SecurityPosture {
+  if (value === 'clear' || value === 'caution' || value === 'blocked') {
+    return value;
+  }
+  throw new TypeError('Project projection returned an invalid security_posture.');
 }

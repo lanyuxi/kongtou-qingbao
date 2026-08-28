@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Database } from '../generated/database.types.js';
 import { createProjectRepository } from '../repositories/project-repository.js';
+import { createSecurityPublicRepository } from '../repositories/security-public-repository.js';
 
 const fixtureProjectIds = [
   randomUUID(),
@@ -28,6 +29,8 @@ const fixtureScoreIds = [
   randomUUID(),
 ] as const;
 const fixtureFactorIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
+const fixtureSecurityIncidentId = randomUUID();
+const fixtureSecurityDecisionId = randomUUID();
 const fixtureSlugSuffixes = fixtureProjectIds.map((projectId) => projectId.replaceAll('-', ''));
 const fixtureSourceHost = `${fixtureSourceId}.example.invalid`;
 const disposableMarker = {
@@ -49,6 +52,18 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
     integrationEnvironment === null
       ? null
       : createProjectRepository(
+          createClient<Database>(
+            integrationEnvironment.supabaseUrl,
+            integrationEnvironment.anonKey,
+            {
+              auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+            },
+          ),
+        );
+  const publicSecurity =
+    integrationEnvironment === null
+      ? null
+      : createSecurityPublicRepository(
           createClient<Database>(
             integrationEnvironment.supabaseUrl,
             integrationEnvironment.anonKey,
@@ -360,6 +375,51 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
         fixtureScoreIds[5],
       ),
     ).toEqual([]);
+  });
+
+  it('exposes a blocked project only through anonymous safe security projections', async () => {
+    if (database === null || publicSecurity === null) {
+      throw new Error('PostgREST integration environment is unavailable.');
+    }
+
+    await database`
+      insert into public.security_incidents (id, target_type, project_id, category)
+      values (${fixtureSecurityIncidentId}::uuid, 'project', ${fixtureProjectIds[0]}::uuid, 'phishing')
+    `;
+    await database`
+      insert into public.security_incident_decisions (
+        id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+        resulting_posture, resulting_severity, public_summary, evidence_id
+      ) values (
+        ${fixtureSecurityDecisionId}::uuid, ${fixtureSecurityIncidentId}::uuid, 1,
+        '90000000-0000-4000-8000-000000000001'::uuid, 'open', 'precautionary_evidence',
+        'blocked', 'critical',
+        'A grounded phishing incident requires an immediate public participation block.',
+        ${fixtureEvidenceIds[0]}::uuid
+      )
+    `;
+
+    try {
+      const state = await publicSecurity.getProjectSecurity(fixtureProjectIds[0]);
+      const blocked = await publicSecurity.listBlockedProjects({ cursor: null, limit: 100 });
+      const row = blocked.items.find((item) => item.project.id === fixtureProjectIds[0]);
+
+      expect(state).toMatchObject({ projectId: fixtureProjectIds[0], posture: 'blocked' });
+      expect(row).toMatchObject({
+        project: { id: fixtureProjectIds[0] },
+        posture: 'blocked',
+        target: { type: 'project', id: fixtureProjectIds[0] },
+      });
+      expect(Object.keys(row ?? {}).join(',')).not.toMatch(/evidence|reviewer|note|raw|url/i);
+    } finally {
+      await database.begin(async (transaction) => {
+        await transaction`set local session_replication_role = replica`;
+        await transaction`
+          delete from public.security_incident_decisions where id = ${fixtureSecurityDecisionId}::uuid
+        `;
+        await transaction`delete from public.security_incidents where id = ${fixtureSecurityIncidentId}::uuid`;
+      });
+    }
   });
 });
 

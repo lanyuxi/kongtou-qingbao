@@ -411,6 +411,25 @@ describe('current score projection input validation and empty results', () => {
       [],
     );
   });
+
+  it('prevents a security-filtered immutable score from falling back to factor or Evidence base tables', async () => {
+    const client = createQueryRecorder({ factorRows: [], citationRows: [] });
+    const repository = createProjectRepository(client);
+
+    await expect(repository.listCurrentScoreFactors(projectId, scoreId)).resolves.toEqual([]);
+    await expect(repository.listCurrentScoreEvidenceCitations(projectId, scoreId)).resolves.toEqual([]);
+
+    expect(client.fromCalls).toEqual([
+      'project_current_score_factors',
+      'project_current_score_evidence_citations',
+    ]);
+    expect(client.filters).toEqual([
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
+    ]);
+  });
 });
 
 interface FakePostgrestError {
