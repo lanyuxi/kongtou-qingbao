@@ -816,6 +816,16 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-28 Phase 7A Task 7（fresh root gate）**：Fix Round 1 已提交为 `7b8c329 fix(database): close public security projection review gaps`。Controller 随后在 Node 22.22.2 / pnpm 11.16.0 下 fresh `pnpm verify` exit 0：contracts 133、domain 376、database 257、worker 221、web 140，共 **1,127 non-skipped / 68 gated skips**；lint、typecheck、build、placeholder 全绿。Task 7 保持 review clean / complete；下一任务为 Task 8（authenticated security BFF/routes/browser client）。生产仍未访问。
 
+**2026-08-28 Phase 7A Task 8（Step 1 plan/baseline preflight）**：用户回复“继续”，确认按已呈现的 bounded 设计进入 Task 8。Controller 复核 approved spec、计划 Task 8、既有 failed-AI-review BFF/client 模式、Task 4 `SecurityReviewRepository` 与 Task 7 `SecurityPublicRepository` 接口；candidate/incident GET+POST 路由、fresh bearer/idempotency、409 不自动重试及 public blocked cursor 的职责边界一致，无需新 ruling。现有 linked worktree `/Users/xixi/AI中心/AI中心/空投情报网站/.worktrees/phase-7a-security-ledger` / branch `codex/phase-7a-security-ledger` tracked clean，BASE `a36a9fe`。Node 22.22.2 / pnpm 11.16.0 下 Web 基线为 9 files / 140 tests PASS。下一步生成 Task 8 brief，按 TDD 先写 handler/client RED；未连接数据库、未 reset、未访问生产。
+
+**2026-08-28 Phase 7A Task 8（RED→focused GREEN）**：先新增具名 security handler/client 测试；首次 `pnpm --filter @airdrop/web test -- security-review-handlers security-review-api-client` 按预期 exit 1，两个 suite 均因待建 `security-review-handlers` / `security-review-api-client` module 缺失而失败，既有 140 tests PASS。随后最小实现 authenticated reviewer candidate/incident/indicator routes、public blocked-projects handler及 browser API client；加入 bundle runtime/isolation markers。当前 bundled runtime Node 24.19.0 / pnpm 11.19.0（与声明 Node 22 不同）下 focused handler/client/bundle gate exit 0：11 files / 167 tests PASS；typecheck exit 0。未连接数据库、未 reset、未访问生产。
+
+**2026-08-28 Phase 7A Task 8（Web gates / commit pending）**：在当前 bundled Node 24.19.0 / pnpm 11.19.0 下 full Web test 11 files / 167 tests、lint、typecheck 和 Next 16.3.0 build 均 exit 0；build route manifest 含九条新增 security BFF routes。`git diff --check` exit 0。安全自审确认 browser fixture 含 public auth/client markers，且拒绝 reviewer repository constructor、Postgres、service-role/database env 与 internal projection markers；public blocked route只构造 `SecurityPublicRepository`。未连接数据库/reset/生产。下一步仅尝试指定 atomic commit；Node 22.22.2 exact-runtime revalidation仍是环境 concern。
+
+**2026-08-28 Phase 7A Task 8（commit blocked）**：按指定 `git add … && git commit -m "feat(web): add security review bff"` 尝试提交时，linked-worktree Git 元数据拒绝创建 `/Users/xixi/AI中心/AI中心/空投情报网站/.git/worktrees/phase-7a-security-ledger/index.lock`（`Operation not permitted`）。按任务约束已停止，未尝试任何权限、索引或 worktree 规避；已验证改动仍保留为未提交工作树状态，完整报告见 Task 8 report。
+
+**2026-08-28 Phase 7A Task 8（declared-runtime controller revalidation）**：Controller 使用仓库声明的 Node 22.22.2 / pnpm 11.16.0 完成复验：focused handler/client/bundle 与 full Web 均为 11 files / 167 tests PASS，lint、顺序执行的 typecheck、Next 16.3.0 build、`git diff --check` 全部 exit 0。首次将 typecheck 与 build 并行启动时，build 重建 `.next/types` 导致 typecheck 临时缺失 `routes.js`；随后单独 typecheck 无源码修改即通过，确认是 generated-artifact race，不是实现类型错误。未连接数据库、未 reset、未访问生产。下一步精确暂存并提交 Task 8，再进行独立 code review。
+
 ---
 
 ## 9. 其他
