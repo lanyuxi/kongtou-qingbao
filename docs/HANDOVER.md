@@ -830,6 +830,10 @@ git branch -d codex/phase-6a-canonical-governance
 
 **2026-08-28 Phase 7A Task 8（Fix Round 1 RED→GREEN / controller revalidation）**：针对独立审查的三项 Important，先在精确 Node 22.22.2 / pnpm 11.16.0 下新增 cross-kind candidate receipt、非法 manual state、五条 mutation authenticated malformed body、九个 client operation strict-envelope/fresh-token、五个 mutation fresh-key/typed-409 no-retry 与 promotion/worker/server-constructor bundle marker 覆盖。focused RED exit 1：2 failed / 181 passed，manual submit 错接 review receipt、handler union schema 均错误接受对方 receipt。最小修复拆分 manual/review success schemas，manual state 使用 shared candidate-state schema，并将 client receipts 收紧为精确类型。实现代理 GREEN 后，Controller 顺序复验 focused/full Web 均为 11 files / 189 tests PASS，lint、typecheck、Next 16.3.0 build、`git diff --check` 全部 exit 0。未访问 DB/network/reset/production；下一步提交 Fix Round 1 并做 scoped re-review。
 
+**2026-08-28 Phase 7A Task 8（Fix Round 1 scoped re-review）**：修复提交为 `db05026 fix(web): tighten security review boundaries`。原独立审查代理复核 `0f303d9..db05026`，三项 Important 全部 **Resolved**：manual/review operation-specific strict receipts、九个 client operation / 五个 mutation / authenticated malformed-body 覆盖，以及 promotion/worker/两类 security repository constructor bundle isolation。新增 Critical / Important / Minor 均为 0，Assessment **Approved**。下一步 fresh 全仓 `pnpm verify`；未连接数据库、未 reset、未访问生产。
+
+**2026-08-28 Phase 7A Task 8（fresh root gate / COMPLETE）**：Node 22.22.2 / pnpm 11.16.0 下 fresh `CI=true pnpm verify` 完整 exit 0：contracts 133、domain 376、database 257、worker 221、web 189，共 **1,176 non-skipped / 68 gated skips**；lint、typecheck、build、placeholder 全绿。首次验证仅在依赖状态检查阶段因 sandbox DNS 阻断而 exit 1，尚未进入门禁；获准重跑后固定依赖全部从缓存复用（196 reused / 0 downloaded），随后完整通过。Task 8 review clean / complete；九条 security BFF routes、strict browser client 与 bundle isolation 已进入本地 Phase 7A 分支，未连接数据库、未 reset、未访问生产。下一任务是 Task 9：构建完整 reviewer security workflow UI。
+
 ---
 
 ## 9. 其他
