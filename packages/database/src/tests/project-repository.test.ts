@@ -105,6 +105,53 @@ describe('ProjectRepository.listOpportunities', () => {
     ]);
   });
 
+  it('rejects an opportunity response row with an unsafe extra field before camel-case mapping', async () => {
+    const client = createSupabaseClient([
+      { ...rows[0], internal_note: 'private reviewer-only note' },
+    ]);
+
+    await expect(
+      createProjectRepository(client).listOpportunities({
+        limit: 1,
+        afterScore: null,
+        afterProjectId: null,
+      }),
+    ).rejects.toThrow('unsafe opportunity projection');
+  });
+
+  it('rejects a malformed opportunity security posture at the strict public boundary', async () => {
+    const client = createSupabaseClient([{ ...rows[0], security_posture: 'unknown' }]);
+
+    await expect(
+      createProjectRepository(client).listOpportunities({
+        limit: 1,
+        afterScore: null,
+        afterProjectId: null,
+      }),
+    ).rejects.toThrow('unsafe opportunity projection');
+  });
+
+  it('sanitizes a failed opportunity query response', async () => {
+    const client = createSupabaseClient(rows, {
+      code: 'PGRST116',
+      message: 'response body contains private source details',
+      details: 'raw provider response',
+      hint: 'review_note=secret',
+      body: 'private body',
+    });
+
+    const error = await createProjectRepository(client)
+      .listOpportunities({ limit: 1, afterScore: null, afterProjectId: null })
+      .catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({
+      name: 'OpportunityListQueryError',
+      code: 'PGRST116',
+      message: 'Unable to read opportunities.',
+    });
+    expect(String(error)).not.toMatch(/private source|raw provider|review_note|secret|private body/i);
+  });
+
   it.each([0, 101, 1.5, Number.NaN])('rejects an invalid limit of %s', async (limit) => {
     await expect(
       createProjectRepository(createSupabaseClient(rows)).listOpportunities({
@@ -208,6 +255,38 @@ describe('ProjectRepository.getProjectBySlug', () => {
     ]);
   });
 
+  it('rejects a project response row with an unsafe extra field before camel-case mapping', async () => {
+    const client = createProjectLookupClient({
+      ...projectDetailRow,
+      reviewer_note: 'private reviewer-only note',
+    });
+
+    await expect(createProjectRepository(client).getProjectBySlug('demo-project')).rejects.toThrow(
+      'unsafe project projection',
+    );
+  });
+
+  it('sanitizes a failed project-detail query response', async () => {
+    const client = createProjectLookupClient(projectDetailRow, {
+      code: 'PGRST116',
+      message: 'response body contains private source details',
+      details: 'raw provider response',
+      hint: 'review_note=secret',
+      body: 'private body',
+    });
+
+    const error = await createProjectRepository(client)
+      .getProjectBySlug('demo-project')
+      .catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({
+      name: 'ProjectLookupQueryError',
+      code: 'PGRST116',
+      message: 'Unable to read project details.',
+    });
+    expect(String(error)).not.toMatch(/private source|raw provider|review_note|secret|private body/i);
+  });
+
   it('returns null when no project matches', async () => {
     const client = createProjectLookupClient(null);
 
@@ -217,7 +296,18 @@ describe('ProjectRepository.getProjectBySlug', () => {
   });
 
   it('reports a project without a score as scoreless', async () => {
-    const unscored = { ...projectDetailRow, opportunity_score: null, score_calculated_at: null };
+    const unscored = {
+      ...projectDetailRow,
+      project_score_id: null,
+      opportunity_score: null,
+      risk_score: null,
+      score_confidence: null,
+      recommendation: null,
+      score_model_version: null,
+      score_input_version: null,
+      score_explanation: null,
+      score_calculated_at: null,
+    };
     const client = createProjectLookupClient(unscored);
 
     const result = await createProjectRepository(client).getProjectBySlug('demo-project');
@@ -265,6 +355,19 @@ describe('ProjectRepository.listProjectSignals', () => {
     ]);
   });
 
+  it('rejects a signal response row with an unsafe extra field before camel-case mapping', async () => {
+    const client = createSignalClient([
+      { ...signalRows[0], reviewer_note: 'private reviewer-only note' },
+    ]);
+
+    await expect(
+      createProjectRepository(client).listProjectSignals(
+        '20000000-0000-4000-8000-000000000001',
+        10,
+      ),
+    ).rejects.toThrow('unsafe signal projection');
+  });
+
   it('rejects a malformed project identifier or limit', async () => {
     const repository = createProjectRepository(createSignalClient(signalRows));
     await expect(repository.listProjectSignals('not-a-uuid', 10)).rejects.toThrow(RangeError);
@@ -272,13 +375,32 @@ describe('ProjectRepository.listProjectSignals', () => {
       repository.listProjectSignals('20000000-0000-4000-8000-000000000001', 0),
     ).rejects.toThrow(RangeError);
   });
+
+  it('sanitizes a failed project-signal query response', async () => {
+    const client = createSignalClient(signalRows, {
+      code: 'PGRST116',
+      message: 'response body contains private source details',
+      details: 'raw provider response',
+      hint: 'review_note=secret',
+      body: 'private body',
+    });
+
+    const error = await createProjectRepository(client)
+      .listProjectSignals('20000000-0000-4000-8000-000000000001', 10)
+      .catch((cause: unknown) => cause);
+
+    expect(error).toMatchObject({
+      name: 'ProjectSignalQueryError',
+      code: 'PGRST116',
+      message: 'Unable to read project signals.',
+    });
+    expect(String(error)).not.toMatch(/private source|raw provider|review_note|secret|private body/i);
+  });
 });
 
 function createProjectLookupClient(
-  fixtureRow:
-    | (Omit<typeof projectDetailRow, 'security_posture'> & { readonly security_posture: string })
-    | { readonly opportunity_score: null; readonly security_posture: string }
-    | null,
+  fixtureRow: unknown | null,
+  error: unknown = null,
 ): SupabaseClient<Database> & {
   readonly relationCalls: string[];
   readonly selections: string[];
@@ -294,7 +416,7 @@ function createProjectLookupClient(
     maybeSingle: () =>
       Promise.resolve({
         data: fixtureRow === null ? null : structuredClone(fixtureRow),
-        error: null,
+        error,
       }),
   };
   return {
@@ -317,27 +439,29 @@ function createProjectLookupClient(
 }
 
 function createSignalClient(
-  fixtureRows: readonly (typeof signalRows)[number][],
+  fixtureRows: readonly unknown[],
+  error: unknown = null,
 ): SupabaseClient<Database> {
   const query = {
     select: () => query,
     eq: () => query,
     order: () => query,
     range: () => query,
-    then: <TResult1 = { data: readonly (typeof signalRows)[number][]; error: null }>(
+    then: <TResult1 = { data: readonly unknown[]; error: unknown }>(
       onfulfilled?:
         | ((value: {
-            data: readonly (typeof signalRows)[number][];
-            error: null;
+            data: readonly unknown[];
+            error: unknown;
           }) => TResult1 | PromiseLike<TResult1>)
         | null,
-    ) => Promise.resolve({ data: fixtureRows, error: null }).then(onfulfilled),
+    ) => Promise.resolve({ data: fixtureRows, error }).then(onfulfilled),
   };
   return { from: () => query } as unknown as SupabaseClient<Database>;
 }
 
 function createSupabaseClient(
-  fixtureRows: readonly OpportunityListRow[],
+  fixtureRows: readonly unknown[],
+  error: unknown = null,
 ): SupabaseClient<Database> & {
   readonly orders: readonly [string, { readonly ascending: boolean }][];
   readonly orFilters: readonly string[];
@@ -361,18 +485,12 @@ function createSupabaseClient(
     },
     range: () => query,
     then: <
-      TResult1 = {
-        data: readonly OpportunityListRow[];
-        error: null;
-      },
+      TResult1 = { data: readonly unknown[]; error: unknown },
     >(
       onfulfilled?:
-        | ((value: {
-            data: readonly OpportunityListRow[];
-            error: null;
-          }) => TResult1 | PromiseLike<TResult1>)
+        | ((value: { data: readonly unknown[]; error: unknown }) => TResult1 | PromiseLike<TResult1>)
         | null,
-    ) => Promise.resolve({ data: fixtureRows, error: null }).then(onfulfilled),
+    ) => Promise.resolve({ data: fixtureRows, error }).then(onfulfilled),
   };
 
   return {

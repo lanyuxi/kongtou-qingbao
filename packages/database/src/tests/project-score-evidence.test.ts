@@ -163,8 +163,13 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
         sourceRelationVerifiedAt: '2026-08-22T00:00:00.000Z',
       },
     ]);
-    expect(client.fromCalls).toEqual(['project_current_score_evidence_citations']);
+    expect(client.fromCalls).toEqual([
+      'project_current_score_evidence_citations',
+      'project_current_score_evidence_citations',
+    ]);
     expect(client.filters).toEqual([
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
       ['project_id', projectId],
       ['project_score_id', scoreId],
     ]);
@@ -225,7 +230,7 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     ]);
   });
 
-  it('returns all 1001 citations across exact-count ordered pages without losing the final conflict', async () => {
+  it('probes exact counts separately before reading ordered citation pages without losing the final conflict', async () => {
     const citationRows = createCitationRows(1_001);
     const client = createQueryRecorder({ citationRows });
 
@@ -242,13 +247,22 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     expect(client.fromCalls).toEqual([
       'project_current_score_evidence_citations',
       'project_current_score_evidence_citations',
+      'project_current_score_evidence_citations',
+      'project_current_score_evidence_citations',
     ]);
     expect(client.selections).toEqual([
+      'project_id',
       'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
+      'project_id',
       'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
     ]);
-    expect(client.countRequests).toEqual(['exact', 'exact']);
+    expect(client.countRequests).toEqual(['exact', null, 'exact', null]);
+    expect(client.headRequests).toEqual([true, false, true, false]);
     expect(client.filters).toEqual([
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
       ['project_id', projectId],
       ['project_score_id', scoreId],
       ['project_id', projectId],
@@ -274,29 +288,33 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     {
       name: 'a null exact count',
       rows: [citationRow],
-      pages: [{ count: null }],
+      countPages: [{ count: null }],
       code: 'citation_count_missing',
     },
     {
       name: 'a changed count on a later page',
       rows: createCitationRows(1_001),
-      pages: [{}, { count: 1_002 }],
+      countPages: [{}, { count: 1_002 }],
       code: 'citation_count_changed',
     },
     {
       name: 'a short page before the expected boundary',
       rows: createCitationRows(1_001),
-      pages: [{ data: createCitationRows(999), count: 1_001 }],
+      dataPages: [{ data: createCitationRows(999) }],
       code: 'citation_page_size_mismatch',
     },
     {
       name: 'a duplicate row that replaces the final citation',
       rows: createCitationRows(1_001),
-      pages: [{}, { data: [createCitationRows(1)[0]], count: 1_001 }],
+      dataPages: [{}, { data: [createCitationRows(1)[0]] }],
       code: 'citation_duplicate_row',
     },
-  ] as const)('fails safely on $name', async ({ rows, pages, code }) => {
-    const client = createQueryRecorder({ citationRows: rows, citationPages: pages });
+  ] as const)('fails safely on $name', async ({ rows, countPages, dataPages, code }) => {
+    const client = createQueryRecorder({
+      citationRows: rows,
+      ...(countPages === undefined ? {} : { citationCountPages: countPages }),
+      ...(dataPages === undefined ? {} : { citationDataPages: dataPages }),
+    });
 
     await expect(
       createProjectRepository(client).listCurrentScoreEvidenceCitations(projectId, scoreId),
@@ -310,7 +328,7 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
   it('sanitizes a PostgREST error from a later page', async () => {
     const client = createQueryRecorder({
       citationRows: createCitationRows(1_001),
-      citationPages: [
+      citationDataPages: [
         {},
         {
           error: {
@@ -342,9 +360,11 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     await createProjectRepository(client).listCurrentScoreEvidenceCitations(projectId, scoreId);
 
     expect(client.selections).toEqual([
+      'project_id',
       'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
     ]);
-    expect(client.selections[0]).not.toMatch(
+    expect(client.selections).not.toContain('*');
+    expect(client.selections.join(',')).not.toMatch(
       /url|raw|candidate|review|hash|provider|audit|outbox|credential/i,
     );
   });
@@ -422,8 +442,11 @@ describe('current score projection input validation and empty results', () => {
     expect(client.fromCalls).toEqual([
       'project_current_score_factors',
       'project_current_score_evidence_citations',
+      'project_current_score_evidence_citations',
     ]);
     expect(client.filters).toEqual([
+      ['project_id', projectId],
+      ['project_score_id', scoreId],
       ['project_id', projectId],
       ['project_score_id', scoreId],
       ['project_id', projectId],
@@ -444,13 +467,15 @@ interface QueryRecorderOptions {
   readonly citationRows?: readonly unknown[] | null;
   readonly factorError?: FakePostgrestError;
   readonly citationError?: FakePostgrestError;
-  readonly citationPages?: readonly CitationPageOverride[];
+  readonly citationCountPages?: readonly CitationPageOverride[];
+  readonly citationDataPages?: readonly CitationPageOverride[];
 }
 
 interface QueryRecorder {
   readonly fromCalls: string[];
   readonly selections: string[];
   readonly countRequests: (string | null)[];
+  readonly headRequests: boolean[];
   readonly filters: [string, string][];
   readonly orders: [string, { readonly ascending: boolean; readonly nullsFirst?: boolean }][];
   readonly ranges: [number, number][];
@@ -468,15 +493,18 @@ function createQueryRecorder(
   const fromCalls: string[] = [];
   const selections: string[] = [];
   const countRequests: (string | null)[] = [];
+  const headRequests: boolean[] = [];
   const filters: [string, string][] = [];
   const orders: [string, { readonly ascending: boolean; readonly nullsFirst?: boolean }][] = [];
   const ranges: [number, number][] = [];
-  let citationRequestIndex = 0;
+  let citationCountRequestIndex = 0;
+  let citationDataRequestIndex = 0;
 
   const client = {
     fromCalls,
     selections,
     countRequests,
+    headRequests,
     filters,
     orders,
     ranges,
@@ -484,12 +512,18 @@ function createQueryRecorder(
       fromCalls.push(relation);
       const isFactorQuery = relation === 'project_current_score_factors';
       let requestedCount: string | null = null;
+      let requestedHead = false;
       let requestedRange: [number, number] | null = null;
       const query = {
-        select: (columns: string, selectOptions?: { readonly count?: string }) => {
+        select: (
+          columns: string,
+          selectOptions?: { readonly count?: string; readonly head?: boolean },
+        ) => {
           selections.push(columns);
           requestedCount = selectOptions?.count ?? null;
+          requestedHead = selectOptions?.head === true;
           countRequests.push(requestedCount);
+          headRequests.push(requestedHead);
           return query;
         },
         eq: (column: string, value: string) => {
@@ -529,15 +563,22 @@ function createQueryRecorder(
             }).then(onfulfilled);
           }
 
-          const requestIndex = citationRequestIndex;
-          citationRequestIndex += 1;
-          const override = options.citationPages?.[requestIndex];
+          const requestIndex = requestedHead
+            ? citationCountRequestIndex++
+            : citationDataRequestIndex++;
+          const override = requestedHead
+            ? options.citationCountPages?.[requestIndex]
+            : options.citationDataPages?.[requestIndex];
           const rows = options.citationRows ?? null;
           const [from, requestedTo] = requestedRange ?? [0, 999];
           const to = Math.min(requestedTo, from + 999);
           const defaultData = rows === null ? null : rows.slice(from, to + 1);
           return Promise.resolve({
-            data: override !== undefined && 'data' in override ? override.data : defaultData,
+            data: requestedHead
+              ? null
+              : override !== undefined && 'data' in override
+                ? override.data
+                : defaultData,
             error:
               override !== undefined && 'error' in override
                 ? (override.error ?? null)

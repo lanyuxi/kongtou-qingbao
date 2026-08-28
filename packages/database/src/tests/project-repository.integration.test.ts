@@ -5,6 +5,7 @@ import postgres, { type TransactionSql } from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Database } from '../generated/database.types.js';
+import { ProjectEvidenceCitationQueryError } from '../repositories/project-score-evidence.js';
 import { createProjectRepository } from '../repositories/project-repository.js';
 import { createSecurityPublicRepository } from '../repositories/security-public-repository.js';
 
@@ -16,8 +17,9 @@ const fixtureProjectIds = [
   randomUUID(),
 ] as const;
 const fixtureProjectIdSet = new Set<string>(fixtureProjectIds);
-const fixtureSourceId = randomUUID();
-const fixtureRawItemIds = [randomUUID(), randomUUID(), randomUUID()] as const;
+const fixtureBlockedSourceId = randomUUID();
+const fixtureAlternativeSourceId = randomUUID();
+const fixtureRawItemIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
 const fixtureSignalIds = [randomUUID(), randomUUID(), randomUUID()] as const;
 const fixtureEvidenceIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
 const fixtureScoreIds = [
@@ -29,10 +31,15 @@ const fixtureScoreIds = [
   randomUUID(),
 ] as const;
 const fixtureFactorIds = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()] as const;
-const fixtureSecurityIncidentId = randomUUID();
-const fixtureSecurityDecisionId = randomUUID();
+const fixtureProjectSecurityIncidentId = randomUUID();
+const fixtureProjectSecurityDecisionId = randomUUID();
+const fixtureBlockedSourceIncidentId = randomUUID();
+const fixtureBlockedSourceDecisionId = randomUUID();
+const fixtureAlternativeSourceIncidentId = randomUUID();
+const fixtureAlternativeSourceDecisionId = randomUUID();
 const fixtureSlugSuffixes = fixtureProjectIds.map((projectId) => projectId.replaceAll('-', ''));
-const fixtureSourceHost = `${fixtureSourceId}.example.invalid`;
+const fixtureBlockedSourceHost = `${fixtureBlockedSourceId}.example.invalid`;
+const fixtureAlternativeSourceHost = `${fixtureAlternativeSourceId}.example.invalid`;
 const disposableMarker = {
   id: '90000000-0000-4000-8000-000000000019',
   slug: 'disposable-integration-database-marker',
@@ -89,28 +96,29 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
     `;
     await database`
       insert into public.sources (id, source_type, name, canonical_url, status)
-      values (
-        ${fixtureSourceId}::uuid, 'official_web', 'Repository Evidence Source',
-        ${`https://${fixtureSourceHost}/`}, 'active'
-      )
+      values
+        (${fixtureBlockedSourceId}::uuid, 'official_web', 'Repository Blocked Evidence Source', ${`https://${fixtureBlockedSourceHost}/`}, 'active'),
+        (${fixtureAlternativeSourceId}::uuid, 'official_web', 'Repository Alternative Evidence Source', ${`https://${fixtureAlternativeSourceHost}/`}, 'active')
     `;
     await database`
       insert into public.project_sources (
         project_id, source_id, authority_domains, is_official,
         verified_at, verified_by, created_at
       ) values
-        (${fixtureProjectIds[0]}::uuid, ${fixtureSourceId}::uuid, ${[fixtureSourceHost]}, true, '2026-08-23T12:00:00.000Z', '90000000-0000-4000-8000-000000000001'::uuid, '2026-08-23T12:00:00.000Z'),
-        (${fixtureProjectIds[1]}::uuid, ${fixtureSourceId}::uuid, ${[fixtureSourceHost]}, true, '2026-08-23T12:00:00.000Z', '90000000-0000-4000-8000-000000000001'::uuid, '2026-08-23T12:00:00.000Z'),
-        (${fixtureProjectIds[2]}::uuid, ${fixtureSourceId}::uuid, '{}', false, null, null, '2026-08-23T12:00:00.000Z')
+        (${fixtureProjectIds[0]}::uuid, ${fixtureBlockedSourceId}::uuid, ${[fixtureBlockedSourceHost]}, true, '2026-08-23T12:00:00.000Z', '90000000-0000-4000-8000-000000000001'::uuid, '2026-08-23T12:00:00.000Z'),
+        (${fixtureProjectIds[0]}::uuid, ${fixtureAlternativeSourceId}::uuid, ${[fixtureAlternativeSourceHost]}, true, '2026-08-23T12:00:00.000Z', '90000000-0000-4000-8000-000000000001'::uuid, '2026-08-23T12:00:00.000Z'),
+        (${fixtureProjectIds[1]}::uuid, ${fixtureBlockedSourceId}::uuid, ${[fixtureBlockedSourceHost]}, true, '2026-08-23T12:00:00.000Z', '90000000-0000-4000-8000-000000000001'::uuid, '2026-08-23T12:00:00.000Z'),
+        (${fixtureProjectIds[2]}::uuid, ${fixtureBlockedSourceId}::uuid, '{}', false, null, null, '2026-08-23T12:00:00.000Z')
     `;
     await database`
       insert into public.raw_items (
         id, project_id, source_id, logical_url, final_url, content_kind, media_type,
         raw_text, sha256, collected_at
       ) values
-        (${fixtureRawItemIds[0]}::uuid, ${fixtureProjectIds[0]}::uuid, ${fixtureSourceId}::uuid, ${`https://${fixtureSourceHost}/active`}, ${`https://${fixtureSourceHost}/active`}, 'feed_article_html', 'text/html', 'First active repository citation. Second active repository citation.', ${'a'.repeat(64)}, '2026-08-09T00:00:00.000Z'),
-        (${fixtureRawItemIds[1]}::uuid, ${fixtureProjectIds[1]}::uuid, ${fixtureSourceId}::uuid, ${`https://${fixtureSourceHost}/active-b`}, ${`https://${fixtureSourceHost}/active-b`}, 'feed_article_html', 'text/html', 'Repository Evidence quote one.', ${'b'.repeat(64)}, '2026-08-09T00:00:00.000Z'),
-        (${fixtureRawItemIds[2]}::uuid, ${fixtureProjectIds[2]}::uuid, ${fixtureSourceId}::uuid, ${`https://${fixtureSourceHost}/rumored`}, ${`https://${fixtureSourceHost}/rumored`}, 'feed_article_html', 'text/html', 'Repository Evidence quote two.', ${'c'.repeat(64)}, '2026-08-09T00:00:00.000Z')
+        (${fixtureRawItemIds[0]}::uuid, ${fixtureProjectIds[0]}::uuid, ${fixtureBlockedSourceId}::uuid, ${`https://${fixtureBlockedSourceHost}/active`}, ${`https://${fixtureBlockedSourceHost}/active`}, 'feed_article_html', 'text/html', 'First active repository citation.', ${'a'.repeat(64)}, '2026-08-09T00:00:00.000Z'),
+        (${fixtureRawItemIds[1]}::uuid, ${fixtureProjectIds[0]}::uuid, ${fixtureAlternativeSourceId}::uuid, ${`https://${fixtureAlternativeSourceHost}/active`}, ${`https://${fixtureAlternativeSourceHost}/active`}, 'feed_article_html', 'text/html', 'Second active repository citation.', ${'b'.repeat(64)}, '2026-08-09T00:00:00.000Z'),
+        (${fixtureRawItemIds[2]}::uuid, ${fixtureProjectIds[1]}::uuid, ${fixtureBlockedSourceId}::uuid, ${`https://${fixtureBlockedSourceHost}/active-b`}, ${`https://${fixtureBlockedSourceHost}/active-b`}, 'feed_article_html', 'text/html', 'Repository Evidence quote one.', ${'c'.repeat(64)}, '2026-08-09T00:00:00.000Z'),
+        (${fixtureRawItemIds[3]}::uuid, ${fixtureProjectIds[2]}::uuid, ${fixtureBlockedSourceId}::uuid, ${`https://${fixtureBlockedSourceHost}/rumored`}, ${`https://${fixtureBlockedSourceHost}/rumored`}, 'feed_article_html', 'text/html', 'Repository Evidence quote two.', ${'d'.repeat(64)}, '2026-08-09T00:00:00.000Z')
     `;
     await database`
       insert into public.signals (
@@ -127,10 +135,10 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
         id, source_id, raw_item_id, source_field, quote_text,
         normalized_quote_sha256, verified_at, created_at
       ) values
-        (${fixtureEvidenceIds[0]}::uuid, ${fixtureSourceId}::uuid, ${fixtureRawItemIds[0]}::uuid, 'article_raw_text', 'First active repository citation.', public.evidence_quote_sha256_v1('First active repository citation.'), '2026-08-09T00:02:00.000Z', '2026-08-09T00:02:00.000Z'),
-        (${fixtureEvidenceIds[1]}::uuid, ${fixtureSourceId}::uuid, ${fixtureRawItemIds[0]}::uuid, 'article_raw_text', 'Second active repository citation.', public.evidence_quote_sha256_v1('Second active repository citation.'), '2026-08-09T00:01:00.000Z', '2026-08-09T00:01:00.000Z'),
-        (${fixtureEvidenceIds[2]}::uuid, ${fixtureSourceId}::uuid, ${fixtureRawItemIds[1]}::uuid, 'article_raw_text', 'Repository Evidence quote one.', public.evidence_quote_sha256_v1('Repository Evidence quote one.'), '2026-08-09T00:00:00.000Z', '2026-08-09T00:00:00.000Z'),
-        (${fixtureEvidenceIds[3]}::uuid, ${fixtureSourceId}::uuid, ${fixtureRawItemIds[2]}::uuid, 'article_raw_text', 'Repository Evidence quote two.', public.evidence_quote_sha256_v1('Repository Evidence quote two.'), '2026-08-09T00:00:00.000Z', '2026-08-09T00:00:00.000Z')
+        (${fixtureEvidenceIds[0]}::uuid, ${fixtureBlockedSourceId}::uuid, ${fixtureRawItemIds[0]}::uuid, 'article_raw_text', 'First active repository citation.', public.evidence_quote_sha256_v1('First active repository citation.'), '2026-08-09T00:02:00.000Z', '2026-08-09T00:02:00.000Z'),
+        (${fixtureEvidenceIds[1]}::uuid, ${fixtureAlternativeSourceId}::uuid, ${fixtureRawItemIds[1]}::uuid, 'article_raw_text', 'Second active repository citation.', public.evidence_quote_sha256_v1('Second active repository citation.'), '2026-08-09T00:01:00.000Z', '2026-08-09T00:01:00.000Z'),
+        (${fixtureEvidenceIds[2]}::uuid, ${fixtureBlockedSourceId}::uuid, ${fixtureRawItemIds[2]}::uuid, 'article_raw_text', 'Repository Evidence quote one.', public.evidence_quote_sha256_v1('Repository Evidence quote one.'), '2026-08-09T00:00:00.000Z', '2026-08-09T00:00:00.000Z'),
+        (${fixtureEvidenceIds[3]}::uuid, ${fixtureBlockedSourceId}::uuid, ${fixtureRawItemIds[3]}::uuid, 'article_raw_text', 'Repository Evidence quote two.', public.evidence_quote_sha256_v1('Repository Evidence quote two.'), '2026-08-09T00:00:00.000Z', '2026-08-09T00:00:00.000Z')
     `;
     await database`
       insert into public.signal_evidence_links (signal_id, evidence_id)
@@ -188,15 +196,9 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
     try {
       await database.begin(async (transaction) => {
         await assertDisposableDatabase(transaction);
-        await transaction`
-          delete from public.project_sources
-          where source_id = ${fixtureSourceId}::uuid
-            and project_id in (
-              ${fixtureProjectIds[0]}::uuid,
-              ${fixtureProjectIds[1]}::uuid,
-              ${fixtureProjectIds[2]}::uuid
-            )
-        `;
+        await transaction`set local session_replication_role = replica`;
+        await deleteFixtureRows(transaction);
+        await assertFixtureRowsDeleted(transaction);
       });
     } finally {
       await database.end({ timeout: 5 });
@@ -281,10 +283,14 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
       throw new Error('PostgREST integration environment is unavailable.');
     }
 
-    const citations = await repository.listCurrentScoreEvidenceCitations(
-      fixtureProjectIds[0],
-      fixtureScoreIds[0],
-    );
+    const citations = await repository
+      .listCurrentScoreEvidenceCitations(fixtureProjectIds[0], fixtureScoreIds[0])
+      .catch((error: unknown) => {
+        if (error instanceof ProjectEvidenceCitationQueryError) {
+          throw new Error(`project_evidence_citation_query_error_code:${error.code}`);
+        }
+        throw error;
+      });
     const citedEvidence = citations
       .map((citation) => ({
         evidenceId: citation.evidenceId,
@@ -377,6 +383,82 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
     ).toEqual([]);
   });
 
+  it('excludes blocked-source citations, retains a clear alternative, then removes the current score after the final eligible source is blocked', async () => {
+    if (database === null || repository === null || publicSecurity === null) {
+      throw new Error('PostgREST integration environment is unavailable.');
+    }
+
+    await database`
+      insert into public.security_incidents (id, target_type, source_id, category)
+      values (${fixtureBlockedSourceIncidentId}::uuid, 'source', ${fixtureBlockedSourceId}::uuid, 'phishing')
+    `;
+    await database`
+      insert into public.security_incident_decisions (
+        id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+        resulting_posture, resulting_severity, public_summary, evidence_id
+      ) values (
+        ${fixtureBlockedSourceDecisionId}::uuid, ${fixtureBlockedSourceIncidentId}::uuid, 1,
+        '90000000-0000-4000-8000-000000000001'::uuid, 'open', 'precautionary_evidence',
+        'blocked', 'critical',
+        'The first source is blocked while a separately grounded alternative remains public.',
+        ${fixtureEvidenceIds[0]}::uuid
+      )
+    `;
+
+    const clearAlternativeCitations = await repository.listCurrentScoreEvidenceCitations(
+      fixtureProjectIds[0],
+      fixtureScoreIds[0],
+    );
+    expect(clearAlternativeCitations).toEqual([
+      expect.objectContaining({
+        evidenceId: fixtureEvidenceIds[1],
+        citationText: 'Second active repository citation.',
+        sourceId: fixtureAlternativeSourceId,
+      }),
+    ]);
+    expect(
+      await repository.listCurrentScoreFactors(fixtureProjectIds[0], fixtureScoreIds[0]),
+    ).toHaveLength(3);
+    expect(
+      (await repository.getProjectBySlug(`repository-active-${fixtureSlugSuffixes[0]}`))?.latestScore?.id,
+    ).toBe(fixtureScoreIds[0]);
+    expect(await publicSecurity.getProjectSecurity(fixtureProjectIds[0])).toMatchObject({
+      projectId: fixtureProjectIds[0],
+      posture: 'clear',
+    });
+
+    await database`
+      insert into public.security_incidents (id, target_type, source_id, category)
+      values (${fixtureAlternativeSourceIncidentId}::uuid, 'source', ${fixtureAlternativeSourceId}::uuid, 'phishing')
+    `;
+    await database`
+      insert into public.security_incident_decisions (
+        id, incident_id, incident_version, reviewer_user_id, action, reason_code,
+        resulting_posture, resulting_severity, public_summary, evidence_id
+      ) values (
+        ${fixtureAlternativeSourceDecisionId}::uuid, ${fixtureAlternativeSourceIncidentId}::uuid, 1,
+        '90000000-0000-4000-8000-000000000001'::uuid, 'open', 'precautionary_evidence',
+        'blocked', 'critical',
+        'The final eligible source is blocked, so the complete score becomes historical only.',
+        ${fixtureEvidenceIds[1]}::uuid
+      )
+    `;
+
+    expect(
+      await repository.listCurrentScoreEvidenceCitations(fixtureProjectIds[0], fixtureScoreIds[0]),
+    ).toEqual([]);
+    expect(
+      await repository.listCurrentScoreFactors(fixtureProjectIds[0], fixtureScoreIds[0]),
+    ).toEqual([]);
+    expect(
+      (await repository.getProjectBySlug(`repository-active-${fixtureSlugSuffixes[0]}`))?.latestScore,
+    ).toBeNull();
+    expect(await publicSecurity.getProjectSecurity(fixtureProjectIds[0])).toMatchObject({
+      projectId: fixtureProjectIds[0],
+      posture: 'clear',
+    });
+  });
+
   it('exposes a blocked project only through anonymous safe security projections', async () => {
     if (database === null || publicSecurity === null) {
       throw new Error('PostgREST integration environment is unavailable.');
@@ -384,14 +466,14 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
 
     await database`
       insert into public.security_incidents (id, target_type, project_id, category)
-      values (${fixtureSecurityIncidentId}::uuid, 'project', ${fixtureProjectIds[0]}::uuid, 'phishing')
+      values (${fixtureProjectSecurityIncidentId}::uuid, 'project', ${fixtureProjectIds[0]}::uuid, 'phishing')
     `;
     await database`
       insert into public.security_incident_decisions (
         id, incident_id, incident_version, reviewer_user_id, action, reason_code,
         resulting_posture, resulting_severity, public_summary, evidence_id
       ) values (
-        ${fixtureSecurityDecisionId}::uuid, ${fixtureSecurityIncidentId}::uuid, 1,
+        ${fixtureProjectSecurityDecisionId}::uuid, ${fixtureProjectSecurityIncidentId}::uuid, 1,
         '90000000-0000-4000-8000-000000000001'::uuid, 'open', 'precautionary_evidence',
         'blocked', 'critical',
         'A grounded phishing incident requires an immediate public participation block.',
@@ -399,29 +481,126 @@ describeIntegration('ProjectRepository PostgREST integration', () => {
       )
     `;
 
-    try {
-      const state = await publicSecurity.getProjectSecurity(fixtureProjectIds[0]);
-      const blocked = await publicSecurity.listBlockedProjects({ cursor: null, limit: 100 });
-      const row = blocked.items.find((item) => item.project.id === fixtureProjectIds[0]);
+    const state = await publicSecurity.getProjectSecurity(fixtureProjectIds[0]);
+    const blocked = await publicSecurity.listBlockedProjects({ cursor: null, limit: 100 });
+    const row = blocked.items.find((item) => item.project.id === fixtureProjectIds[0]);
 
-      expect(state).toMatchObject({ projectId: fixtureProjectIds[0], posture: 'blocked' });
-      expect(row).toMatchObject({
-        project: { id: fixtureProjectIds[0] },
-        posture: 'blocked',
-        target: { type: 'project', id: fixtureProjectIds[0] },
-      });
-      expect(Object.keys(row ?? {}).join(',')).not.toMatch(/evidence|reviewer|note|raw|url/i);
-    } finally {
-      await database.begin(async (transaction) => {
-        await transaction`set local session_replication_role = replica`;
-        await transaction`
-          delete from public.security_incident_decisions where id = ${fixtureSecurityDecisionId}::uuid
-        `;
-        await transaction`delete from public.security_incidents where id = ${fixtureSecurityIncidentId}::uuid`;
-      });
-    }
+    expect(state).toMatchObject({ projectId: fixtureProjectIds[0], posture: 'blocked' });
+    expect(row).toMatchObject({
+      project: { id: fixtureProjectIds[0] },
+      posture: 'blocked',
+      target: { type: 'project', id: fixtureProjectIds[0] },
+    });
+    expect(Object.keys(row ?? {}).join(',')).not.toMatch(/evidence|reviewer|note|raw|url/i);
   });
 });
+
+async function deleteFixtureRows(transaction: TransactionSql): Promise<void> {
+  await transaction`
+    delete from public.security_incident_decisions
+    where id in (
+      ${fixtureProjectSecurityDecisionId}::uuid,
+      ${fixtureBlockedSourceDecisionId}::uuid,
+      ${fixtureAlternativeSourceDecisionId}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.security_incidents
+    where id in (
+      ${fixtureProjectSecurityIncidentId}::uuid,
+      ${fixtureBlockedSourceIncidentId}::uuid,
+      ${fixtureAlternativeSourceIncidentId}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.score_factors
+    where id in (
+      ${fixtureFactorIds[0]}::uuid, ${fixtureFactorIds[1]}::uuid, ${fixtureFactorIds[2]}::uuid,
+      ${fixtureFactorIds[3]}::uuid, ${fixtureFactorIds[4]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.score_signal_links
+    where project_score_id in (
+      ${fixtureScoreIds[0]}::uuid, ${fixtureScoreIds[1]}::uuid, ${fixtureScoreIds[2]}::uuid,
+      ${fixtureScoreIds[3]}::uuid, ${fixtureScoreIds[4]}::uuid, ${fixtureScoreIds[5]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.signal_evidence_links
+    where signal_id in (
+      ${fixtureSignalIds[0]}::uuid, ${fixtureSignalIds[1]}::uuid, ${fixtureSignalIds[2]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.evidence
+    where id in (
+      ${fixtureEvidenceIds[0]}::uuid, ${fixtureEvidenceIds[1]}::uuid,
+      ${fixtureEvidenceIds[2]}::uuid, ${fixtureEvidenceIds[3]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.project_scores
+    where id in (
+      ${fixtureScoreIds[0]}::uuid, ${fixtureScoreIds[1]}::uuid, ${fixtureScoreIds[2]}::uuid,
+      ${fixtureScoreIds[3]}::uuid, ${fixtureScoreIds[4]}::uuid, ${fixtureScoreIds[5]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.signals
+    where id in (
+      ${fixtureSignalIds[0]}::uuid, ${fixtureSignalIds[1]}::uuid, ${fixtureSignalIds[2]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.raw_items
+    where id in (
+      ${fixtureRawItemIds[0]}::uuid, ${fixtureRawItemIds[1]}::uuid,
+      ${fixtureRawItemIds[2]}::uuid, ${fixtureRawItemIds[3]}::uuid
+    )
+  `;
+  await transaction`
+    delete from public.project_sources
+    where (project_id, source_id) in (
+      (${fixtureProjectIds[0]}::uuid, ${fixtureBlockedSourceId}::uuid),
+      (${fixtureProjectIds[0]}::uuid, ${fixtureAlternativeSourceId}::uuid),
+      (${fixtureProjectIds[1]}::uuid, ${fixtureBlockedSourceId}::uuid),
+      (${fixtureProjectIds[2]}::uuid, ${fixtureBlockedSourceId}::uuid)
+    )
+  `;
+  await transaction`
+    delete from public.sources
+    where id in (${fixtureBlockedSourceId}::uuid, ${fixtureAlternativeSourceId}::uuid)
+  `;
+  await transaction`
+    delete from public.projects
+    where id in (
+      ${fixtureProjectIds[0]}::uuid, ${fixtureProjectIds[1]}::uuid, ${fixtureProjectIds[2]}::uuid,
+      ${fixtureProjectIds[3]}::uuid, ${fixtureProjectIds[4]}::uuid
+    )
+  `;
+}
+
+async function assertFixtureRowsDeleted(transaction: TransactionSql): Promise<void> {
+  const rows = await transaction`
+    select
+      exists(select 1 from public.security_incident_decisions where id in (${fixtureProjectSecurityDecisionId}::uuid, ${fixtureBlockedSourceDecisionId}::uuid, ${fixtureAlternativeSourceDecisionId}::uuid)) as security_decisions,
+      exists(select 1 from public.security_incidents where id in (${fixtureProjectSecurityIncidentId}::uuid, ${fixtureBlockedSourceIncidentId}::uuid, ${fixtureAlternativeSourceIncidentId}::uuid)) as security_incidents,
+      exists(select 1 from public.score_factors where id in (${fixtureFactorIds[0]}::uuid, ${fixtureFactorIds[1]}::uuid, ${fixtureFactorIds[2]}::uuid, ${fixtureFactorIds[3]}::uuid, ${fixtureFactorIds[4]}::uuid)) as score_factors,
+      exists(select 1 from public.score_signal_links where project_score_id in (${fixtureScoreIds[0]}::uuid, ${fixtureScoreIds[1]}::uuid, ${fixtureScoreIds[2]}::uuid, ${fixtureScoreIds[3]}::uuid, ${fixtureScoreIds[4]}::uuid, ${fixtureScoreIds[5]}::uuid)) as score_signal_links,
+      exists(select 1 from public.project_scores where id in (${fixtureScoreIds[0]}::uuid, ${fixtureScoreIds[1]}::uuid, ${fixtureScoreIds[2]}::uuid, ${fixtureScoreIds[3]}::uuid, ${fixtureScoreIds[4]}::uuid, ${fixtureScoreIds[5]}::uuid)) as project_scores,
+      exists(select 1 from public.signals where id in (${fixtureSignalIds[0]}::uuid, ${fixtureSignalIds[1]}::uuid, ${fixtureSignalIds[2]}::uuid)) as signals,
+      exists(select 1 from public.signal_evidence_links where signal_id in (${fixtureSignalIds[0]}::uuid, ${fixtureSignalIds[1]}::uuid, ${fixtureSignalIds[2]}::uuid)) as signal_evidence_links,
+      exists(select 1 from public.evidence where id in (${fixtureEvidenceIds[0]}::uuid, ${fixtureEvidenceIds[1]}::uuid, ${fixtureEvidenceIds[2]}::uuid, ${fixtureEvidenceIds[3]}::uuid)) as evidence,
+      exists(select 1 from public.raw_items where id in (${fixtureRawItemIds[0]}::uuid, ${fixtureRawItemIds[1]}::uuid, ${fixtureRawItemIds[2]}::uuid, ${fixtureRawItemIds[3]}::uuid)) as raw_items,
+      exists(select 1 from public.project_sources where (project_id, source_id) in ((${fixtureProjectIds[0]}::uuid, ${fixtureBlockedSourceId}::uuid), (${fixtureProjectIds[0]}::uuid, ${fixtureAlternativeSourceId}::uuid), (${fixtureProjectIds[1]}::uuid, ${fixtureBlockedSourceId}::uuid), (${fixtureProjectIds[2]}::uuid, ${fixtureBlockedSourceId}::uuid))) as project_sources,
+      exists(select 1 from public.sources where id in (${fixtureBlockedSourceId}::uuid, ${fixtureAlternativeSourceId}::uuid)) as sources,
+      exists(select 1 from public.projects where id in (${fixtureProjectIds[0]}::uuid, ${fixtureProjectIds[1]}::uuid, ${fixtureProjectIds[2]}::uuid, ${fixtureProjectIds[3]}::uuid, ${fixtureProjectIds[4]}::uuid)) as projects
+  `;
+  if (rows[0] === undefined || Object.values(rows[0]).some(Boolean)) {
+    throw new Error('project_repository_fixture_cleanup_residue');
+  }
+}
 
 async function listAllOpportunities(
   repository: ReturnType<typeof createProjectRepository>,
