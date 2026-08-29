@@ -188,7 +188,7 @@ Phase 7A 设计铁律：安全态与 opportunity/risk/confidence/score recommend
 
 ## 1. 项目定位（一段话版）
 
-Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前四个（情报采集 → AI 抽取 → 确定性评分 → 页面展示）已端到端打通，采集之外的两个 AI 阶段（抽取、评分）由 worker 内编排循环自动驱动；Phase 6A 又把「AI 候选 → 人工审核 → Evidence 证据链 → 公开可见」的最后一环硬化为可执行的数据库边界（专用 promotion_service 角色、受保护幂等命令、审计与事务性 outbox，公开数据一律 Evidence 门禁）。教程、任务管理、通知、安全风控尚未开始。
+Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前四个（情报采集 → AI 抽取 → 确定性评分 → 页面展示）已端到端打通，采集之外的两个 AI 阶段（抽取、评分）由 worker 内编排循环自动驱动；Phase 6A 又把「AI 候选 → 人工审核 → Evidence 证据链 → 公开可见」的最后一环硬化为可执行的数据库边界（专用 promotion_service 角色、受保护幂等命令、审计与事务性 outbox，公开数据一律 Evidence 门禁）；Phase 7A 则在其上叠加了独立、追加式的安全事件与指标覆盖层（protect-first 门禁、审核工作流、公共 blocked/caution 呈现），已于 2026-08-29 合并主线。教程、任务管理、通知、verified allowlisted references（Phase 7B）尚未开始。
 
 核心铁律（详见 AGENTS.md）：永不接触私钥/助记词；永不自动签名；机会分、风险分、置信度三者独立不得合成单一总分；AI 输出只是候选数据，写入正式事实必须走 Promotion Service 并留审计；冲突证据保持可见，不静默覆盖。
 
@@ -242,10 +242,11 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
 7. 通知系统（alerts、偏好）
-8. 安全风控（incidents、indicators、protect-first 工作流）
+8. ~~**安全风控（incidents、indicators、protect-first 工作流）**~~ ✅ **2026-08-29 本地完成并已合并主线（Phase 7A）**：Task 1–11 全部通过独立复审，提交链 `fbf49d2..55d7f2b`，merge 提交 `00b4497`。产出含 strict 契约、纯 domain 规则、九表追加式 Security Ledger + 受保护命令/RLS、bearer-scoped repository、extraction/Promotion 路由、collection/scoring 门禁、公共安全投影、BFF/浏览器客户端、`/review/security` 审核 UI、公共 blocked/caution 呈现、Golden Dataset 与 runbook。生产未应用第 22 个 migration。详见顶部 Phase 7A 全景看板
 9. 用户认证与私有数据（profiles、RLS user_id 场景目前未启用）
 10. 运营/审核后台界面（目前只有 API）；详情页 score factors / reviewed Evidence 的本地实现已完成，生产未应用
 11. 多源扩展：X/Twitter、项目方公告页结构化解析等
+12. **verified allowlisted references（Phase 7B）**：教程功能的前置条件，下一步单独做架构设计
 
 ---
 
@@ -508,14 +509,15 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 > 新接手者三步上手：起隧道 → `pnpm dev`（含 AI env 时编排循环自动运行）→ 浏览 `/`、`/opportunities`、`/projects/ethereum`；随后用 Node 22.22.2 / pnpm 11.16.0 执行 `pnpm verify`，确认 798 个非跳过测试全绿。文档阅读顺序：`AGENTS.md`（规范）→ `docs/runbooks/local-development.md`（流程，含治理审核/对账命令）→ `docs/architecture/`（决策）→ 本手册 §6（坑）。
 
-### 8.1 当前状态快照（2026-08-24 主线集成后）
+### 8.1 当前状态快照（2026-08-29 Phase 7A 合并主线后）
 
 | 维度 | 状态 |
 |------|------|
-| 代码 | Phase 0–6B Task 1–8 已在主线 `codex/phase-0-1-foundation`；Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（§8.5）；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地 |
-| 测试 | Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` 798 个非跳过测试全绿，exit 0；lint/typecheck/build/placeholder 全部通过。Task 7 fix round 1 后 disposable 复验：focused integration 6/6、fixture 5/5、full repository integration 40/40；011 focused 87/87、full pgTAP 1031/1031。 |
-| 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities |
-| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康（auth/db/kong 均 healthy）；20 migrations reset exit 0，updated focused pgTAP 87/87、full 1031/1031；**fix round 1 后复验**：focused integration 6/6（4.05s）、full repository integration 40/40（74.19s），cleanup 经 marker 校验且仅删精确 fixture；`errorDetail` 与 revoked-role mutation 均命中具名回归。**只允许对它 reset**；生产未访问。 |
+| 代码 | Phase 0–6B Task 1–8、**详情页 score factors / reviewed Evidence**、**Phase 7A 安全事件与指标（Task 1–11）**均已在主线 `codex/phase-0-1-foundation`（7A merge 提交 `00b4497`，提交链 `fbf49d2..55d7f2b`）；Phase 6B Task 9 止于 `PRODUCTION_READY — REVIEWER_ACCOUNT_REQUIRED`（§8.5）；审核页不复用公开 shell，且没有 raw/provider detail 渲染路径；仓库**无 remote**，纯本地 |
+| 测试 | Node 22.22.2 / pnpm 11.16.0 下主线 `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；lint/typecheck/build/placeholder 全部通过。Phase 7A disposable 复验（2026-08-29，经授权）：reset exit 0、**full pgTAP 13 files / 1,338 PASS**、**集成矩阵 9 files / 66 tests PASS**，清理后回到 seed 基线零残留 |
+| Phase 7A worktree | `.worktrees/phase-7a-security-ledger` / `codex/phase-7a-security-ledger` 已合并主线，分支与 worktree 按既有惯例保留未删除；合并前两端状态有备份引用 `backup/pre-7a-merge-main`、`backup/pre-7a-merge-7a` |
+| 生产库 `airdrop-intelligence-os` | **19 个迁移已应用**，最高 `20260820000300`；Evidence 门禁已生效并完成补证/对账。19 Evidence / 19 signal links / 7 review decisions / 7 command receipts / 7 outbox events；待对账 0；anon 14 signals / 24 scores / 12 opportunities。**第 20–22 个 migration（6B / score-evidence / 7A ledger）均未应用**，生产仍无 `supabase_auth_airdrop-intelligence-os` 容器 |
+| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康（auth/db/kong 均 healthy）；**22 migrations** reset exit 0，**full pgTAP 13 files / 1,338 PASS**，**repository 集成矩阵 9 files / 66 tests PASS**；cleanup 经 marker 校验且仅删精确 fixture，清理后安全表与 outbox 全 0。**只允许对它 reset**；生产未访问 |
 | 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）
