@@ -14,9 +14,9 @@ import {
   OfficialWebsiteLink,
   ProjectSecurityBanner,
   SafeSecurityIndicatorText,
-  blockedCursorFromQuery,
   blockedProjectsPageHref,
 } from '../components/security-elements.js';
+import { blockedCursorFromQuery } from '../lib/security-cursor.js';
 
 const projectId = 'b1000000-0000-4000-8000-000000000001';
 const incidentId = 'b1000000-0000-4000-8000-000000000002';
@@ -289,9 +289,8 @@ describe('OfficialWebsiteLink', () => {
   });
 
   it('does not reference internal security or outbound-link fields in the public component source', () => {
-    const source = readFileSync(
-      new URL('../components/security-elements.tsx', import.meta.url),
-      'utf8',
+    const sources = ['security-elements.tsx', 'opportunity-elements.tsx'].map((file) =>
+      readFileSync(new URL(`../components/${file}`, import.meta.url), 'utf8'),
     );
 
     for (const forbidden of [
@@ -303,7 +302,9 @@ describe('OfficialWebsiteLink', () => {
       'payload',
       'markdown',
     ]) {
-      expect(source).not.toContain(forbidden);
+      for (const source of sources) {
+        expect(source).not.toContain(forbidden);
+      }
     }
   });
 });

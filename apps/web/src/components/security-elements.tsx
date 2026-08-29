@@ -1,5 +1,4 @@
 import {
-  blockedProjectSecurityCursorSchema,
   type PublicActiveSecurityIncidentSummary,
   type PublicBlockedProjectSecurityRow,
   type PublicProjectSecurityState,
@@ -140,13 +139,6 @@ export function blockedProjectsPageHref(cursor: string | null): string {
   return cursor === null
     ? '/opportunities?tab=blocked'
     : `/opportunities?tab=blocked&after=${encodeURIComponent(cursor)}`;
-}
-
-export function blockedCursorFromQuery(value: string | undefined): string | null {
-  if (value === undefined) {
-    return null;
-  }
-  return blockedProjectSecurityCursorSchema.safeParse(value).success ? value : null;
 }
 
 export function OfficialWebsiteLink({

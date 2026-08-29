@@ -4,10 +4,10 @@ import type { ReactNode } from 'react';
 import { OpportunityRow } from '../../components/opportunity-elements.js';
 import {
   BlockedProjectTable,
-  blockedCursorFromQuery,
   blockedProjectsPageHref,
 } from '../../components/security-elements.js';
 import { listBlockedProjects, listOpportunities } from '../../lib/opportunity-queries.js';
+import { blockedCursorFromQuery } from '../../lib/security-cursor.js';
 
 export const dynamic = 'force-dynamic';
 

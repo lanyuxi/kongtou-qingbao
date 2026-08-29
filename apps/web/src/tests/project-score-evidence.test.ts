@@ -100,8 +100,11 @@ describe('ScoreFactorGroups', () => {
     );
 
     const gridStart = html.indexOf('class="score-factor-groups"');
+    const gridContent = html.slice(gridStart);
     expect(gridStart).toBeGreaterThanOrEqual(0);
     expect(html.indexOf('历史评分快照')).toBeLessThan(gridStart);
+    expect(gridContent).not.toContain('score-historical-notice');
+    expect(gridContent.split('<section').length - 1).toBe(3);
   });
 });
 
