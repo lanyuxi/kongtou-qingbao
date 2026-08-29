@@ -34,6 +34,7 @@ describe('collection outcome classification', () => {
     'invalid_feed',
     'discovered_only',
     'body_fetch_budget_exhausted',
+    'security_blocked',
   ] satisfies CollectionOutcome[])('classifies %s as dead letter', (outcome) => {
     expect(classifyCollectionOutcome(outcome)).toBe('dead_letter');
   });

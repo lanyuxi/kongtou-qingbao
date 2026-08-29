@@ -230,6 +230,119 @@ test, and seed hashes. Never target `airdrop-intelligence-os` or ports
 append-only Evidence and score history; clean them only with a final fresh reset
 of the verified disposable stack, never with row-by-row history deletion.
 
+## Security incidents and indicators (Phase 7A)
+
+The security overlay is an append-only ledger layered over the existing Catalog,
+intelligence, and decision modules. It never rewrites project lifecycle, score
+values, score history, or score recommendation; it publishes an independent
+`clear` / `caution` / `blocked` posture derived from the strictest active
+precaution on a target.
+
+### Reviewer provisioning and revocation
+
+Canonical security writes are only possible from the current bearer session of a
+user holding an active `security_reviewer` or `admin` grant in `public.user_roles`
+(`revoked_at is null`). Provisioning is a database operation performed by an
+operator with existing privileges: insert a grant row for the reviewer's user ID,
+and revoke by setting `revoked_at` — never by deleting the row, because the grant
+history is part of the audit trail.
+
+Revocation takes effect on the next command: the protected functions re-check the
+caller's `auth.uid()` on every call. The reviewer UI treats `401` and `403` as
+"clear the local session and return to `/review/sign-in`"; it never retries.
+
+### Reviewer workflow (`/review/security`)
+
+1. Sign in at `/review/sign-in` with a Supabase account that has the grant above.
+   The shell verifies the session before any list or detail call.
+2. **Candidates** — the queue lists AI/collector `security_risk` and
+   `scam_indicator` candidates plus reviewer-submitted manual candidates. Each
+   decision (`needs_review`, `reject`, `accept_and_open`, `accept_and_attach`) is
+   append-only. Grounding is verified before a canonical row exists: a candidate
+   whose Evidence locator does not match the source text is recorded as
+   `needs_review` and creates no indicator or incident.
+3. **Incidents** — `open`, `adjust`, `attach_indicator`, `resolve`, and `reopen`
+   each append a decision. Posture is always chosen explicitly as `caution` or
+   `blocked`; `clear` is only ever derived when no active precaution remains.
+4. **Disclosure** — indicator values become public one row at a time through the
+   `set_indicator_disclosure` **command operation** (submitted like any other
+   protected command, not a separate RPC), with an explicit version typed by the
+   reviewer. The UI never guesses or auto-increments it.
+5. High-impact commands require ticking an affirmative confirmation bound to the
+   authoritative aggregate version. Editing any command field, or a `409`
+   conflict, clears the confirmation rather than silently adopting the newer
+   version.
+
+### Stable error codes
+
+The API returns stable domain codes; never branch on human-readable text.
+
+| Code | Meaning | Typical operator action |
+| --- | --- | --- |
+| `security_candidate_not_found` (`AS101`) | Candidate ID does not exist or is not visible to this session | Reload the queue |
+| `security_candidate_not_reviewable` (`AS102`) | Candidate is already `accepted`/`rejected`, or the command payload is malformed for its decision | Reload; do not resubmit a decided candidate |
+| `security_incident_not_found` (`AS103`) | Incident ID does not exist or is not visible | Reload the incident list |
+| `security_reviewer_required` (`AS104`) | Either a protected command ran without an active `security_reviewer` / `admin` grant, **or** ordinary Promotion tried to approve a `caution`-posture target for a reviewer without one | Provision/restore the grant, or route the approval to a security reviewer |
+| `security_indicator_not_found` (`AS105`) | Indicator ID does not exist | Reload the incident detail |
+| `security_version_conflict` (`AS106`) | `expected_version` is stale | Reload and re-confirm; never auto-adopt the new version |
+| `security_idempotency_conflict` (`AS107`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |
+| `security_command_invalid` (`AS108`) | Command failed contract or reason/state validation | Fix the command payload |
+| `security_target_mismatch` (`AS109`) | Target does not match the incident scope | Re-select the target |
+| `security_review_required` (`AS111`) | A `security_risk` / `scam_indicator` candidate reached the **ordinary** Promotion path (or the security routing function) | Route it to `/review/security`; never promote it as an ordinary signal |
+| `security_promotion_blocked` (`AS112`) | Target is `blocked`; no canonical intelligence may pass | Resolve or adjust the incident first |
+| `security_persistence_failed` (`AS199`) | Transaction failed and rolled back | Retry once; if it persists, inspect the database logs |
+
+### Blocked-source queue behaviour
+
+A `blocked` source stops entering new collection, extraction, and ordinary
+Promotion, and its Evidence stops counting toward public validity. The collector
+returns the typed outcome `security_blocked`; the queue then cancels the in-flight
+job with the terminal result code `source_security_blocked` and does **not** retry
+it — cancelling is not a failure to be retried. Do not read the outcome name and
+the cancellation code as interchangeable: `security_blocked` is what the collector
+reports, `source_security_blocked` is what the queue persists. Its already
+grounded Evidence stays available to the Security Ledger for investigation, but
+that never restores ordinary public eligibility. Only `score`s whose every
+score-linked signal still has at least one non-blocked Evidence remain public;
+otherwise the whole score and its factor set drop out of the current public
+projection and are retained as history.
+
+### Focused disposable acceptance commands
+
+```bash
+supabase test db supabase/tests/013_phase_7a_security_incidents_indicators.test.sql
+pnpm --filter @airdrop/database exec vitest run src/tests/security-review-repository.integration.test.ts
+pnpm --filter @airdrop/database exec vitest run src/tests/promotion-repository.integration.test.ts
+pnpm --filter @airdrop/database exec vitest run src/tests/source-collection-repository.integration.test.ts
+pnpm --filter @airdrop/database exec vitest run src/tests/scoring-repository.integration.test.ts
+pnpm --filter @airdrop/worker exec vitest run src/ai/tests/security-extraction-golden.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/security-elements.test.ts
+```
+
+The same fail-closed preflight as the earlier phases applies: confirm the remote
+work directory, project, database/Kong ports `64322`/`64321`, local tunnels
+`16432`/`16433`, the paused seed marker, and the migration, test, and seed hashes
+before any reset. Never target `airdrop-intelligence-os` or ports
+`54321`/`54322`.
+
+### Append-only recovery
+
+Nothing in the ledger is updated in place. To correct a mistaken decision, append
+the correcting decision (`adjust`, `resolve`, `reopen`, or a withdrawn
+disclosure) and let the read models re-derive posture. Do not delete incident,
+decision, event, or command-receipt rows, and do not edit history rows to make a
+mistake disappear — the contradiction must stay visible. The Golden Dataset
+(`apps/worker/src/ai/fixtures/security-extraction-golden.ts`) is the regression
+net for the extraction boundary; extend it rather than loosening grounding.
+
+### Production exclusion
+
+Phase 7A is local/disposable-verified only. Its migration is not applied to
+production, and this runbook authorizes no production operation: no migration,
+no role or account creation, no data backfill, and no deployment. Production
+rollout remains gated behind reviewer supply, a healthy production Auth service,
+a rehearsed pre-migration backup, and explicit authorization.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:

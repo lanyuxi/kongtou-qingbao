@@ -14,6 +14,7 @@ const factorSelection =
   'project_id,project_score_id,axis,factor_code,contribution,input_value,detail';
 const citationSelection =
   'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at';
+const citationCountSelection = 'project_id';
 const citationPageSize = 1_000;
 
 const axisOrder = { opportunity: 0, risk: 1, confidence: 2 } as const;
@@ -83,9 +84,31 @@ export async function listCurrentScoreEvidenceCitations(
   let expectedCount: number | undefined;
 
   for (let from = 0; ; from += citationPageSize) {
+    const countResponse = await client
+      .from('project_current_score_evidence_citations')
+      .select(citationCountSelection, { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .eq('project_score_id', projectScoreId);
+
+    if (countResponse.error !== null) {
+      throw new ProjectEvidenceCitationQueryError(countResponse.error.code);
+    }
+    if (
+      countResponse.count === null ||
+      !Number.isSafeInteger(countResponse.count) ||
+      countResponse.count < 0
+    ) {
+      throw new ProjectEvidenceCitationQueryError('citation_count_missing');
+    }
+    if (expectedCount === undefined) {
+      expectedCount = countResponse.count;
+    } else if (countResponse.count !== expectedCount) {
+      throw new ProjectEvidenceCitationQueryError('citation_count_changed');
+    }
+
     const response = await client
       .from('project_current_score_evidence_citations')
-      .select(citationSelection, { count: 'exact' })
+      .select(citationSelection)
       .eq('project_id', projectId)
       .eq('project_score_id', projectScoreId)
       .order('signal_published_at', { ascending: false, nullsFirst: false })
@@ -96,18 +119,6 @@ export async function listCurrentScoreEvidenceCitations(
 
     if (response.error !== null) {
       throw new ProjectEvidenceCitationQueryError(response.error.code);
-    }
-    if (
-      response.count === null ||
-      !Number.isSafeInteger(response.count) ||
-      response.count < 0
-    ) {
-      throw new ProjectEvidenceCitationQueryError('citation_count_missing');
-    }
-    if (expectedCount === undefined) {
-      expectedCount = response.count;
-    } else if (response.count !== expectedCount) {
-      throw new ProjectEvidenceCitationQueryError('citation_count_changed');
     }
 
     const page = response.data ?? [];

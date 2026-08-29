@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 
 import type { PendingActionGate } from '../../lib/review-pending-action.js';
 import type { ReviewSessionController } from '../../lib/review-session.js';
@@ -19,7 +20,7 @@ export function ReviewShell({
       <header className="review-header">
         <div>
           <span className="review-kicker">受限工作区</span>
-          <strong className="review-brand">AI Run 审核</strong>
+          <strong className="review-brand">受限审核</strong>
         </div>
         {onSignOut === undefined ? null : (
           <button
@@ -32,6 +33,11 @@ export function ReviewShell({
           </button>
         )}
       </header>
+      <nav aria-label="审核导航">
+        <Link className="review-link" href="/review/ai-runs">AI Run 审核</Link>
+        {' · '}
+        <Link className="review-link" href="/review/security">安全审核</Link>
+      </nav>
       {signOutPending ? <p className="review-sign-out-state" role="status">正在安全退出…</p> : null}
       <div className="review-content">{children}</div>
     </div>

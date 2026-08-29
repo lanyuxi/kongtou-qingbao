@@ -10,6 +10,7 @@ import type {
   SourceCollectionContext,
   SourceCollectionRepository,
 } from '@airdrop/database/collection-worker';
+import { SourceSecurityBlockedError } from '@airdrop/database/collection-worker';
 
 import { createCollectSource, createNodeContentHasher } from '../collect-source.js';
 import { createFeedParser } from '../feed-parser.js';
@@ -326,6 +327,23 @@ describe('collect source', () => {
     },
   );
 
+  it('discards a fetched response when the source becomes blocked before persistence', async () => {
+    const fixture = createFixture();
+    fixture.repository.securityBlockedOperation = 'commitEndpoint';
+
+    await expect(fixture.collect(validJob)).resolves.toEqual({
+      attemptId: ATTEMPT_ID,
+      projectId: PROJECT_ID,
+      sourceId: SOURCE_ID,
+      outcome: 'security_blocked',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.http.requests).toHaveLength(1);
+    expect(fixture.repository.commits).toEqual([]);
+  });
+
   it('parses the repository result strictly before returning it', async () => {
     const fixture = createFixture();
     fixture.repository.resultExtra = '<html>must not escape</html>';
@@ -616,6 +634,23 @@ describe('collect source', () => {
     expect(fixture.repository.articleCommits.every(({ attempt }) => /^article:[0-9a-f]{64}$/.test(attempt.idempotencyKey))).toBe(true);
   });
 
+  it('stops later article requests when the source becomes blocked at article persistence', async () => {
+    const fixture = feedWithArticlesFixture(3);
+    fixture.repository.securityBlockArticleCommitAt = 1;
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({
+      outcome: 'security_blocked',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.http.requests).toHaveLength(2);
+    expect(fixture.repository.articleCommitAttempts).toBe(1);
+    expect(fixture.repository.articleCommits).toEqual([]);
+  });
+
   it('records a bounded persistence failure when article validators cannot load and continues', async () => {
     const fixture = feedWithArticlesFixture(2);
     fixture.repository.failLatestUrls.add('https://official.example/1');
@@ -666,7 +701,9 @@ class InMemoryRepository implements SourceCollectionRepository {
   readonly latestByUrl = new Map<string, LatestRawItem>();
   readonly failLatestUrls = new Set<string>();
   failureOperation: 'findCommitted' | 'loadContext' | 'loadLatest' | 'commitEndpoint' | 'commitFeed' | null = null;
+  securityBlockedOperation: 'commitEndpoint' | 'commitFeed' | null = null;
   failArticleCommitAt: number | null = null;
+  securityBlockArticleCommitAt: number | null = null;
   articleCommitAttempts = 0;
   resultExtra: string | null = null;
   readonly commits: CommitEndpointInput[] = [];
@@ -711,6 +748,7 @@ class InMemoryRepository implements SourceCollectionRepository {
 
   async commitEndpoint(input: CommitEndpointInput): Promise<CollectSourceResult> {
     this.events.push('repository.commitEndpoint');
+    if (this.securityBlockedOperation === 'commitEndpoint') throw new SourceSecurityBlockedError();
     this.failIfSelected('commitEndpoint');
     this.commits.push(input);
     return {
@@ -728,6 +766,7 @@ class InMemoryRepository implements SourceCollectionRepository {
 
   async commitFeed(input: CommitFeedInput): Promise<CommitFeedResult> {
     this.events.push('repository.commitFeed');
+    if (this.securityBlockedOperation === 'commitFeed') throw new SourceSecurityBlockedError();
     this.failIfSelected('commitFeed');
     this.feedCommits.push(input);
     if (this.feedReplayResult !== null) {
@@ -754,6 +793,9 @@ class InMemoryRepository implements SourceCollectionRepository {
   async commitArticleOutcome(input: CommitArticleOutcomeInput): Promise<void> {
     this.events.push('repository.commitArticleOutcome');
     this.articleCommitAttempts += 1;
+    if (this.securityBlockArticleCommitAt === this.articleCommitAttempts) {
+      throw new SourceSecurityBlockedError();
+    }
     if (this.failArticleCommitAt === this.articleCommitAttempts) {
       throw new Error('postgres article body must never leak');
     }

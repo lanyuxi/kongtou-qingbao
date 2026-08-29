@@ -51,6 +51,7 @@ export function classifyCollectionOutcome(
     case 'invalid_feed':
     case 'discovered_only':
     case 'body_fetch_budget_exhausted':
+    case 'security_blocked':
       return 'dead_letter';
   }
 }

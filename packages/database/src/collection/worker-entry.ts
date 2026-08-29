@@ -1,5 +1,6 @@
 export {
   createSourceCollectionRepository,
+  SourceSecurityBlockedError,
   SourceCollectionPersistenceError,
 } from './source-collection-repository.js';
 export type {

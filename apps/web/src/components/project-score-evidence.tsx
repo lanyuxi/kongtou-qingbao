@@ -56,56 +56,69 @@ const sourceTypeLabels: Record<ProjectEvidenceCitation['sourceType'], string> = 
 
 export function ScoreFactorGroups({
   factors,
+  historical = false,
 }: {
   readonly factors: readonly ProjectScoreFactor[];
+  readonly historical?: boolean;
 }) {
   if (factors.length === 0) {
     return <div className="empty-state">该评分快照暂无因子分解数据。</div>;
   }
 
   return (
-    <div className="score-factor-groups">
-      {axisGroups.map(({ axis, label }) => {
-        const axisFactors = factors.filter((factor) => factor.axis === axis);
-        return (
-          <section className={`score-factor-group score-factor-group-${axis}`} key={axis}>
-            <h3>{label}</h3>
-            {axisFactors.length === 0 ? (
-              <p className="score-factor-axis-empty">该轴暂无因子数据。</p>
-            ) : (
-              <div className="score-factor-list">
-                {axisFactors.map((factor) => (
-                  <div className="score-factor-row" key={`${axis}:${factor.factorCode}`}>
-                    <div className="score-factor-heading">
-                      <strong>{factorLabel(factor)}</strong>
-                      <span>
-                        贡献值 +{factor.contribution.toFixed(2)} · 输入值{' '}
-                        {factor.inputValue.toFixed(4)}
-                      </span>
+    <>
+      {historical ? (
+        <p className="score-historical-notice">
+          历史评分快照：以下因子来自安全事件发生前的评分，不代表当前结论。
+        </p>
+      ) : null}
+      <div className="score-factor-groups">
+        {axisGroups.map(({ axis, label }) => {
+          const axisFactors = factors.filter((factor) => factor.axis === axis);
+          return (
+            <section className={`score-factor-group score-factor-group-${axis}`} key={axis}>
+              <h3>{label}</h3>
+              {axisFactors.length === 0 ? (
+                <p className="score-factor-axis-empty">该轴暂无因子数据。</p>
+              ) : (
+                <div className="score-factor-list">
+                  {axisFactors.map((factor) => (
+                    <div className="score-factor-row" key={`${axis}:${factor.factorCode}`}>
+                      <div className="score-factor-heading">
+                        <strong>{factorLabel(factor)}</strong>
+                        <span>
+                          贡献值 +{factor.contribution.toFixed(2)} · 输入值{' '}
+                          {factor.inputValue.toFixed(4)}
+                        </span>
+                      </div>
+                      <p>{factor.detail}</p>
                     </div>
-                    <p>{factor.detail}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
 export function ScoreEvidenceCitations({
   projectLifecycle,
   citations,
+  historical = false,
 }: {
   readonly projectLifecycle: ProjectLifecycle;
   readonly citations: readonly ProjectEvidenceCitation[];
+  readonly historical?: boolean;
 }) {
   return (
     <div className="score-evidence-citations">
       <p className="score-evidence-notice">
-        以下为本次评分快照使用的证据集，不代表每条证据单独决定某个评分因子。
+        {historical
+          ? '历史评分快照：以下为安全事件发生前该评分使用的证据集，不代表每条证据单独决定某个评分因子，也不代表当前结论。'
+          : '以下为本次评分快照使用的证据集，不代表每条证据单独决定某个评分因子。'}
       </p>
       {projectLifecycle !== 'active' ? (
         <div className="empty-state">

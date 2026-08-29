@@ -66,7 +66,8 @@ export default async function OverviewPage() {
 
       <p className="fixture-note">
         当前 MVP 中的评分来自手工构造的样例数据（模型版本 <code>seed-fixture-v1</code>
-        ），仅用于演示界面，后续将由情报管线产出的结果替换。
+        ），仅用于演示界面，后续将由情报管线产出的结果替换。被安全封锁的项目不计入以上统计与推荐，
+        可在 <Link href="/opportunities?tab=blocked">安全封锁视图</Link> 查看。
       </p>
     </main>
   );

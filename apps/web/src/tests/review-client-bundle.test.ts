@@ -21,8 +21,11 @@ const publicUrlMarker = 'https://public-review-bundle-marker.example.test';
 const publicAnonMarker = 'public-review-anon-bundle-marker';
 const sessionRuntimeMarker = 'sign_in_failed';
 const apiRuntimeMarker = 'review_version_conflict';
+const securityApiRuntimeMarker = 'security_version_conflict';
 const forbiddenServiceMarker = 'forbidden-service-role-bundle-marker';
 const forbiddenDatabaseMarker = 'postgresql://forbidden-database-bundle-marker';
+const forbiddenPromotionMarker = 'forbidden-promotion-env-bundle-marker';
+const forbiddenWorkerMarker = 'forbidden-worker-env-bundle-marker';
 
 describe('review browser client production bundle', () => {
   it('bundles the review runtime with only public Supabase values and preserves a sibling', () => {
@@ -46,6 +49,8 @@ describe('review browser client production bundle', () => {
             NEXT_PUBLIC_SUPABASE_ANON_KEY: publicAnonMarker,
             SUPABASE_SERVICE_ROLE_KEY: forbiddenServiceMarker,
             AIRDROP_DATABASE_URL: forbiddenDatabaseMarker,
+            AIRDROP_PROMOTION_SERVICE_URL: forbiddenPromotionMarker,
+            AIRDROP_WORKER_QUEUE_SECRET: forbiddenWorkerMarker,
           },
           timeout: 25_000,
         });
@@ -63,10 +68,14 @@ describe('review browser client production bundle', () => {
       expect({
         sessionRuntime: bundle?.includes(sessionRuntimeMarker),
         apiRuntime: bundle?.includes(apiRuntimeMarker),
-      }).toEqual({ sessionRuntime: true, apiRuntime: true });
+        securityApiRuntime: bundle?.includes(securityApiRuntimeMarker),
+      }).toEqual({ sessionRuntime: true, apiRuntime: true, securityApiRuntime: true });
       expect(bundle?.includes(forbiddenServiceMarker)).toBe(false);
       expect(bundle?.includes(forbiddenDatabaseMarker)).toBe(false);
-      expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL/);
+      expect(bundle?.includes(forbiddenPromotionMarker)).toBe(false);
+      expect(bundle?.includes(forbiddenWorkerMarker)).toBe(false);
+      expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL|AIRDROP_PROMOTION_SERVICE_URL|AIRDROP_WORKER_QUEUE_SECRET/);
+      expect(bundle).not.toMatch(/createSecurityReviewRepository|createSecurityPublicRepository|postgres|internalNote|evidenceLocator|rawPayload/);
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }
@@ -97,6 +106,7 @@ function createFixture(fixtureRoot: string): void {
   for (const file of [
     'env.ts',
     'review-api-client.ts',
+    'security-review-api-client.ts',
     'review-session.ts',
     'supabase-browser.ts',
   ]) {
@@ -178,6 +188,7 @@ export default function Page() {
 
 import { useEffect } from 'react';
 import { createReviewApiClient } from '../lib/review-api-client';
+import { createSecurityReviewApiClient } from '../lib/security-review-api-client';
 import { createReviewSessionController } from '../lib/review-session';
 import {
   createReviewBrowserAuthPort,
@@ -201,6 +212,19 @@ export function ReviewClientBundleSmoke() {
       }, { status: 409 }),
       ids: { generate: () => 'fixture-idempotency-key' },
     });
+    const securityApi = createSecurityReviewApiClient({
+      session,
+      fetch: async () => Response.json({
+        ok: false,
+        error: {
+          code: 'security_version_conflict',
+          message: 'Fixture conflict.',
+          requestId: 'a1000000-0000-4000-8000-000000000001',
+          details: null,
+        },
+      }, { status: 409 }),
+      ids: { generate: () => 'fixture-security-idempotency-key' },
+    });
 
     void session.signIn('reviewer@example.test', 'fixture-password').then((result) => {
       document.body.dataset.sessionResult = result.ok ? 'ok' : result.code;
@@ -211,6 +235,14 @@ export function ReviewClientBundleSmoke() {
         : result.state === 'conflict'
           ? result.code
           : result.state;
+    });
+    void securityApi.reviewCandidate('a2000000-0000-4000-8000-000000000001', {
+      version: 1,
+      candidateId: 'a2000000-0000-4000-8000-000000000001',
+      expectedCandidateVersion: 1,
+      decision: 'reject',
+      reasonCode: 'claim_not_supported',
+      note: null,
     });
   }, []);
   return null;

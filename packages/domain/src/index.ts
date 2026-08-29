@@ -126,3 +126,26 @@ export {
   normalizeEvidenceText,
 } from './intelligence/evidence-grounding.js';
 export type { EvidenceGroundingErrorCode } from './intelligence/evidence-grounding.js';
+export {
+  compareSecurityPosture,
+  deriveSecurityPosture,
+  orderSecurityTargetsForLock,
+} from './security/posture.js';
+export {
+  validateCandidateDecision,
+  validateDisclosureDecision,
+  validateIncidentTransition,
+} from './security/review-rules.js';
+export type {
+  CandidateDecisionInput,
+  DisclosureDecisionInput,
+  IncidentCurrentDecision,
+  IncidentTransitionCommand,
+  IncidentTransitionInput,
+  SecurityRuleValidationResult,
+} from './security/review-rules.js';
+export {
+  isSecurityIndicatorLexicallyValid,
+  normalizeSecurityIndicatorValueV1,
+} from './security/indicator.js';
+export type { SecurityIndicatorLexicalInput } from './security/indicator.js';

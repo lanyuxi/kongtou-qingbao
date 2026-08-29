@@ -78,6 +78,19 @@ describe('collection job processor', () => {
     ]);
   });
 
+  it('cancels a source that becomes blocked during collection without retrying', async () => {
+    const fixture = createFixture();
+    fixture.collector.result = result('security_blocked');
+
+    await fixture.processor.process(claimedJob(), new AbortController().signal);
+
+    expect(fixture.repository.cancellations).toEqual([
+      { fence: fence(), resultCode: 'source_security_blocked', now: NOW },
+    ]);
+    expect(fixture.repository.retries).toEqual([]);
+    expect(fixture.repository.deadLetters).toEqual([]);
+  });
+
   it('dead-letters a retryable outcome on its fifth execution', async () => {
     const fixture = createFixture();
     fixture.collector.result = result('timeout');
@@ -199,13 +212,13 @@ class FakeRepository implements Pick<DurableCollectionQueueRepository, 'isEligib
   readonly successes: Array<{ fence: LeaseFence; resultCode: string; now: Date }> = [];
   readonly retries: Array<{ fence: LeaseFence; result: QueueFailure; availableAt: Date; now: Date }> = [];
   readonly deadLetters: Array<{ fence: LeaseFence; result: QueueFailure; now: Date }> = [];
-  readonly cancellations: Array<{ fence: LeaseFence; resultCode: 'source_ineligible'; now: Date }> = [];
+  readonly cancellations: Array<{ fence: LeaseFence; resultCode: 'source_ineligible' | 'source_security_blocked'; now: Date }> = [];
   async isEligible(): Promise<boolean> { return this.eligible; }
   async renew(leaseFence: LeaseFence, now: Date): Promise<Date> { this.renewals.push({ fence: leaseFence, now }); if (this.renewError) throw this.renewError; return this.pendingRenewal === null ? new Date(NOW.getTime() + 120_000) : this.pendingRenewal.promise; }
   async succeed(leaseFence: LeaseFence, resultCode: string, now: Date): Promise<void> { this.successes.push({ fence: leaseFence, resultCode, now }); }
   async retry(leaseFence: LeaseFence, result: QueueFailure, availableAt: Date, now: Date): Promise<void> { this.retries.push({ fence: leaseFence, result, availableAt, now }); }
   async deadLetter(leaseFence: LeaseFence, result: QueueFailure, now: Date): Promise<void> { this.deadLetters.push({ fence: leaseFence, result, now }); }
-  async cancel(leaseFence: LeaseFence, resultCode: 'source_ineligible', now: Date): Promise<void> { this.cancellations.push({ fence: leaseFence, resultCode, now }); }
+  async cancel(leaseFence: LeaseFence, resultCode: 'source_ineligible' | 'source_security_blocked', now: Date): Promise<void> { this.cancellations.push({ fence: leaseFence, resultCode, now }); }
 }
 
 class FakeCollector implements SourceCollectorPort {

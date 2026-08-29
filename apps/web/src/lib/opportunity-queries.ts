@@ -2,8 +2,10 @@ import 'server-only';
 
 import {
   createProjectRepository,
+  createSecurityPublicRepository,
   type OpportunityListItem,
 } from '@airdrop/database';
+import type { PublicBlockedProjectSecurityPage } from '@airdrop/contracts';
 
 import {
   loadProjectDetailFromRepository,
@@ -57,7 +59,16 @@ export async function listOpportunities(input: {
 
 export async function loadProjectDetail(slug: string): Promise<ProjectDetailResult | null> {
   const repository = createProjectRepository(createServerSupabaseClient());
-  return loadProjectDetailFromRepository(repository, slug);
+  const securityRepository = createSecurityPublicRepository(createServerSupabaseClient());
+  return loadProjectDetailFromRepository(repository, securityRepository, slug);
+}
+
+export function listBlockedProjects(input: {
+  readonly cursor: string | null;
+  readonly limit: number;
+}): Promise<PublicBlockedProjectSecurityPage> {
+  const repository = createSecurityPublicRepository(createServerSupabaseClient());
+  return repository.listBlockedProjects(input);
 }
 
 function countBy(

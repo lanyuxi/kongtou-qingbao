@@ -4,6 +4,7 @@ import type { CollectSourceResult } from '@airdrop/contracts';
 
 import {
   createSourceCollectionRepositoryFromTransactions,
+  SourceSecurityBlockedError,
   SourceCollectionPersistenceError,
   type CollectionTransaction,
   type CollectionTransactionRunner,
@@ -56,10 +57,38 @@ describe('SourceCollectionRepository', () => {
 
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:one',
       'find committed collect:one',
       `insert raw ${rawItemId}`,
       `insert attempt ${attemptId}:${rawItemId}`,
+    ]);
+  });
+
+  it('rejects a newly blocked source before any collection write', async () => {
+    const harness = createHarness({ sourcePosture: 'blocked' });
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(repository.commitFeed(feedInput())).rejects.toEqual(
+      new SourceSecurityBlockedError(),
+    );
+
+    expect(harness.transactions.at(-1)).toEqual([
+      'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
+    ]);
+  });
+
+  it('keeps caution sources eligible for collection persistence', async () => {
+    const harness = createHarness({ sourcePosture: 'caution' });
+    const repository = createSourceCollectionRepositoryFromTransactions(harness.run);
+
+    await expect(repository.commitEndpoint(endpointInput())).resolves.toEqual(result());
+    expect(harness.transactions.at(-1)?.slice(1, 3)).toEqual([
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
     ]);
   });
 
@@ -77,6 +106,8 @@ describe('SourceCollectionRepository', () => {
 
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:one',
       'find committed collect:one',
       `insert attempt ${attemptId}:${rawItemId}`,
@@ -137,6 +168,8 @@ describe('SourceCollectionRepository', () => {
 
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:one',
       'find committed collect:one',
     ]);
@@ -188,6 +221,8 @@ describe('SourceCollectionRepository', () => {
     });
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:one',
       'find committed collect:one',
       `insert raw ${rawItemId}`,
@@ -234,6 +269,8 @@ describe('SourceCollectionRepository', () => {
 
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:article:one',
       'find committed collect:article:one',
       `insert raw ${rawItemId}`,
@@ -255,6 +292,8 @@ describe('SourceCollectionRepository', () => {
 
     expect(harness.transactions.at(-1)).toEqual([
       'set local role collection_worker',
+      `lock security source:${sourceId}`,
+      `load security posture source:${sourceId}`,
       'lock idempotency collect:article:one',
       'find committed collect:article:one',
       `insert attempt ${attemptId}:${rawItemId}`,
@@ -459,6 +498,7 @@ function result(overrides: Partial<CollectSourceResult> = {}): CollectSourceResu
 function createHarness(options: {
   committed?: CollectSourceResult;
   reusedRawItemId?: string;
+  sourcePosture?: 'clear' | 'caution' | 'blocked';
 } = {}): {
   readonly run: CollectionTransactionRunner;
   readonly transactions: string[][];
@@ -478,10 +518,16 @@ function createHarnessTransaction(
   options: {
     committed?: CollectSourceResult;
     reusedRawItemId?: string;
+    sourcePosture?: 'clear' | 'caution' | 'blocked';
   } = {},
 ): CollectionTransaction {
   return {
     setCollectionWorkerRole: async () => { events.push('set local role collection_worker'); },
+    lockSecurityTarget: async (targetType, targetId) => { events.push(`lock security ${targetType}:${targetId}`); },
+    loadSecurityPosture: async (targetType, targetId) => {
+      events.push(`load security posture ${targetType}:${targetId}`);
+      return options.sourcePosture ?? 'clear';
+    },
     lockIdempotencyKey: async (key) => { events.push(`lock idempotency ${key}`); },
     loadContext: async () => null,
     findCommitted: async (key) => { events.push(`find committed ${key}`); return options.committed ?? null; },

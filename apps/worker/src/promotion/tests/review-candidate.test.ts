@@ -238,6 +238,9 @@ describe('runReviewCandidate', () => {
 describe('reviewCandidateCliMain', () => {
   it.each([
     [new PromotionCommandRejectionError('promotion_idempotency_conflict'), 'promotion_idempotency_conflict'],
+    [new PromotionCommandRejectionError('security_reviewer_required'), 'security_reviewer_required'],
+    [new PromotionCommandRejectionError('security_review_required'), 'security_review_required'],
+    [new PromotionCommandRejectionError('security_promotion_blocked'), 'security_promotion_blocked'],
     [new PromotionPersistenceError(), 'promotion_persistence_failed'],
   ])('prints only the stable repository error code', async (failure, expectedCode) => {
     const stderr: string[] = [];

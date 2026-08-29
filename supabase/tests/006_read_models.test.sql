@@ -79,6 +79,14 @@ select results_eq(
       ('score_signal_links'::text, 'score_signal_links_ai_stage_worker_read'::text),
       ('score_signal_links'::text, 'score_signal_links_select_anon'::text),
       ('score_signal_links'::text, 'score_signal_links_select_authenticated'::text),
+      ('security_incident_decisions'::text, 'security_incident_decisions_select_anon'::text),
+      ('security_incident_decisions'::text, 'security_incident_decisions_select_authenticated'::text),
+      ('security_incident_indicator_links'::text, 'security_incident_indicator_links_select_anon'::text),
+      ('security_incident_indicator_links'::text, 'security_incident_indicator_links_select_authenticated'::text),
+      ('security_incidents'::text, 'security_incidents_select_anon'::text),
+      ('security_incidents'::text, 'security_incidents_select_authenticated'::text),
+      ('security_indicators'::text, 'security_indicators_select_anon'::text),
+      ('security_indicators'::text, 'security_indicators_select_authenticated'::text),
       ('signal_evidence_links'::text, 'signal_evidence_links_select_anon'::text),
       ('signal_evidence_links'::text, 'signal_evidence_links_select_authenticated'::text),
       ('signals'::text, 'signals_ai_stage_worker_read'::text),
@@ -211,7 +219,8 @@ select columns_are(
     'score_model_version',
     'score_input_version',
     'score_explanation',
-    'project_score_id'
+    'project_score_id',
+    'security_posture'
   ],
   'project_current_state has the exact project-detail state columns'
 );
@@ -230,7 +239,8 @@ select columns_are(
     'confidence',
     'recommendation',
     'calculated_at',
-    'latest_published_signal_at'
+    'latest_published_signal_at',
+    'security_posture'
   ],
   'opportunity_list has only the explicit browser-safe opportunity columns'
 );

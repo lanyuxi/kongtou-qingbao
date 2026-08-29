@@ -17,6 +17,7 @@ export const collectionOutcomeSchema = z.enum([
   'timeout',
   'http_error',
   'invalid_feed',
+  'security_blocked',
   'persistence_failed',
 ]);
 

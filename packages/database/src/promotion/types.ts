@@ -63,7 +63,10 @@ export type PromotionCommandRejectionCode =
   | 'promotion_command_invalid'
   | 'promotion_evidence_quote_invalid'
   | 'promotion_source_identity_mismatch'
-  | 'promotion_grounding_failed';
+  | 'promotion_grounding_failed'
+  | 'security_reviewer_required'
+  | 'security_review_required'
+  | 'security_promotion_blocked';
 
 export class PromotionCommandRejectionError extends Error {
   constructor(readonly code: PromotionCommandRejectionCode) {
