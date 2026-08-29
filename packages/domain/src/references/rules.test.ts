@@ -10,6 +10,7 @@ import {
   canDecideDomainAuthority,
   canDecideReference,
   deriveDomainAuthorityState,
+  deriveEffectiveReferenceState,
   deriveLastVerifiedAt,
   deriveReferenceState,
   resultingReferenceState,
@@ -120,5 +121,21 @@ describe('deriveDomainAuthorityState', () => {
     expect(canDecideDomainAuthority('granted', 'revoke')).toBe(true);
     expect(canDecideDomainAuthority('revoked', 'regrant')).toBe(true);
     expect(canDecideDomainAuthority('candidate', 'regrant')).toBe(false);
+  });
+});
+
+describe('deriveEffectiveReferenceState', () => {
+  it('lets an unreleased security flag win over a later verification', () => {
+    const decisions = [
+      decision('register', 'candidate', '2026-08-29T00:00:00.000Z'),
+      decision('verify', 'verified', '2026-08-29T01:00:00.000Z', 'evidence-1'),
+    ];
+    expect(deriveEffectiveReferenceState(decisions, false)).toBe('verified');
+    expect(deriveEffectiveReferenceState(decisions, true)).toBe('flagged');
+  });
+
+  it('returns flagged even with no decision history', () => {
+    expect(deriveEffectiveReferenceState([], true)).toBe('flagged');
+    expect(deriveEffectiveReferenceState([], false)).toBe('candidate');
   });
 });

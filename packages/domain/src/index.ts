@@ -154,11 +154,13 @@ export {
   isReferenceUrlLexicallyValid,
   normalizeReferenceDomain,
   normalizeReferenceUrl,
+  referenceUrlHost,
 } from './references/normalize.js';
 export {
   canDecideDomainAuthority,
   canDecideReference,
   deriveDomainAuthorityState,
+  deriveEffectiveReferenceState,
   deriveLastVerifiedAt,
   deriveReferenceState,
   resultingDomainAuthorityState,

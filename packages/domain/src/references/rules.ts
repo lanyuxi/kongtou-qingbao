@@ -53,6 +53,19 @@ export function deriveReferenceState(
   return decisions.at(-1)?.resultingState ?? 'candidate';
 }
 
+// An unreleased security flag always wins over the last verification: the
+// database derives current state through the same rule, so rendering stops
+// without any background job.
+export function deriveEffectiveReferenceState(
+  decisions: readonly ReferenceDecisionRecord[],
+  hasUnreleasedSecurityFlag: boolean,
+): ReferenceState {
+  if (hasUnreleasedSecurityFlag) {
+    return 'flagged';
+  }
+  return deriveReferenceState(decisions);
+}
+
 export function deriveDomainAuthorityState(
   decisions: readonly DomainAuthorityDecisionRecord[],
 ): DomainAuthorityState {

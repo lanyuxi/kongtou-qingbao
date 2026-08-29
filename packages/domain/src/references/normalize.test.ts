@@ -5,6 +5,7 @@ import {
   isReferenceUrlLexicallyValid,
   normalizeReferenceDomain,
   normalizeReferenceUrl,
+  referenceUrlHost,
 } from './normalize.js';
 
 describe('normalizeReferenceUrl', () => {
@@ -51,6 +52,45 @@ describe('normalizeReferenceUrl', () => {
     expect(normalizeReferenceUrl('https://example.com/claim\nx')).toBeNull();
     expect(normalizeReferenceUrl('https://example.com/claim x')).toBeNull();
     expect(normalizeReferenceUrl('https://exa mple.com/claim')).toBeNull();
+  });
+
+  it('rejects raw input outside printable ascii in both layers', () => {
+    expect(normalizeReferenceUrl('https://example.com/é')).toBeNull();
+    expect(normalizeReferenceUrl('https://例え.jp/x')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com/claim\u00A0')).toBeNull();
+    expect(normalizeReferenceDomain('exämple.com')).toBeNull();
+  });
+
+  it('rejects percent-encoded and idn/ipv6 hosts so both layers agree', () => {
+    expect(normalizeReferenceUrl('https://ex%41mple.com/x')).toBeNull();
+    expect(normalizeReferenceUrl('https://[::1]/x')).toBeNull();
+    expect(normalizeReferenceUrl('https://exa_mple.com/x')).toBeNull();
+  });
+
+  it('normalizes a non-default port with leading zeros like the sql layer', () => {
+    expect(normalizeReferenceUrl('https://example.com:0080/x')).toBe('https://example.com:80/x');
+    expect(normalizeReferenceUrl('https://example.com:0/x')).toBe('https://example.com:0/x');
+  });
+
+  it('drops an empty query like the sql layer', () => {
+    expect(normalizeReferenceUrl('https://example.com?')).toBe('https://example.com/');
+    expect(normalizeReferenceUrl('https://example.com?x#y')).toBe('https://example.com/?x');
+  });
+
+  it('rejects dot-segments instead of silently rewriting them', () => {
+    expect(normalizeReferenceUrl('https://example.com/a/../b')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com/./b')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com/a/.')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com/a/..')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com/a..b')).toBe('https://example.com/a..b');
+  });
+});
+
+describe('referenceUrlHost', () => {
+  it('extracts the host from a normalized url exactly like the sql helper', () => {
+    expect(referenceUrlHost('https://www.example.com/claim')).toBe('www.example.com');
+    expect(referenceUrlHost('https://example.com:8443/claim')).toBe('example.com');
+    expect(referenceUrlHost('https://example.com')).toBe('example.com');
   });
 });
 

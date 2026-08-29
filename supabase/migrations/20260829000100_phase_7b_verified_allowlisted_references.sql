@@ -23,10 +23,12 @@ begin
   if p_value <> pg_catalog.btrim(p_value) then
     return null;
   end if;
-  if p_value ~ '[[:cntrl:]]' or p_value ~ '[[:space:]]' then
+  -- Printable ASCII only: rejects control characters, whitespace (including
+  -- non-breaking space), and every non-ASCII byte so both layers agree.
+  if p_value ~ '[^ -~]' then
     return null;
   end if;
-  if p_value ~ '[/:@?#]' then
+  if p_value ~ '[/:@?#%]' then
     return null;
   end if;
 
@@ -74,7 +76,8 @@ begin
   if p_value <> pg_catalog.btrim(p_value) then
     return null;
   end if;
-  if p_value ~ '[[:cntrl:]]' or p_value ~ '[[:space:]]' then
+  -- Printable ASCII only, matching the TypeScript normalizer exactly.
+  if p_value ~ '[^ -~]' then
     return null;
   end if;
   if p_value !~ '^https://' then
@@ -85,6 +88,21 @@ begin
   -- An empty authority must be rejected explicitly: a bare `https:///claim`
   -- would otherwise be repointed at host `claim`.
   if v_rest = '' or v_rest ~ '^[/?#]' then
+    return null;
+  end if;
+  -- Percent-encoding in the authority would decode to a different host than
+  -- the raw string suggests; more than one colon means an IPv6 literal.
+  if pg_catalog.position('%' in v_rest) between 1 and pg_catalog.coalesce(
+    pg_catalog.least(
+      pg_catalog.nullif(pg_catalog.position('/' in v_rest), 0),
+      pg_catalog.nullif(pg_catalog.position('?' in v_rest), 0),
+      pg_catalog.nullif(pg_catalog.position('#' in v_rest), 0)
+    ) - 1,
+    pg_catalog.length(v_rest)
+  ) then
+    return null;
+  end if;
+  if pg_catalog.length(v_rest) - pg_catalog.length(pg_catalog.replace(v_rest, ':', '')) > 1 then
     return null;
   end if;
 
@@ -107,8 +125,16 @@ begin
   if pg_catalog.position(':' in v_authority) > 0 then
     v_host := pg_catalog.split_part(v_authority, ':', 1);
     v_port := pg_catalog.split_part(v_authority, ':', 2);
-    if v_port !~ '^[0-9]+$' or v_port::integer < 1 or v_port::integer > 65535 then
+    if v_port !~ '^[0-9]+$' or v_port::integer < 0 or v_port::integer > 65535 then
       return null;
+    end if;
+    -- Strip leading zeros so `:0080` and `:80` are the same reference.
+    v_port := pg_catalog.ltrim(v_port, '0');
+    if v_port = '' then
+      v_port := '0';
+    end if;
+    if v_port = '443' then
+      v_port := null;
     end if;
   end if;
 
@@ -137,8 +163,21 @@ begin
   if v_path = '' then
     v_path := '/';
   end if;
+  if v_query = '?' then
+    v_query := '';
+  end if;
+  -- Dot-segments are rejected instead of silently rewritten: the TypeScript
+  -- layer rejects them too, so both layers agree on the same raw input.
+  if v_path = '/.' or v_path = '/..'
+    or pg_catalog.position('/./' in v_path) > 0
+    or pg_catalog.position('/../' in v_path) > 0
+    or pg_catalog.right(v_path, 2) = '/.'
+    or pg_catalog.right(v_path, 3) = '/..'
+  then
+    return null;
+  end if;
 
-  if v_port is null or v_port = '443' then
+  if v_port is null then
     return 'https://' || v_host || v_path || v_query;
   end if;
 
@@ -600,6 +639,58 @@ $function$;
 
 alter function public.domain_authority_state_for_reference(uuid) owner to postgres;
 
+create function public.domain_authority_granted_at_v1(p_authority_id uuid)
+returns timestamptz
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, extensions
+as $function$
+  select decision.created_at
+  from public.project_domain_authority_decisions as decision
+  where decision.authority_id = p_authority_id
+    and decision.resulting_state = 'granted'
+  order by decision.created_at desc, decision.id desc
+  limit 1;
+$function$;
+
+alter function public.domain_authority_granted_at_v1(uuid) owner to postgres;
+
+-- Single decision point for "may this reference be rendered publicly". Both
+-- the RLS policy and the public view call it, so the lifecycle, posture, and
+-- state rules cannot drift apart. Security definer keeps the 7A posture
+-- function out of anonymous reach.
+create function public.reference_is_publicly_renderable_v1(p_reference_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, extensions
+as $function$
+  select
+    public.reference_current_state_v1(p_reference_id) = 'verified'
+    and exists (
+      select 1
+      from public.projects as project
+      where project.id = (
+        select reference_row.project_id
+        from public.project_references as reference_row
+        where reference_row.id = p_reference_id
+      )
+        and project.lifecycle in ('active', 'rumored')
+    )
+    and public.current_security_target_posture(
+      'project',
+      (
+        select reference_row.project_id
+        from public.project_references as reference_row
+        where reference_row.id = p_reference_id
+      )
+    ) <> 'blocked';
+$function$;
+
+alter function public.reference_is_publicly_renderable_v1(uuid) owner to postgres;
+
 -- Synchronous Phase 7A coupling: accepting an indicator flags every reference
 -- whose normalized url or domain matches. The flag row is never deleted.
 
@@ -609,11 +700,47 @@ language plpgsql
 security definer
 set search_path = pg_catalog, public, extensions
 as $function$
+declare
+  v_matched record;
+  v_occurred_at_text text;
 begin
-  insert into public.reference_security_flags (reference_id, indicator_id)
-  select matched.reference_id, new.id
-  from public.match_references_for_indicator(new.indicator_type, new.value_text) as matched
-  on conflict (reference_id, indicator_id) do nothing;
+  v_occurred_at_text := pg_catalog.to_char(
+    pg_catalog.transaction_timestamp() at time zone 'UTC',
+    'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
+  );
+
+  for v_matched in
+    select reference_row.id as reference_id, reference_row.version as reference_version
+    from public.match_references_for_indicator(new.indicator_type, new.value_text) as matched
+    join public.project_references as reference_row
+      on reference_row.id = matched.reference_id
+  loop
+    insert into public.reference_security_flags (reference_id, indicator_id)
+    values (v_matched.reference_id, new.id)
+    on conflict (reference_id, indicator_id) do nothing;
+
+    -- Only the flag that this indicator actually created is published.
+    if found then
+      insert into public.outbox_events (
+        aggregate_type, aggregate_id, aggregate_version,
+        event_type, payload, occurred_at, created_at
+      ) values (
+        'reference', v_matched.reference_id, v_matched.reference_version,
+        'reference.security_flagged.v1',
+        pg_catalog.jsonb_build_object(
+          'version', 1,
+          'eventType', 'reference.security_flagged.v1',
+          'aggregateId', v_matched.reference_id,
+          'aggregateVersion', v_matched.reference_version,
+          'indicatorId', new.id,
+          'occurredAt', v_occurred_at_text
+        ),
+        pg_catalog.transaction_timestamp(),
+        pg_catalog.transaction_timestamp()
+      );
+    end if;
+  end loop;
+
   return null;
 end;
 $function$;
@@ -692,21 +819,6 @@ begin
     v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
   );
 
-  v_domain := p_command_payload ->> 'domain';
-  v_normalized_domain := public.normalize_reference_domain_v1(v_domain);
-  if v_normalized_domain is null
-    or v_normalized_domain <> v_domain
-  then
-    raise exception 'reference_normalization_invalid' using errcode = 'AR210';
-  end if;
-
-  if not exists (select 1 from public.projects as project where project.id = v_project_id) then
-    raise exception 'reference_command_invalid' using errcode = 'AR208';
-  end if;
-  if not public.reference_evidence_is_usable(v_evidence_id) then
-    raise exception 'reference_evidence_required' using errcode = 'AR209';
-  end if;
-
   select * into v_existing
   from public.reference_review_commands as receipt
   where receipt.actor_user_id = v_actor
@@ -728,19 +840,41 @@ begin
       true;
   end if;
 
-  begin
-    insert into public.project_domain_authorities (project_id, normalized_domain)
-    values (v_project_id, v_normalized_domain)
-    on conflict (project_id, normalized_domain) do nothing
-    returning id, version into v_authority_id, v_version;
+  v_domain := p_command_payload ->> 'domain';
+  v_normalized_domain := public.normalize_reference_domain_v1(v_domain);
+  if v_normalized_domain is null
+    or v_normalized_domain <> v_domain
+  then
+    raise exception 'reference_normalization_invalid' using errcode = 'AR210';
+  end if;
 
-    if v_authority_id is null then
-      select authority.id, authority.version into v_authority_id, v_version
+  if not exists (select 1 from public.projects as project where project.id = v_project_id) then
+    raise exception 'reference_command_invalid' using errcode = 'AR208';
+  end if;
+  if not public.reference_evidence_is_usable(v_evidence_id) then
+    raise exception 'reference_evidence_required' using errcode = 'AR209';
+  end if;
+
+  begin
+    -- `version` is also an OUT parameter of this function, so every column
+    -- reference is qualified and no INSERT ... RETURNING is used.
+    if exists (
+      select 1
       from public.project_domain_authorities as authority
       where authority.project_id = v_project_id
-        and authority.normalized_domain = v_normalized_domain;
+        and authority.normalized_domain = v_normalized_domain
+    ) then
       raise exception 'reference_command_invalid' using errcode = 'AR208';
     end if;
+
+    insert into public.project_domain_authorities (project_id, normalized_domain)
+    values (v_project_id, v_normalized_domain);
+
+    select authority.id, authority.version
+    into v_authority_id, v_version
+    from public.project_domain_authorities as authority
+    where authority.project_id = v_project_id
+      and authority.normalized_domain = v_normalized_domain;
 
     insert into public.project_domain_authority_decisions (
       authority_id, decision, resulting_state, reason_code,
@@ -789,6 +923,8 @@ begin
     return query select
       1, v_command_id, v_authority_id, v_version, 'candidate'::text, false;
   exception
+    when unique_violation then
+      raise exception 'reference_command_invalid' using errcode = 'AR208';
     when others then
       if SQLSTATE in ('AR204', 'AR207', 'AR208', 'AR209', 'AR210') then
         raise;
@@ -965,9 +1101,9 @@ begin
     raise exception 'reference_not_decidable' using errcode = 'AR202';
   end if;
 
-  update public.project_domain_authorities
-  set version = version + 1
-  where id = p_authority_id;
+  update public.project_domain_authorities as authority_row
+  set version = authority_row.version + 1
+  where authority_row.id = p_authority_id;
 
   insert into public.project_domain_authority_decisions (
     authority_id, decision, resulting_state, reason_code,
@@ -1110,25 +1246,6 @@ begin
     v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
   );
 
-  v_normalized_url := public.normalize_reference_url_v1(v_url);
-  v_normalized_domain := public.reference_url_host_v1(coalesce(v_normalized_url, ''));
-  if v_normalized_url is null
-    or v_normalized_domain is null
-    or v_normalized_url <> v_url
-    or pg_catalog.char_length(v_label) < 1
-    or pg_catalog.char_length(v_label) > 160
-    or v_label <> pg_catalog.btrim(v_label)
-  then
-    raise exception 'reference_normalization_invalid' using errcode = 'AR210';
-  end if;
-
-  if not exists (select 1 from public.projects as project where project.id = v_project_id) then
-    raise exception 'reference_command_invalid' using errcode = 'AR208';
-  end if;
-  if not public.reference_evidence_is_usable(v_evidence_id) then
-    raise exception 'reference_evidence_required' using errcode = 'AR209';
-  end if;
-
   select * into v_existing
   from public.reference_review_commands as receipt
   where receipt.actor_user_id = v_actor
@@ -1150,6 +1267,25 @@ begin
       true;
   end if;
 
+  v_normalized_url := public.normalize_reference_url_v1(v_url);
+  v_normalized_domain := public.reference_url_host_v1(coalesce(v_normalized_url, ''));
+  if v_normalized_url is null
+    or v_normalized_domain is null
+    or v_normalized_url <> v_url
+    or pg_catalog.char_length(v_label) < 1
+    or pg_catalog.char_length(v_label) > 160
+    or v_label <> pg_catalog.btrim(v_label)
+  then
+    raise exception 'reference_normalization_invalid' using errcode = 'AR210';
+  end if;
+
+  if not exists (select 1 from public.projects as project where project.id = v_project_id) then
+    raise exception 'reference_command_invalid' using errcode = 'AR208';
+  end if;
+  if not public.reference_evidence_is_usable(v_evidence_id) then
+    raise exception 'reference_evidence_required' using errcode = 'AR209';
+  end if;
+
   begin
     if exists (
       select 1 from public.project_references as reference_row
@@ -1162,7 +1298,12 @@ begin
       project_id, kind, normalized_url, normalized_domain, label
     ) values (
       v_project_id, v_kind, v_normalized_url, v_normalized_domain, v_label
-    ) returning id, version into v_reference_id, v_version;
+    );
+
+    select reference_row.id, reference_row.version
+    into v_reference_id, v_version
+    from public.project_references as reference_row
+    where reference_row.normalized_url = v_normalized_url;
 
     insert into public.project_reference_decisions (
       reference_id, decision, resulting_state, reason_code,
@@ -1210,6 +1351,8 @@ begin
     return query select
       1, v_command_id, v_reference_id, v_version, 'candidate'::text, false;
   exception
+    when unique_violation then
+      raise exception 'reference_command_invalid' using errcode = 'AR208';
     when others then
       if SQLSTATE in ('AR204', 'AR207', 'AR208', 'AR209', 'AR210') then
         raise;
@@ -1379,9 +1522,9 @@ begin
     end if;
   end if;
 
-  update public.project_references
-  set version = version + 1
-  where id = p_reference_id;
+  update public.project_references as reference_row
+  set version = reference_row.version + 1
+  where reference_row.id = p_reference_id;
 
   insert into public.project_reference_decisions (
     reference_id, decision, resulting_state, reason_code,
@@ -1489,15 +1632,14 @@ create view public.public_project_references
 with (security_invoker = true, security_barrier = true)
 as
 select
-  state.reference_id,
-  state.project_id,
-  state.kind,
-  state.label,
-  state.normalized_url as url,
-  state.last_verified_at
-from public.project_reference_current_state as state
-where state.current_state = 'verified'
-  and public.current_security_target_posture('project', state.project_id) <> 'blocked';
+  reference_row.id as reference_id,
+  reference_row.project_id,
+  reference_row.kind,
+  reference_row.label,
+  reference_row.normalized_url as url,
+  public.reference_last_verified_at_v1(reference_row.id) as last_verified_at
+from public.project_references as reference_row
+where public.reference_is_publicly_renderable_v1(reference_row.id);
 
 create view public.public_project_domain_authorities
 with (security_invoker = true, security_barrier = true)
@@ -1506,16 +1648,15 @@ select
   authority.id as authority_id,
   authority.project_id,
   authority.normalized_domain as domain,
-  (
-    select decision.created_at
-    from public.project_domain_authority_decisions as decision
-    where decision.authority_id = authority.id
-      and decision.resulting_state = 'granted'
-    order by decision.created_at desc, decision.id desc
-    limit 1
-  ) as granted_at
+  public.domain_authority_granted_at_v1(authority.id) as granted_at
 from public.project_domain_authorities as authority
-where public.domain_authority_current_state_v1(authority.id) = 'granted';
+where public.domain_authority_current_state_v1(authority.id) = 'granted'
+  and exists (
+    select 1
+    from public.projects as project
+    where project.id = authority.project_id
+      and project.lifecycle in ('active', 'rumored')
+  );
 
 alter table public.project_references enable row level security;
 alter table public.project_domain_authorities enable row level security;
@@ -1532,23 +1673,31 @@ create policy project_references_select_public
 on public.project_references
 for select
 to anon, authenticated
-using (
-  exists (
-    select 1
-    from public.projects as project
-    where project.id = project_references.project_id
-      and project.lifecycle in ('active', 'rumored')
-  )
-  and public.reference_current_state_v1(project_references.id) = 'verified'
-);
+using (public.reference_is_publicly_renderable_v1(project_references.id));
 
 revoke all on table public.project_references
 from anon, authenticated;
 grant select (id, project_id, kind, label, normalized_url)
 on public.project_references to anon, authenticated;
 
+create policy project_domain_authorities_select_public
+on public.project_domain_authorities
+for select
+to anon, authenticated
+using (
+  public.domain_authority_current_state_v1(project_domain_authorities.id) = 'granted'
+  and exists (
+    select 1
+    from public.projects as project
+    where project.id = project_domain_authorities.project_id
+      and project.lifecycle in ('active', 'rumored')
+  )
+);
+
 revoke all on table public.project_domain_authorities
 from anon, authenticated;
+grant select (id, project_id, normalized_domain)
+on public.project_domain_authorities to anon, authenticated;
 revoke all on table public.project_domain_authority_decisions
 from anon, authenticated;
 revoke all on table public.project_reference_decisions
@@ -1571,7 +1720,11 @@ revoke all on function public.reference_current_state_v1(uuid) from public;
 grant execute on function public.reference_current_state_v1(uuid) to anon, authenticated;
 revoke all on function public.reference_last_verified_at_v1(uuid) from public;
 grant execute on function public.reference_last_verified_at_v1(uuid) to anon, authenticated;
+revoke all on function public.reference_is_publicly_renderable_v1(uuid) from public;
+grant execute on function public.reference_is_publicly_renderable_v1(uuid) to anon, authenticated;
 revoke all on function public.domain_authority_current_state_v1(uuid) from public;
+revoke all on function public.domain_authority_granted_at_v1(uuid) from public;
+grant execute on function public.domain_authority_granted_at_v1(uuid) to anon, authenticated;
 revoke all on function public.domain_authority_state_for_reference(uuid) from public;
 revoke all on function public.match_references_for_indicator(text, text) from public;
 revoke all on function public.reference_evidence_is_usable(uuid) from public;
