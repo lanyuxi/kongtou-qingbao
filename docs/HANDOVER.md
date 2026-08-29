@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-29（Phase 7A Task 10 已 review clean；Task 11 的 Step 1/2 Golden Dataset（worker 221→235，经变异检验）、Step 4 runbook Phase 7A 章节、Step 5 敏感字段扫描与全仓门禁已完成并提交，`pnpm verify` exit 0 = 1,243 non-skipped / 68 gated skips。**Step 3 的 disposable 集成矩阵需要 SSH 隧道，已停下等待显式授权**；Step 6 收口复审与 Step 7 文档提交在其之后）
+> 最近更新：2026-08-29（**Phase 7A Task 1–11 全部完成，整分支 review clean**，HEAD `55d7f2b`，未合并主线。Task 11 收口复审 0C/2I/4M 已全部闭环；Step 3 经你授权执行 disposable 矩阵：reset exit 0、full pgTAP 13 files/1,338 PASS、集成矩阵 9 files/66 tests PASS、清理后回到 seed 基线零残留、隧道已关闭、生产 54321/54322 全程未访问。最终 `pnpm verify` exit 0 = 1,244 non-skipped / 68 gated skips。**下一步需你决定**：合并主线 / 进入 Phase 7B 设计 / 转生产 rollout）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-08-29 Task 10 完成）**：Phase 0–6B 与详情页功能仍在主线；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行，Task 1–10 均已本地实现、验证并原子提交，当前 HEAD 为 Task 10 提交（见 §Phase 7A 看板）。Task 7 已交付 anon 安全仓库与公开投影，Task 8 已交付 `/api/v1/review/security/*` 与严格浏览器客户端，Task 9 已交付 `/review/security` 审核工作流，Task 10 已交付公共 blocked 视图与项目详情安全呈现；剩余 Task 11（Golden Dataset、E2E、runbook、full verify）。生产仍只保留历史快照中的 19 个已应用迁移，第 20–22 个 migration 继续按 production unapplied 处理。任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
@@ -75,7 +75,11 @@
 | 8 | Authenticated security BFF routes + browser client | ✅ 完成 | 初审 0C/3I/0M → Fix Round 1 → re-review **Approved** | `0f303d9`/`db05026`/`ada09c6` |
 | 9 | Reviewer security workflow UI（`/review/security`） | ✅ 完成 | 初审 1C/1I → Fix Round 1 → 复审 2I → Fix Round 2 → re-review **Approved**（含 1 项 DISPROVEN） | `6a87a24`/`b791210`/`70e8ebc`/`e999a97`/`7292903` |
 | 10 | Public blocked opportunities + project security presentation | ✅ 完成（review clean） | 初审 0C/3I/3M：历史快照提示语作为 grid 直接子元素破坏三列因子布局、caution 仅灰色文本后缀而非 badge、`after` 未校验导致 500 → Fix Round 1 → scoped re-review **Approved**（3 Minor 亦当轮闭环） | `5258ca8`/`54cda0a`/`72a41b7`/`14cf1ca` |
-| 11 | Golden Dataset、E2E、runbook、full verification 收口 | 🔄 进行中（4/7，Step 3 待授权） | Step 1/2 Golden Dataset 11 例 + 变异检验（worker 221→235）、Step 4 runbook Phase 7A 章节、Step 5 敏感字段扫描 4 处命中均非缺陷；`pnpm verify` 1,243 non-skipped / 68 gated skips 全绿 | `942ee9f`/`0dea65f` |
+| 11 | Golden Dataset、E2E、runbook、full verification 收口 | ✅ 完成（review clean） | 初审 0C/2I/4M（runbook AS104/AS111 语义写反、prompt-injection 断言空转等）→ Fix Round → 全部闭环；Step 3 经授权执行 disposable 矩阵：reset exit 0、pgTAP 13 files/1,338 PASS、集成矩阵 9 files/66 PASS、零残留 | `942ee9f`/`7dd3ee9`/`d38f9af`/`55d7f2b` |
+
+**Phase 7A 分支状态（2026-08-29）**：`codex/phase-7a-security-ledger` 上 Task 1–11 **全部完成并通过独立复审**，HEAD `55d7f2b`，提交链 `fbf49d2..55d7f2b`，**未合并主线**。最终 `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；lint/typecheck/build/placeholders 与 `git diff --check` 全绿。生产仍为 19 个已应用迁移，Phase 7A 迁移继续按 production unapplied 处理。
+
+**下一步决策点（需项目所有者决定）**：① 合并 `codex/phase-7a-security-ledger` 回主线 `codex/phase-0-1-foundation`；② 或进入 **Phase 7B verified allowlisted references** 的架构设计（原定排在 7A 之后、tutorials 之前）；③ 或转向生产 rollout（四前置：human reviewer 供给、生产 Auth `/auth/v1/health` 恢复 200、迁移前备份演练、显式授权——目前均未满足）。
 
 worktree 提交链（Task 1–9）：`fbf49d2..7292903`；全部位于 `codex/phase-7a-security-ledger`，未合并主线。Task 10 改动在本轮提交后接续。
 
