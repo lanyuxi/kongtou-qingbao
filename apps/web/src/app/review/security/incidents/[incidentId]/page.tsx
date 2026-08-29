@@ -32,8 +32,8 @@ export default function SecurityIncidentDetailPage({ params }: { readonly params
   else if (runtime !== null && state.status === 'failed') body = <p className="review-state review-message-error" role="alert">安全事件详情暂时无法加载。请稍后重试。</p>;
   else if (runtime !== null && state.status === 'ready') body = <>
     <SecurityIncidentDetail detail={state.detail} />
-    <section className="review-panel"><h2>事件处置命令</h2><SecurityIncidentCommandForm api={runtime.securityApi} incident={state.detail.incident} onRefresh={refresh} onSessionExpired={() => { void clearAndSignIn(); }} /></section>
-    {state.detail.indicatorIds.map((indicatorId) => <section className="review-panel" key={indicatorId}><h2>指标公开披露</h2><SecurityIndicatorDisclosureForm api={runtime.securityApi} indicatorId={indicatorId} onRefresh={refresh} onSessionExpired={() => { void clearAndSignIn(); }} /></section>)}
+    <section className="review-panel"><h2>事件处置命令</h2><SecurityIncidentCommandForm api={runtime.securityApi} incident={state.detail.incident} onRefresh={refresh} onSessionExpired={clearAndSignIn} /></section>
+    {state.detail.indicatorIds.map((indicatorId) => <section className="review-panel" key={indicatorId}><h2>指标公开披露</h2><SecurityIndicatorDisclosureForm api={runtime.securityApi} indicatorId={indicatorId} onRefresh={refresh} onSessionExpired={clearAndSignIn} /></section>)}
   </>;
   return <ReviewShell {...(runtime === null ? {} : { onSignOut: signOut, signOutPending })}><main><p className="review-back"><Link className="review-link" href="/review/security">← 返回安全审核</Link></p>{body}</main></ReviewShell>;
 }
