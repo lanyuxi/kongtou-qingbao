@@ -28,7 +28,7 @@
 
 | Task | 交付物 | 状态 | 证据 / 关键提交 |
 |---|---|---|---|
-| 1 | Strict reference contracts | 待执行 | — |
+| 1 | Strict reference contracts | ✅ 完成（本地门禁绿，待独立复审） | RED：4 个 suite 全部 `Cannot find module`（0 个新用例执行，既有 133 全过）；GREEN：contracts 16 files / **161 tests PASS**，lint/typecheck exit 0。变异检验：把 `publicProjectReferenceSchema` 放宽为 non-strict 后「公开投影携带内部字段」用例失败，随即还原。踩坑：测试导入路径误写为 `../`（会解析到 `src/enums.js` 而非同目录）；URL 控制字符判定用字面量正则会被 `no-control-regex` 拦下、且会往文件里写真实控制字节，已改为码点谓词。 |
 | 2 | Pure normalization / transition / derivation rules | 待执行 | — |
 | 3 | Reference Ledger migration + protected commands + RLS + 安全联动 SQL | 待执行 | — |
 | 4 | Bearer-scoped reference review repositories + race tests | 待执行 | — |
@@ -52,3 +52,5 @@
 |---|---|---|
 | 2026-08-29 | 设计批准 | 调研确认仓库不存在 canonical 引用对象（`official_website_url` 无验证；`project_sources.authority_domains` 为来源级、无历史、无 URL 粒度；7A indicator 明确不判定官方/可访问/白名单）。用户确认四项产品决策，规范 20 节定稿。 |
 | 2026-08-29 | 实施计划 | 产出 10 个任务、574 行计划；Task 5 由「改迁移」重构为「仅集成测试」，把安全联动 SQL 前移到 Task 3，避免任务间改写已 reset 的迁移；归一化例子修正为不剥离 `www.`。 |
+| 2026-08-29 | Task 1 预检 | 建分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references`（HEAD `e9aa866`）；`pnpm install --frozen-lockfile` exit 0；Node 22.22.2 / pnpm 11.16.0 下 `pnpm verify` exit 0 = 1,244 non-skipped / 68 gated skips（contracts 133 / domain 376 / database 257 / worker 236 / web 242）。未连库、未访问生产。 |
+| 2026-08-29 | Task 1 RED→GREEN | 四个契约模块（enums/commands/projections/events）+ 四个测试；28 个新用例覆盖枚举取值、strict 拒绝越权字段与 `reviewerUserId`、https/绝对/无 fragment URL、长度边界（2048/2049、label 160/161）、verify·reverify·restore 必须带 Evidence、grant·regrant 必须带 Evidence、公开投影严格键集、游标 base64url 与 payload 校验、事件仅含安全键。变异检验通过。 |
