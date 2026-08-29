@@ -13,6 +13,13 @@ export interface ProjectDetailResult {
   readonly signals: readonly ProjectSignal[];
   readonly factors: readonly ProjectScoreFactor[];
   readonly citations: readonly ProjectEvidenceCitation[];
+  /**
+   * Authoritative posture for the security overlay. `project.securityPosture` is
+   * read from `project_current_state` by the Catalog repository and is not used
+   * for presentation; both fields derive from the same append-only ledger but are
+   * separate reads, so consumers must use this one to stay consistent with the
+   * active incident summaries rendered beside it.
+   */
   readonly security: PublicProjectSecurityState;
 }
 

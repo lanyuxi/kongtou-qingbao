@@ -8,13 +8,13 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import { OpportunityRow } from '../components/opportunity-elements.js';
+import { OpportunityRow, SecurityPostureBadge } from '../components/opportunity-elements.js';
 import {
   BlockedProjectTable,
   OfficialWebsiteLink,
   ProjectSecurityBanner,
   SafeSecurityIndicatorText,
-  SecurityPostureBadge,
+  blockedCursorFromQuery,
   blockedProjectsPageHref,
 } from '../components/security-elements.js';
 
@@ -200,16 +200,30 @@ describe('ProjectSecurityBanner', () => {
 
 describe('BlockedProjectTable', () => {
   it('renders blocked rows with an internal project link and no external anchor', () => {
-    const html = renderToStaticMarkup(
-      createElement(BlockedProjectTable, { items: [blockedRow] }),
-    );
+    const html = renderToStaticMarkup(createElement(BlockedProjectTable, { items: [blockedRow] }));
 
     expect(html).toContain('演示项目');
     expect(html).toContain('href="/projects/demo-project"');
     expect(html).toContain('claim.example');
-    expect(html).not.toContain('http://');
-    expect(html).not.toContain('https://');
+    expect(html).not.toContain('href="http');
+    expect(html).not.toContain('href="//');
     expect(html).not.toContain('reviewerUserId');
+  });
+
+  it('renders a public-safe url indicator as inert text without an anchor', () => {
+    const html = renderToStaticMarkup(
+      createElement(BlockedProjectTable, {
+        items: [
+          {
+            ...blockedRow,
+            indicators: [{ id: indicatorId, type: 'url', value: 'https://evil.example/claim' }],
+          },
+        ],
+      }),
+    );
+
+    expect(html).toContain('https://evil.example/claim');
+    expect(html).not.toContain('href="http');
   });
 
   it('renders an explicit empty state without synthesizing blocked rows', () => {
@@ -226,6 +240,19 @@ describe('blockedProjectsPageHref', () => {
     expect(blockedProjectsPageHref('cursor-value')).toBe(
       '/opportunities?tab=blocked&after=cursor-value',
     );
+  });
+});
+
+describe('blockedCursorFromQuery', () => {
+  it('accepts a well-formed cursor and rejects malformed untrusted input', () => {
+    const validCursor = encodeBlockedCursor('2026-08-29T00:00:00.000Z', projectId);
+
+    expect(blockedCursorFromQuery(undefined)).toBeNull();
+    expect(blockedCursorFromQuery(validCursor)).toBe(validCursor);
+    expect(blockedCursorFromQuery('xyz')).toBeNull();
+    expect(blockedCursorFromQuery('')).toBeNull();
+    expect(blockedCursorFromQuery('../etc/passwd')).toBeNull();
+    expect(blockedCursorFromQuery(`${validCursor} `)).toBeNull();
   });
 });
 
@@ -260,6 +287,7 @@ describe('OfficialWebsiteLink', () => {
       renderToStaticMarkup(createElement(OfficialWebsiteLink, { url: null, posture: 'clear' })),
     ).toBe('');
   });
+
   it('does not reference internal security or outbound-link fields in the public component source', () => {
     const source = readFileSync(
       new URL('../components/security-elements.tsx', import.meta.url),
@@ -281,12 +309,13 @@ describe('OfficialWebsiteLink', () => {
 });
 
 describe('OpportunityRow security presentation', () => {
-  it('keeps caution projects in the ordinary opportunity row with a warning and unchanged order', () => {
+  it('renders caution as a badge in the ordinary opportunity row without reordering', () => {
     const html = renderToStaticMarkup(
       createElement(OpportunityRow, { item: createOpportunityItem('caution') }),
     );
 
     expect(html).toContain('谨慎');
+    expect(html).toContain('badge warn');
     expect(html).toContain('72');
     expect(html).toContain('演示项目');
   });
@@ -301,6 +330,14 @@ describe('OpportunityRow security presentation', () => {
     expect(html).not.toContain('已封锁');
   });
 });
+
+function encodeBlockedCursor(lastVerifiedAt: string, cursorProjectId: string): string {
+  return globalThis
+    .btoa(JSON.stringify({ lastVerifiedAt, projectId: cursorProjectId }))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/u, '');
+}
 
 function createOpportunityItem(posture: 'clear' | 'caution' | 'blocked'): OpportunityListItem {
   return {

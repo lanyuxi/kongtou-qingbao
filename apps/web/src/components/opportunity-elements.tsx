@@ -1,6 +1,26 @@
 import Link from 'next/link';
+import type { SecurityPosture } from '@airdrop/contracts';
 
 import type { OpportunityListItem, ProjectLifecycle, ProjectSignal } from '@airdrop/database';
+
+export const securityPostureLabels: Readonly<Record<SecurityPosture, string>> = {
+  clear: '正常',
+  caution: '谨慎',
+  blocked: '已封锁',
+};
+
+export function securityPostureBadgeClass(posture: SecurityPosture): string {
+  return posture === 'blocked' ? 'badge bad' : 'badge warn';
+}
+
+export function SecurityPostureBadge({ posture }: { readonly posture: SecurityPosture }) {
+  if (posture === 'clear') {
+    return null;
+  }
+  return (
+    <span className={securityPostureBadgeClass(posture)}>{securityPostureLabels[posture]}</span>
+  );
+}
 
 export function OpportunityScoreNumber({ score }: { readonly score: number }) {
   return <span className="num">{score.toFixed(0)}</span>;
@@ -114,9 +134,9 @@ export function OpportunityRow({ item }: { readonly item: OpportunityListItem })
           <span className="project-cell-meta">
             {item.primaryChain ?? '未知公链'}
             {item.lifecycle === 'rumored' ? ' · 传闻' : ''}
-            {item.securityPosture === 'caution' ? ' · 谨慎' : ''}
           </span>
         </Link>
+        <SecurityPostureBadge posture={item.securityPosture} />
       </td>
       <td className="num-col">
         <OpportunityScoreNumber score={item.opportunityScore} />

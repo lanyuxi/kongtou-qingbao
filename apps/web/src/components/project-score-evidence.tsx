@@ -66,35 +66,41 @@ export function ScoreFactorGroups({
   }
 
   return (
-    <div className="score-factor-groups">
-      {historical ? <p className="score-historical-notice">历史评分快照：以下因子来自安全事件发生前的评分，不代表当前结论。</p> : null}
-      {axisGroups.map(({ axis, label }) => {
-        const axisFactors = factors.filter((factor) => factor.axis === axis);
-        return (
-          <section className={`score-factor-group score-factor-group-${axis}`} key={axis}>
-            <h3>{label}</h3>
-            {axisFactors.length === 0 ? (
-              <p className="score-factor-axis-empty">该轴暂无因子数据。</p>
-            ) : (
-              <div className="score-factor-list">
-                {axisFactors.map((factor) => (
-                  <div className="score-factor-row" key={`${axis}:${factor.factorCode}`}>
-                    <div className="score-factor-heading">
-                      <strong>{factorLabel(factor)}</strong>
-                      <span>
-                        贡献值 +{factor.contribution.toFixed(2)} · 输入值{' '}
-                        {factor.inputValue.toFixed(4)}
-                      </span>
+    <>
+      {historical ? (
+        <p className="score-historical-notice">
+          历史评分快照：以下因子来自安全事件发生前的评分，不代表当前结论。
+        </p>
+      ) : null}
+      <div className="score-factor-groups">
+        {axisGroups.map(({ axis, label }) => {
+          const axisFactors = factors.filter((factor) => factor.axis === axis);
+          return (
+            <section className={`score-factor-group score-factor-group-${axis}`} key={axis}>
+              <h3>{label}</h3>
+              {axisFactors.length === 0 ? (
+                <p className="score-factor-axis-empty">该轴暂无因子数据。</p>
+              ) : (
+                <div className="score-factor-list">
+                  {axisFactors.map((factor) => (
+                    <div className="score-factor-row" key={`${axis}:${factor.factorCode}`}>
+                      <div className="score-factor-heading">
+                        <strong>{factorLabel(factor)}</strong>
+                        <span>
+                          贡献值 +{factor.contribution.toFixed(2)} · 输入值{' '}
+                          {factor.inputValue.toFixed(4)}
+                        </span>
+                      </div>
+                      <p>{factor.detail}</p>
                     </div>
-                    <p>{factor.detail}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
-    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

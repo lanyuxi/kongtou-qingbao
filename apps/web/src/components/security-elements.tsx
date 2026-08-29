@@ -1,21 +1,16 @@
-import type {
-  PublicActiveSecurityIncidentSummary,
-  PublicBlockedProjectSecurityRow,
-  PublicProjectSecurityState,
-  SecurityIncidentCategory,
-  SecurityIndicatorType,
-  SecurityPosture,
-  SecuritySeverity,
+import {
+  blockedProjectSecurityCursorSchema,
+  type PublicActiveSecurityIncidentSummary,
+  type PublicBlockedProjectSecurityRow,
+  type PublicProjectSecurityState,
+  type SecurityIncidentCategory,
+  type SecurityIndicatorType,
+  type SecurityPosture,
+  type SecuritySeverity,
 } from '@airdrop/contracts';
 import Link from 'next/link';
 
-import { formatTimestamp } from './opportunity-elements.js';
-
-export const securityPostureLabels: Readonly<Record<SecurityPosture, string>> = {
-  clear: '正常',
-  caution: '谨慎',
-  blocked: '已封锁',
-};
+import { SecurityPostureBadge, formatTimestamp } from './opportunity-elements.js';
 
 const categoryLabels: Readonly<Record<SecurityIncidentCategory, string>> = {
   phishing: '钓鱼仿冒',
@@ -42,19 +37,6 @@ const indicatorTypeLabels: Readonly<Record<SecurityIndicatorType, string>> = {
   social_account: '社交账号',
   observed_behavior: '观察到的行为',
 };
-
-export function securityPostureBadgeClass(posture: SecurityPosture): string {
-  return posture === 'blocked' ? 'badge bad' : 'badge warn';
-}
-
-export function SecurityPostureBadge({ posture }: { readonly posture: SecurityPosture }) {
-  if (posture === 'clear') {
-    return null;
-  }
-  return (
-    <span className={securityPostureBadgeClass(posture)}>{securityPostureLabels[posture]}</span>
-  );
-}
 
 export function SafeSecurityIndicatorText({ value }: { readonly value: string }) {
   return <code className="security-indicator-text">{value}</code>;
@@ -158,6 +140,13 @@ export function blockedProjectsPageHref(cursor: string | null): string {
   return cursor === null
     ? '/opportunities?tab=blocked'
     : `/opportunities?tab=blocked&after=${encodeURIComponent(cursor)}`;
+}
+
+export function blockedCursorFromQuery(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  return blockedProjectSecurityCursorSchema.safeParse(value).success ? value : null;
 }
 
 export function OfficialWebsiteLink({

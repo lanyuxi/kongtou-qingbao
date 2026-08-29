@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { OpportunityRow } from '../../components/opportunity-elements.js';
 import {
   BlockedProjectTable,
+  blockedCursorFromQuery,
   blockedProjectsPageHref,
 } from '../../components/security-elements.js';
 import { listBlockedProjects, listOpportunities } from '../../lib/opportunity-queries.js';
@@ -137,7 +138,10 @@ async function loadOpportunityTab(
 async function loadBlockedTab(
   after: string | undefined,
 ): Promise<{ readonly content: ReactNode; readonly nextHref: string | null }> {
-  const page = await listBlockedProjects({ cursor: after ?? null, limit: pageSize });
+  const page = await listBlockedProjects({
+    cursor: blockedCursorFromQuery(after),
+    limit: pageSize,
+  });
   return {
     content: <BlockedProjectTable items={page.items} />,
     nextHref: page.nextCursor === null ? null : blockedProjectsPageHref(page.nextCursor),

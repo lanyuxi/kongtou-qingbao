@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import {
   LifecycleBadge,
   RecommendationBadge,
+  SecurityPostureBadge,
   SignalTimeline,
   formatTimestamp,
   lifecycleLabel,
@@ -11,11 +12,7 @@ import {
   ScoreEvidenceCitations,
   ScoreFactorGroups,
 } from '../../../components/project-score-evidence.js';
-import {
-  OfficialWebsiteLink,
-  ProjectSecurityBanner,
-  SecurityPostureBadge,
-} from '../../../components/security-elements.js';
+import { OfficialWebsiteLink, ProjectSecurityBanner } from '../../../components/security-elements.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';

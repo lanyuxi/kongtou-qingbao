@@ -90,6 +90,19 @@ describe('ScoreFactorGroups', () => {
     expect(historical).toContain('安全事件发生前保留的因子明细。');
     expect(current).not.toContain('历史评分快照');
   });
+
+  it('renders the historical notice outside the three-column factor grid', () => {
+    const html = renderToStaticMarkup(
+      createElement(ScoreFactorGroups, {
+        factors: [createFactor({})],
+        historical: true,
+      }),
+    );
+
+    const gridStart = html.indexOf('class="score-factor-groups"');
+    expect(gridStart).toBeGreaterThanOrEqual(0);
+    expect(html.indexOf('历史评分快照')).toBeLessThan(gridStart);
+  });
 });
 
 describe('ScoreEvidenceCitations', () => {
