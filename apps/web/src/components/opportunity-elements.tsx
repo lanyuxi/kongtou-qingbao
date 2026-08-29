@@ -114,6 +114,7 @@ export function OpportunityRow({ item }: { readonly item: OpportunityListItem })
           <span className="project-cell-meta">
             {item.primaryChain ?? '未知公链'}
             {item.lifecycle === 'rumored' ? ' · 传闻' : ''}
+            {item.securityPosture === 'caution' ? ' · 谨慎' : ''}
           </span>
         </Link>
       </td>

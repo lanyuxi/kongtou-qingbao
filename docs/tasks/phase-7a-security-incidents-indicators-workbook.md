@@ -1,7 +1,7 @@
 # Phase 7A Security Incidents and Indicators — Development Workbook
 
 > 日期：2026-08-26
-> 当前状态：Task 9 complete / review clean；下一任务 Task 10；生产未访问
+> 当前状态：Task 10 本地完成（全仓门禁绿，待独立复审）；下一任务 Task 11；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-26-phase-7a-security-incidents-indicators-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-26-phase-7a-security-incidents-indicators.md`
 
@@ -29,7 +29,7 @@
 | 7 | Public security repositories/project projections | **已完成（review clean）** | 初始实现与 marker-verified 8-test integration 完成；Fix Round 1 收紧 public row/error boundary、完整 fixture cleanup、source-Evidence security composition 与 citation count/data split。最终 disposable 9/9 PASS、database 257 PASS / 66 gated skips、fresh root verify 1,127 non-skipped / 68 gated skips；scoped re-review APPROVED，提交 `7b8c329`。生产未访问。 |
 | 8 | Authenticated BFF/routes/browser client | **已完成（review clean）** | 初版 `0f303d9`；初审 0C/3I/0M。Fix Round 1 分离 operation-specific receipts，补九操作/five mutations/auth malformed-body 与 bundle secret/server-constructor isolation；提交 `db05026` 后 scoped re-review APPROVED。fresh root verify 1,176 non-skipped / 68 gated skips；Task 8 文档收口至 `ada09c6`。生产未访问。 |
 | 9 | Reviewer security UI | **已完成（review clean）** | 初版 `6a87a24`；初审 1C/1I，Fix Round 1 `b791210` 建立 candidate/incident/disclosure affirmative confirmation、protected attach context。复审新增 2I；Fix Round 2 `70e8ebc` 绑定 authoritative aggregate snapshots 并在 409 清确认。source-target 隐藏 finding 经真实正则/UI test 证伪。最终 Web 12 files / 217 PASS，scoped re-review APPROVED；fresh root verify 1,204 non-skipped / 68 gated skips，lint/typecheck/build/placeholders 全绿。生产未访问。 |
-| 10 | Public blocked/caution/project UI | 待执行 | — |
+| 10 | Public blocked/caution/project UI | **已完成（本地门禁绿，待独立复审）** | 精确 Node 22.22.2 / pnpm 11.16.0 下 RED 为 3 failed files / 4 failed tests / 215 passed：新 `security-elements.test.ts` 因模块缺失 0 用例执行，loader 2 个具名失败锁定结果缺 `security` 字段与并行安全读，`project-score-evidence` 2 个失败锁定 `historical` 历史快照标注缺失。最小实现新增 `components/security-elements.tsx`（posture 徽标、warning-first 横幅、惰性指标文本、blocked 表格/行、`blockedProjectsPageHref`、blocked 时停用官网外链），`project-detail-loader` 改为并行读取 `getProjectSecurity` 并原样返回 `security`，机会页新增只走 `public_blocked_projects` 的 `blocked` tab，详情页 blocked 时把因子/证据标为历史快照。focused/full Web 13 files / 239 tests PASS，lint、顺序 typecheck、Next 16.3.0 build、`git diff --check` 均 exit 0；fresh `pnpm verify` exit 0（contracts 133 / domain 376 / database 257 / worker 221 / web 239 = 1,226 non-skipped、68 gated skips）。未连接 DB/network、未 reset、未访问生产。 |
 | 11 | Golden Dataset、E2E、runbook、full verification | 待执行 | — |
 
 ## 3. 计划阶段记录
@@ -89,6 +89,10 @@
 | 2026-08-29 | Task 9 Fix Round 2 controller final gate | Node 22.22.2 / pnpm 11.16.0 下 controller 顺序复验 focused/full Web 均 12 files / 217 PASS，lint/typecheck/Next build/diff check 全部 exit 0，reviewer-security routes 完整。最终 production diff 只保留 authoritative aggregate snapshot 与 409 clear-confirmation；source/extraction visible 和 hostile text inert 为 test-only behavior coverage，无 literal allowlist。无 DB/network/reset/production；下一步提交并 scoped re-review。 |
 | 2026-08-29 | Task 9 Fix Round 2 scoped re-review | 提交 `70e8ebc`。Aggregate-version finding RESOLVED：candidate/incident confirmation 绑定权威版本/完整展示上下文，UI/helper 均拒绝 stale props，三类 409 清确认且 disclosure 人工 version 不变。Source-target finding 经 reviewer 核对 regex 与 behavior tests 正式 DISPROVEN。新增 0C/0I/0M，Assessment APPROVED。Task 9 review clean，下一步 fresh root verify；无 DB/network/reset/production。 |
 | 2026-08-29 | Task 9 fresh root gate / COMPLETE | Node 22.22.2 / pnpm 11.16.0 下 fresh `CI=true pnpm verify` 一次 exit 0：contracts 133 + domain 376 + database 257 + worker 221 + web 217 = 1,204 non-skipped，68 gated skips；lint/typecheck/tests/build/placeholders 全绿。Task 9 review clean / complete；下一任务 Task 10 public blocked/caution/project UI。无 DB/network/reset/production。 |
+| 2026-08-29 | Task 10 plan/baseline preflight | 接续 Task 9 收口提交 `7292903`。复核 spec §3/§5、plan Task 10、Task 7 `SecurityPublicRepository` 与两条现有视图：`opportunity_list` 已在数据库层排除 blocked 项目，`project_current_state` 保留 blocked 项目供详情访问，故首页统计与普通 tab 天然使用安全过滤数据源。linked worktree tracked clean，Web baseline 12 files / 217 tests PASS。未连接 DB/network/reset/生产。 |
+| 2026-08-29 | Task 10 RED | 新增 `security-elements.test.ts`（19 用例：blocked 横幅含“当前项目已被安全封锁”/“历史评分快照”/role=alert/无 `<a`/无 `reviewerUserId`、clear 后无横幅、caution 保留排序无历史标注、类别/严重度/时间窗本地化、官方来源免责声明、未获批指标不渲染、hostile HTML/Markdown 转义、blocked 表格内部链接无外链、空态、游标 href、官网链接 blocked 停用、OpportunityRow caution 标记）并扩展 loader 与 score-evidence 测试。精确 PATH/CI 下 RED exit 1：3 failed files / 4 failed / 215 passed。未写生产代码、未连库。 |
+| 2026-08-29 | Task 10 local GREEN | 新增 `components/security-elements.tsx`；`project-detail-loader` 改为 `(repository, securityRepository, slug)` 并在捕获 `scoreId` 后并行读 `getProjectSecurity`；`opportunity-queries` 新增 `listBlockedProjects`；机会页新增 `blocked` tab 与游标分页；详情页 warning-first 横幅 + blocked 时历史快照标注 + `OfficialWebsiteLink` 停用外链；首页补充统计口径说明与封锁视图入口；`globals.css` 追加对应样式。focused/full Web 13 files / 239 tests PASS，lint、顺序 typecheck、Next 16.3.0 build、`git diff --check` 均 exit 0。未连接 DB/network/reset/生产。 |
+| 2026-08-29 | Task 10 fresh root gate | Node 22.22.2 / pnpm 11.16.0 下 `PATH=/tmp/airdrop-node22-pnpm/bin:$PATH CI=true env -u NODE_OPTIONS -u NODE_TLS_REJECT_UNAUTHORIZED pnpm verify` exit 0：contracts 133、domain 376、database 257、worker 221、web 239，共 1,226 non-skipped / 68 gated skips；lint/typecheck/build/placeholders 全绿。环境要点：本机 `NODE_OPTIONS` 含 `--use-system-ca`，Next 16 Turbopack worker 会 `ERR_WORKER_INVALID_EXEC_ARGV`，build/verify 必须 `env -u NODE_OPTIONS`。未访问 DB/reset/生产。 |
 | 2026-08-26 | 产品范围逐项确认 | 完成：独立 posture、project/source scope、角色、门禁、披露和完整纵切片均确认。 |
 | 2026-08-26 | 架构选型与四节设计 | 完成：采用追加式 Security Ledger；数据边界、命令事务、读模型/UI、测试/不做项均确认。 |
 | 2026-08-26 | 正式设计规范 | 完成：规范获用户批准，状态 `Approved`。 |

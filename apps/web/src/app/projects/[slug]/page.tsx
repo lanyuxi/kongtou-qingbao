@@ -11,6 +11,11 @@ import {
   ScoreEvidenceCitations,
   ScoreFactorGroups,
 } from '../../../components/project-score-evidence.js';
+import {
+  OfficialWebsiteLink,
+  ProjectSecurityBanner,
+  SecurityPostureBadge,
+} from '../../../components/security-elements.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +31,9 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const { project, signals, factors, citations } = detail;
+  const { project, signals, factors, citations, security } = detail;
   const score = project.latestScore;
+  const historical = security.posture === 'blocked';
 
   return (
     <main>
@@ -45,24 +51,20 @@ export default async function ProjectDetailPage({
           </h1>
           <LifecycleBadge lifecycle={project.lifecycle === 'rumored' ? 'rumored' : 'active'} />
           {score !== null && <RecommendationBadge recommendation={score.recommendation} />}
+          <SecurityPostureBadge posture={security.posture} />
         </div>
         <p className="page-subtitle">
           {project.primaryChain ?? '未知公链'} · 更新于 {formatTimestamp(project.updatedAt)}
           {project.officialWebsiteUrl === null ? null : (
             <>
               {' · '}
-              <a
-                href={project.officialWebsiteUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                style={{ color: 'var(--accent-ink)' }}
-              >
-                官方网站 ↗
-              </a>
+              <OfficialWebsiteLink url={project.officialWebsiteUrl} posture={security.posture} />
             </>
           )}
         </p>
       </div>
+
+      <ProjectSecurityBanner state={security} />
 
       {score === null ? (
         <section className="card">
@@ -103,7 +105,7 @@ export default async function ProjectDetailPage({
 
               <section className="card detail-section">
                 <h2 className="detail-section-title">评分因子</h2>
-                <ScoreFactorGroups factors={factors} />
+                <ScoreFactorGroups factors={factors} historical={historical} />
               </section>
 
               <section className="card detail-section">
@@ -111,6 +113,7 @@ export default async function ProjectDetailPage({
                 <ScoreEvidenceCitations
                   projectLifecycle={project.lifecycle}
                   citations={citations}
+                  historical={historical}
                 />
               </section>
 

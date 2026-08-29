@@ -1,9 +1,11 @@
+import type { PublicProjectSecurityState } from '@airdrop/contracts';
 import type {
   ProjectDetail,
   ProjectEvidenceCitation,
   ProjectRepository,
   ProjectScoreFactor,
   ProjectSignal,
+  SecurityPublicRepository,
 } from '@airdrop/database';
 
 export interface ProjectDetailResult {
@@ -11,10 +13,12 @@ export interface ProjectDetailResult {
   readonly signals: readonly ProjectSignal[];
   readonly factors: readonly ProjectScoreFactor[];
   readonly citations: readonly ProjectEvidenceCitation[];
+  readonly security: PublicProjectSecurityState;
 }
 
 export async function loadProjectDetailFromRepository(
   repository: ProjectRepository,
+  securityRepository: SecurityPublicRepository,
   slug: string,
 ): Promise<ProjectDetailResult | null> {
   const project = await repository.getProjectBySlug(slug);
@@ -22,15 +26,14 @@ export async function loadProjectDetailFromRepository(
     return null;
   }
 
-  const signals = await repository.listProjectSignals(project.projectId, 20);
   const scoreId = project.latestScore?.id;
-  if (scoreId === undefined) {
-    return { project, signals, factors: [], citations: [] };
-  }
-
-  const [factors, citations] = await Promise.all([
-    repository.listCurrentScoreFactors(project.projectId, scoreId),
-    repository.listCurrentScoreEvidenceCitations(project.projectId, scoreId),
+  const [signals, factors, citations, security] = await Promise.all([
+    repository.listProjectSignals(project.projectId, 20),
+    scoreId === undefined ? [] : repository.listCurrentScoreFactors(project.projectId, scoreId),
+    scoreId === undefined
+      ? []
+      : repository.listCurrentScoreEvidenceCitations(project.projectId, scoreId),
+    securityRepository.getProjectSecurity(project.projectId),
   ]);
-  return { project, signals, factors, citations };
+  return { project, signals, factors, citations, security };
 }

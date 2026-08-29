@@ -77,6 +77,19 @@ describe('ScoreFactorGroups', () => {
     expect(html).toContain('该评分快照暂无因子分解数据。');
     expect(html).not.toContain('>机会</h3>');
   });
+
+  it('labels retained factors as a pre-incident historical snapshot only when marked historical', () => {
+    const factors = [createFactor({ detail: '安全事件发生前保留的因子明细。' })];
+
+    const historical = renderToStaticMarkup(
+      createElement(ScoreFactorGroups, { factors, historical: true }),
+    );
+    const current = renderToStaticMarkup(createElement(ScoreFactorGroups, { factors }));
+
+    expect(historical).toContain('历史评分快照');
+    expect(historical).toContain('安全事件发生前保留的因子明细。');
+    expect(current).not.toContain('历史评分快照');
+  });
 });
 
 describe('ScoreEvidenceCitations', () => {
@@ -155,6 +168,25 @@ describe('ScoreEvidenceCitations', () => {
     );
 
     expect(html).toContain('本次评分快照暂无可公开的证据引用。');
+  });
+
+  it('labels retained citations as a pre-incident historical snapshot only when marked historical', () => {
+    const citations = [createCitation({ citationText: '安全事件发生前保留的证据引用。' })];
+
+    const historical = renderToStaticMarkup(
+      createElement(ScoreEvidenceCitations, {
+        projectLifecycle: 'active',
+        citations,
+        historical: true,
+      }),
+    );
+    const current = renderToStaticMarkup(
+      createElement(ScoreEvidenceCitations, { projectLifecycle: 'active', citations }),
+    );
+
+    expect(historical).toContain('历史评分快照');
+    expect(historical).toContain('安全事件发生前保留的证据引用。');
+    expect(current).not.toContain('历史评分快照');
   });
 
   it('uses the approved official-source wording only for a verified official relation', () => {

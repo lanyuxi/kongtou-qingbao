@@ -56,8 +56,10 @@ const sourceTypeLabels: Record<ProjectEvidenceCitation['sourceType'], string> = 
 
 export function ScoreFactorGroups({
   factors,
+  historical = false,
 }: {
   readonly factors: readonly ProjectScoreFactor[];
+  readonly historical?: boolean;
 }) {
   if (factors.length === 0) {
     return <div className="empty-state">该评分快照暂无因子分解数据。</div>;
@@ -65,6 +67,7 @@ export function ScoreFactorGroups({
 
   return (
     <div className="score-factor-groups">
+      {historical ? <p className="score-historical-notice">历史评分快照：以下因子来自安全事件发生前的评分，不代表当前结论。</p> : null}
       {axisGroups.map(({ axis, label }) => {
         const axisFactors = factors.filter((factor) => factor.axis === axis);
         return (
@@ -98,14 +101,18 @@ export function ScoreFactorGroups({
 export function ScoreEvidenceCitations({
   projectLifecycle,
   citations,
+  historical = false,
 }: {
   readonly projectLifecycle: ProjectLifecycle;
   readonly citations: readonly ProjectEvidenceCitation[];
+  readonly historical?: boolean;
 }) {
   return (
     <div className="score-evidence-citations">
       <p className="score-evidence-notice">
-        以下为本次评分快照使用的证据集，不代表每条证据单独决定某个评分因子。
+        {historical
+          ? '历史评分快照：以下为安全事件发生前该评分使用的证据集，不代表每条证据单独决定某个评分因子，也不代表当前结论。'
+          : '以下为本次评分快照使用的证据集，不代表每条证据单独决定某个评分因子。'}
       </p>
       {projectLifecycle !== 'active' ? (
         <div className="empty-state">

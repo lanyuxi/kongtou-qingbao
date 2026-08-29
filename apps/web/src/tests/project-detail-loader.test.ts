@@ -5,7 +5,9 @@ import type {
   ProjectRepository,
   ProjectScoreFactor,
   ProjectSignal,
+  SecurityPublicRepository,
 } from '@airdrop/database';
+import type { PublicProjectSecurityState } from '@airdrop/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { loadProjectDetailFromRepository } from '../lib/project-detail-loader.js';
@@ -76,52 +78,85 @@ const citations: readonly ProjectEvidenceCitation[] = [
   },
 ];
 
-describe('loadProjectDetailFromRepository', () => {
-  it('loads both score projections in parallel with the exact project and immutable score IDs', async () => {
-    const repository = new RecordingProjectRepository(projectWithScore, true);
+const securityState: PublicProjectSecurityState = {
+  version: 1,
+  projectId,
+  posture: 'blocked',
+  activeIncidents: [
+    {
+      version: 1,
+      incidentId: 'b1000000-0000-4000-8000-000000000006',
+      target: { type: 'project', id: projectId },
+      category: 'phishing',
+      severity: 'critical',
+      state: 'active',
+      publicSummary: '该项目出现仿冒领取页面，请勿在任何页面连接钱包。',
+      firstObservedAt: '2026-08-28T00:00:00.000Z',
+      lastVerifiedAt: '2026-08-29T00:00:00.000Z',
+      indicators: [],
+    },
+  ],
+};
 
-    const pendingDetail = loadProjectDetailFromRepository(repository, 'demo-project');
+describe('loadProjectDetailFromRepository', () => {
+  it('loads both score projections and the public security state in parallel with the exact project and immutable score IDs', async () => {
+    const repository = new RecordingProjectRepository(projectWithScore, true);
+    const securityRepository = new RecordingSecurityPublicRepository();
+
+    const pendingDetail = loadProjectDetailFromRepository(
+      repository,
+      securityRepository,
+      'demo-project',
+    );
     await waitForMicrotasks();
 
     expect(repository.scoreReads).toEqual([
       { kind: 'factors', projectId, scoreId },
       { kind: 'citations', projectId, scoreId },
     ]);
+    expect(securityRepository.reads).toEqual([projectId]);
 
     repository.releaseScoreReads();
+    securityRepository.release();
     await expect(pendingDetail).resolves.toEqual({
       project: projectWithScore,
       signals,
       factors,
       citations,
+      security: securityState,
     });
     expect(repository.signalReads).toEqual([{ projectId, limit: 20 }]);
   });
 
-  it('keeps the signal timeline but skips both score projection reads when no score exists', async () => {
+  it('still reads the public security state when the project has no score', async () => {
     const projectWithoutScore: ProjectDetail = { ...projectWithScore, latestScore: null };
     const repository = new RecordingProjectRepository(projectWithoutScore, false);
+    const securityRepository = new RecordingSecurityPublicRepository();
+    securityRepository.release();
 
     await expect(
-      loadProjectDetailFromRepository(repository, 'demo-project'),
+      loadProjectDetailFromRepository(repository, securityRepository, 'demo-project'),
     ).resolves.toEqual({
       project: projectWithoutScore,
       signals,
       factors: [],
       citations: [],
+      security: securityState,
     });
-    expect(repository.signalReads).toEqual([{ projectId, limit: 20 }]);
     expect(repository.scoreReads).toEqual([]);
+    expect(securityRepository.reads).toEqual([projectId]);
   });
 
   it('returns null without follow-up reads when the project does not exist', async () => {
     const repository = new RecordingProjectRepository(null, false);
+    const securityRepository = new RecordingSecurityPublicRepository();
 
     await expect(
-      loadProjectDetailFromRepository(repository, 'missing-project'),
+      loadProjectDetailFromRepository(repository, securityRepository, 'missing-project'),
     ).resolves.toBeNull();
     expect(repository.signalReads).toEqual([]);
     expect(repository.scoreReads).toEqual([]);
+    expect(securityRepository.reads).toEqual([]);
   });
 });
 
@@ -181,6 +216,25 @@ class RecordingProjectRepository implements ProjectRepository {
   releaseScoreReads(): void {
     this.factorRead.resolve([...factors]);
     this.citationRead.resolve([...citations]);
+  }
+}
+
+class RecordingSecurityPublicRepository implements SecurityPublicRepository {
+  readonly reads: string[] = [];
+
+  private readonly securityRead = createDeferred<PublicProjectSecurityState>();
+
+  async getProjectSecurity(inputProjectId: string): Promise<PublicProjectSecurityState> {
+    this.reads.push(inputProjectId);
+    return this.securityRead.promise;
+  }
+
+  async listBlockedProjects(): Promise<never> {
+    throw new Error('The project detail loader must not list blocked projects.');
+  }
+
+  release(): void {
+    this.securityRead.resolve(securityState);
   }
 }
 
