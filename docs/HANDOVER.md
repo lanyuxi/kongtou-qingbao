@@ -6,6 +6,22 @@
 >
 > **当前一句话状态（2026-08-29 Phase 7A 已完成并合并主线）**：Phase 0–6B、详情页评分因子/证据引用与 **Phase 7A 安全事件与指标**全部在主线 `codex/phase-0-1-foundation` 上。Phase 7A 提供追加式 Security Ledger、protect-first 门禁、reviewer 审核工作流与公共 blocked/caution 呈现；worktree `.worktrees/phase-7a-security-ledger` 按既有惯例保留未删除。生产仍为 19 个已应用迁移，第 20–22 个 migration 继续按 production unapplied 处理；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
+### Phase 7B 架构设计（2026-08-29，spec 已产出待你签字后进入计划）
+
+**背景与定位**：按 `canonical-intelligence-governance-design.md` §17 的既定顺序第 3 项，「Security incidents, indicators, and verified allowlisted references」共同构成 tutorials 的前置条件。7A 已完成前两项，7B 即第三项，也是 tutorials 之前的最后一环。Gap 很具体：`AGENTS.md` 要求 tutorials 暴露 `last_verified_at`、使用 allowlisted 链接引用，并要求标记任何未经已验证引用解析的用户可见官方链接——但仓库里**不存在 canonical 引用对象**。`projects.official_website_url` 是无验证、无历史的自由文本；`project_sources.authority_domains` 只是**来源级**域名权限，无历史、无 URL 粒度；Phase 7A 的 indicator 明确声明「不判定某值官方、可安全访问或已加入白名单」。
+
+**已确认的四项产品决策**（用户 2026-08-29 拍板）：
+1. **两层建模**：`project_domain_authorities`（域名归属性）+ `project_references`（具体 URL 条目）。已验证域名**不**验证其下的任意 URL，这是对「官方域名下的伪造路径」的正面防御。
+2. **复用 `reviewer` / `senior_reviewer` / `admin`**，不新增 `app_role` 值。
+3. **`projects.official_website_url` 保留为 Catalog 线索，但渲染链接必须经已验证引用**；否则渲染为惰性文本并显式标注「未验证」。
+4. **安全联动 protect-first**：Phase 7A indicator 命中即自动 `flagged` 并同步停止公开渲染；恢复只能由人工追加新的、有 Evidence 支撑的核验决策，且 flag 行不删除、只置 `released_at`（冲突保持可见）。
+
+**设计要点**：五张追加式表（2 张 canonical 当前行 + 2 张决策历史 + 1 张 `reference_security_flags`）+ 3 个视图；当前状态由最新决策推导，但未释放的 flag 强制覆盖为 `flagged`（使联动同步生效、无需后台任务）；`last_verified_at` 由最近一次成功 verify 决策推导；verify/reverify/restore 必须引用未被 7A 封锁来源的 Evidence；注册时做共享的确定性 URL/域名归一化，避免「一种形式通过验证、另一种形式被 flag」；稳定错误码走 `AR2xx` 新波段；明确不做：tutorials、合约地址、DNS/WHOIS 自动所有权证明、AI 创建 canonical 验证、改写 sources 信誉或项目生命周期。
+
+**产物**：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`（20 节，含目标/已确认决策/非目标/现状集成点/信任边界/契约/数据模型/流程/安全联动/幂等并发/同步门禁/公开读模型/仓储与 HTTP/审核 UI/公开 UI/授权 RLS/错误/测试/交付边界/验收）。
+
+**下一步**：待你确认规范后，按既有流程用 writing-plans 产出 Phase 7B 实施计划（预计 contracts → domain 纯规则 → 单一 forward migration/pgTAP → bearer repository → 安全联动 → 公开投影 → BFF/client → reviewer UI → 公开呈现 → Golden/runbook/收口）。
+
 ### Phase 7A 全景看板（2026-08-29 更新，Task 1–11 全部完成并已合并主线）
 
 #### 任务看板总览
