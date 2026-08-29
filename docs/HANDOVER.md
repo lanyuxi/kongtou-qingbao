@@ -1,10 +1,33 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-27（Phase 7A Task 3 与 Task 4 均已闭环并复审 Approved；WorkBuddy 本轮完成 Task 3 Fix Round 1 数据库验证与 Task 4 repository 全流程 TDD + disposable 集成，worktree 提交链 `daf6d40`→`6b990fd`→`287f677`→`2d2c29b`；下一步 Task 5 extraction routing + Promotion guards；全程未访问生产）
+> 最近更新：2026-08-29（Phase 7A Task 10 已在隔离 worktree 本地完成并全仓门禁通过：公共侧新增 `/opportunities?tab=blocked` 独立安全封锁视图（`public_blocked_projects` 游标）、项目详情页 warning-first 安全横幅、caution 保留排序并警示、blocked 把因子/证据标注为事件发生前历史快照并停用官网外链；公开指标值一律惰性文本渲染。精确 Node 22.22.2 / pnpm 11.16.0 `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 221 + web 239 = 1,226 non-skipped / 68 gated skips。Phase 7A 现剩 Task 11；未连接数据库、未 reset、未访问生产）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-27 接续执行）**：Phase 0–6B 与详情页功能仍在主线（HEAD `c102df6`，含已批准的 Phase 7A spec/plan/workbook 提交）；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行：Task 1 contracts、Task 2 domain 纯规则均已完成并通过复审（review clean），Task 3 Security Ledger migration 实现提交 `8134bf4` 后独立评审 NEEDS_FIXES（0 Critical / 8 Important / 5 Minor），Fix Round 1 全部修复并经 disposable 栈验证（focused 013 224/224、full pgTAP 13 files / 1,338、typegen 双次一致替换手工 types、fresh `pnpm verify` exit 0），修复提交 `daf6d40`。Phase 7A 进度：Task 1–4 已闭环，剩余 Task 5–11。Task 4 产出 SecurityReviewRepository（9 方法 per-call bearer、strict parse-before-map、AS101–AS199 稳定错误映射、browser deny 三层隔离），openIncident 双路由与数据库设计精确对齐，list 分页 clamp 至 RPC 上限 100；focused integration 7/7 于 marker-verified disposable 栈通过，database 包内 225 passed / 51 gated skipped，根 verify exit 0；复审八项安全核查全 Pass、0C/0I、3 Minor 当轮闭环。生产仍为 19 个迁移，第 20–22 个 migration 均 production unapplied；下一任务是 Task 5（security extraction routing + ordinary Promotion guards），随后 Task 6–11；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-29 Task 10 完成）**：Phase 0–6B 与详情页功能仍在主线；Phase 7A 在隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger` 执行，Task 1–10 均已本地实现、验证并原子提交，当前 HEAD 为 Task 10 提交（见 §Phase 7A 看板）。Task 7 已交付 anon 安全仓库与公开投影，Task 8 已交付 `/api/v1/review/security/*` 与严格浏览器客户端，Task 9 已交付 `/review/security` 审核工作流，Task 10 已交付公共 blocked 视图与项目详情安全呈现；剩余 Task 11（Golden Dataset、E2E、runbook、full verify）。生产仍只保留历史快照中的 19 个已应用迁移，第 20–22 个 migration 继续按 production unapplied 处理。任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+
+### 2026-08-28 本轮接续复核进度
+
+| 步骤 | 状态 | 已核对内容 / 后续动作 |
+|---|---|---|
+| 1. 完整阅读交接手册 | **完成** | 已分段逐行读完当前 757 行；确认顶部 Phase 7A 看板将 Task 1–4 记为已闭环、Task 5 记为下一项，但本手册同时保留大量 Phase 6A/6B 与详情页历史记录；后续必须以当前 Git/worktree、已批准 spec/plan/workbook 和新鲜验证交叉校准，不直接把历史外部快照当作当前事实。主工作区现场 HEAD 为 `e84ed99`，较手册旧快照已有后续文档提交。 |
+| 2. 详细复核项目目录产出 | **完成** | 已逐段读完仓库强制的 Phase 0/1 plan（599 行）与 workbook（386 行），并详细复核 README、两份 architecture、local runbook、Phase 7A Approved spec（716 行）、实施计划结构、Task 5 完整步骤与 worktree workbook。主线现有 279 个跟踪文件（docs 26 / apps 101 / packages 94 / migrations 21 / pgTAP 12 / scripts 4 / 其他 21）；Phase 7A worktree 为 302 个（packages 115 / migrations 22 / pgTAP 13），相对当前主线的实现差异为 34 文件约 `+11,681/-176`。实际产出覆盖 strict contracts、纯 domain 规则、九表追加式 Security Ledger + protected RPC/RLS/四个 public views、bearer-scoped SecurityReviewRepository 与真实集成测试。 |
+| 3. 核验当前阶段与未完成项 | **完成** | Phase 7A worktree 现场 HEAD 为 `2d2c29b`，tracked worktree 干净，提交链和实际文件确认 Task 1–4 已产出、Task 5 尚无任何测试或实现 diff。可用本机运行时实为 Node 24.19.0 / pnpm 11.16.0（与仓库 `>=22 <23` 不符）；在该非声明版本下，Task 5 相关 focused 基线为 database 11 files passed / 8 skipped、225 tests passed / 51 skipped，worker 17 files passed / 1 skipped、212 tests passed / 2 skipped。完整 `pnpm verify` 两次均在 pnpm 自动依赖状态检查阶段尝试 registry，因 `ENOTFOUND` 中止；离线冻结安装明确缺 `@eslint/js@10.0.1` tarball。这不是代码门禁失败，也不能冒充 Node 22 的 fresh root 验收。诊断后原 `node_modules` 已从 `/tmp` 备份原位恢复，源码、lockfile 与 tracked worktree 仍无改动。 |
+| 4. Task 5 方案与 RED | **完成** | 用户已批准短设计及 `AS104 → security_reviewer_required`、`AS111 → security_review_required`、`AS112 → security_promotion_blocked`。测试先行新增 extraction repository 7 个具名用例及 worker/Promotion 回归；有效 extraction RED 为 7/7 失败，精确证明现实现缺少事务、security route、回滚与 ordinary pending 隔离。Promotion suite 因 worktree 依赖链接缺失在 import 前阻断，未冒充业务 RED。下一步是最小 GREEN；远端 disposable integration 仍需另行精确授权。 |
+| 5. Task 5 本地 GREEN | **完成** | 按 lockfile 恢复生成依赖后完成最小实现：每批单事务、新插入 security/scam 候选专用路由、重放不重路由、失败整批回滚、ordinary pending 隔离及 AS104/111/112 稳定映射；新增真实 ingress 与 Promotion caution/blocked integration 回归并纳入脚本。当前非声明 Node 24 / pnpm 11.19 验证为 database 235 pass / 54 gated skip、worker 217 pass / 2 skip，两包 lint/typecheck exit 0。下一步是 Node 22 root verify 与经单独授权的 disposable integration；生产继续禁止访问。 |
+| 6. Task 5 当前运行时全仓门禁 | **完成** | Node 24.19.0 下 fresh `pnpm verify` exit 0：1,099 non-skipped / 56 environment-gated skips，lint/typecheck/build/placeholders 全绿；脚本内 pnpm 为 11.16.0。该结果证明当前 diff 无跨包回归，但 Node engine 不符，最终仍需 Node 22.22.2 重验。 |
+| 7. Task 5 声明运行时全仓门禁 | **完成** | 通过隔离 `/tmp` runtime 精确核对 Node 22.22.2 / pnpm 11.16.0，fresh root `pnpm verify` exit 0：1,099 non-skipped / 56 gated skips，lint/typecheck/build/placeholders 全绿；未改用户 shell 或项目配置。下一步仅剩经单独授权的 disposable integration、最终 review 与独立提交。 |
+| 8. Task 5 disposable focused integration / review fix | **完成** | 首轮两个 focused integration 文件 15/15 PASS；独立复审 0C/1I/1M 后补齐 security_risk/scam_indicator 真实 AS111、caution 两授权角色和 blocked reviewer/security_reviewer/admin 全拒绝，复跑 17/17 PASS（60.37s）。未 reset/复制远端文件，fixture 自清理，隧道关闭；生产端口未访问。 |
+| 9. Task 5 final gate / scoped re-review | **完成（review clean）** | 最终精确 Node 22.22.2 / pnpm 11.16.0 root `pnpm verify` exit 0：1,099 non-skipped / 58 gated skips，lint/typecheck/build/placeholders 全绿。Scoped re-review 确认 prior Important/Minor 均 Resolved，无新增 C/I/M，Ready to merge: Yes。下一任务为 Task 6。 |
+| 10. Task 5 atomic commit | **完成** | Task 5 已以提交 `9dd3155`（`feat(worker): route security extraction candidates`）在 Phase 7A worktree 原子提交，未包含主工作区 `.DS_Store` 或其他用户文件；下一步进入 Task 6 `Collection/scoring protect-first gates`。 |
+| 11. Task 6 RED / local GREEN | **完成** | 测试先行覆盖 collection endpoint/feed/article 写入前 posture gate、typed `security_blocked` 终态、队列非重试取消，以及 scoring 输入筛选和持久化前二次复核；最小实现保持 opportunity/risk 分离并在受限输入下零写入 Score/Factor/Link。collector unit 40/40、queue repository 18/18 通过。 |
+| 12. Task 6 disposable integration / review fix | **完成** | marker-verified disposable 栈双会话 focused integration 最终 2 files / 15 tests PASS。初审 1 Critical / 1 Important / 2 Minor 暴露 blocked→caution 评分竞态、article 阻断被吞、测试 promise 收尾与 workbook 状态问题；逐项用失败回归复现后修复。未 reset、未访问生产。 |
+| 13. Task 6 final gate / scoped re-review | **完成（review clean）** | 最终精确 Node 22.22.2 / pnpm 11.16.0 root `pnpm verify` exit 0：contracts 133 + domain 376 + database 238 + worker 221 + web 140 = 1,108 non-skipped，66 gated skips；lint/typecheck/test/build/placeholders 全绿。Scoped re-review 为 0C/0I/0M、Ready to merge: Yes；隧道已关闭并核验无监听。 |
+| 14. Task 6 atomic commit | **完成** | Task 6 已以提交 `0bda9ce`（`feat(security): enforce collection and scoring gates`）在 Phase 7A worktree 原子提交，22 files、`+1,127/-23`；worktree 干净，未包含主工作区 `.DS_Store` 或其他用户文件。下一步进入 Task 7 `Strict public security repositories + project projections`。 |
+
+> 本轮 Step 2 只做本地读取与本手册更新，未访问数据库、远端或生产。已发现一处交接文档内部不一致：Phase 7A worktree workbook 顶部与 HANDOVER 记录 Task 4 已 Approved/闭环，但该 workbook 的 Task 4 看板行仍是“已实现（待复审 + 数据库集成）”。提交链 `287f677`→`2d2c29b`、手册与 workbook 后续执行记录支持“已闭环”；该陈旧看板单元格应在下一次 worktree 文档提交中更正，不改变代码状态。
+
+> 本轮 Step 3 仅执行本地命令，未连接 Supabase、SSH、远端或生产。声明运行时与完整离线依赖的缺失是当前验收环境缺口，不阻止先经确认后按 TDD 编写 Task 5 本地 RED/实现，但任务不能在 Node 22 fresh `pnpm verify` 和需要的 disposable integration 成功前宣布完成。
 
 ### 2026-08-26 本轮接续复核进度
 
@@ -36,7 +59,7 @@
 
 ---
 
-### Phase 7A 全景看板与剩余任务计划（2026-08-27 更新）
+### Phase 7A 全景看板与剩余任务计划（2026-08-28 更新）
 
 #### 任务看板总览
 
@@ -46,25 +69,25 @@
 | 2 | Pure posture/transition/indicator rules（domain） | ✅ 完成 | Approved（两轮 fix 后 clean） | 至 `a6ac4b0` |
 | 3 | Security Ledger migration + protected commands + RLS 矩阵 | ✅ 完成 | 初审 NEEDS_FIXES(0C/8I/5M) → Fix Round 1 → re-review **Approved** | `8134bf4`/`daf6d40`/`6b990fd` |
 | 4 | Bearer-scoped security review repository + race 集成 | ✅ 完成 | re-review **Approved**（0C/0I） | `287f677`/`2d2c29b` |
-| 5 | Route security extraction candidates and harden ordinary Promotion | ⬜ 未开始 | — | — |
-| 6 | Enforce protect-first collection and scoring races | ⬜ 未开始 | — | — |
-| 7 | Strict public security repositories + project projections | ⬜ 未开始 | — | — |
-| 8 | Authenticated security BFF routes + browser client | ⬜ 未开始 | — | — |
-| 9 | Reviewer security workflow UI（`/review/security`） | ⬜ 未开始 | — | — |
-| 10 | Public blocked opportunities + project security presentation | ⬜ 未开始 | — | — |
+| 5 | Route security extraction candidates and harden ordinary Promotion | ✅ 完成 | 初审 0C/1I/1M → scoped re-review **Approved**（0C/0I/0M） | `9dd3155` |
+| 6 | Enforce protect-first collection and scoring races | ✅ 完成 | 初审 1C/1I/2M → scoped re-review **Approved**（0C/0I/0M） | `0bda9ce` |
+| 7 | Strict public security repositories + project projections | ✅ 完成 | 初审 0C/3I/0M → Fix Round 1 → re-review **Approved** | `3f0e906`/`7b8c329` |
+| 8 | Authenticated security BFF routes + browser client | ✅ 完成 | 初审 0C/3I/0M → Fix Round 1 → re-review **Approved** | `0f303d9`/`db05026`/`ada09c6` |
+| 9 | Reviewer security workflow UI（`/review/security`） | ✅ 完成 | 初审 1C/1I → Fix Round 1 → 复审 2I → Fix Round 2 → re-review **Approved**（含 1 项 DISPROVEN） | `6a87a24`/`b791210`/`70e8ebc`/`e999a97`/`7292903` |
+| 10 | Public blocked opportunities + project security presentation | ✅ 完成（本地门禁绿，待独立复审） | RED 3 files / 4 failed / 215 passed → GREEN Web 13 files / 239 tests；fresh `pnpm verify` 1,226 non-skipped / 68 gated skips | `5258ca8` |
 | 11 | Golden Dataset、E2E、runbook、full verification 收口 | ⬜ 未开始 | — | — |
 
-worktree 提交链（Task 1–4）：`fbf49d2..2d2c29b` 共 14 commits；全部位于 `codex/phase-7a-security-ledger`，未合并主线。
+worktree 提交链（Task 1–9）：`fbf49d2..7292903`；全部位于 `codex/phase-7a-security-ledger`，未合并主线。Task 10 改动在本轮提交后接续。
 
 #### Task 5–11 范围摘要（依据已批准实施计划）
 
-- **Task 5（下一步，从 BASE `2d2c29b` 开始）**：extraction 事务按批调用 `route_security_extraction_candidate` 把 `security_risk` / `scam_indicator` 候选从普通 Promotion 路由进专用 security review queue（仍是候选数据、不得写 canonical）；Promotion CLI/repository 映射受保护命令结果且不泄漏 SQL；被 gate 的普通 Promotion 路径在 DB guard（Task 3 已 RED/GREEN）之上做 regression 断言。RED 来自缺失 routing/mapping 行为。
-- **Task 6**：collection/scoring protect-first——collection 结局新增安全终态并按 posture 在调度、请求前多点重检；`caution` 强制 active security reviewer 才能 Promotion 新 canonical intelligence、`blocked` 除 ledger 命令外拒绝；评分输入与持久化在 caution/blocked 目标前暂停；真实双会话竞态集成。
-- **Task 7**：anon 安全仓库严格映射四个 public 视图（blocked 列表游标、posture、获批 incident 摘要、逐条 public_safe indicator 惰性文本），immutable score ID 作组合锚点，禁止 base-table fallback。
-- **Task 8**：thin `/api/v1/review/security/*` handlers 与 `/api/v1/security/blocked-projects` 公共端点 + strict browser API client（fresh token/idempotency key、expected version）；bundle isolation 证明。
-- **Task 9**：reviewer 安全工作流 UI（候选队列/详情/incident 创建与调整/历史/解除/披露），高影响命令显式确认、409 刷新不覆盖；惰性渲染测试。
-- **Task 10**：公共侧 blocked 机会独立视图与项目详情安全呈现（caution 保留排序+警示、blocked 退出统计但详情可访问、既有评分为安全事件前历史快照）。
-- **Task 11**：Golden Dataset 增补（明确/否定/错实体/prompt injection/locator 校验）、最终授权矩阵扩展、runbook 补章节、fresh 全仓 verify 与整分支收口复审。
+- **Task 5（已完成，提交 `9dd3155`）**：extraction 事务按批调用 `route_security_extraction_candidate`，把 `security_risk` / `scam_indicator` 候选从普通 Promotion 路由进专用 security review queue；ordinary Promotion guards、稳定错误映射及真实授权回归均已闭环。
+- **Task 6（已完成，提交 `0bda9ce`）**：collection/scoring protect-first gates 已实现；collection 写入前锁定并复核 Source posture，阻断后取消且不重试；scoring 锁定并复核全部关联 Evidence Source，受限输入不生成任何评分持久化记录；真实双会话竞态已覆盖。
+- **Task 7（已完成，提交 `3f0e906`/`7b8c329`）**：anon 安全仓库严格映射四个 public 视图（blocked 列表游标、posture、获批 incident 摘要、逐条 public-safe indicator 惰性文本），immutable score ID 作组合锚点，禁止 base-table fallback。
+- **Task 8（已完成，提交 `0f303d9`/`db05026`/`ada09c6`）**：thin `/api/v1/review/security/*` handlers 与 `/api/v1/security/blocked-projects` 公共端点 + strict browser API client（fresh token/idempotency key、expected version）；bundle isolation 已证明。
+- **Task 9（已完成，提交 `6a87a24`/`b791210`/`70e8ebc`/`7292903`）**：reviewer 安全工作流 UI（候选队列/详情/incident 创建与调整/历史/解除/披露），高影响命令 affirmatice 确认绑定权威 aggregate 版本、409 清除确认、惰性渲染测试。
+- **Task 10（本轮完成）**：公共侧 blocked 机会独立视图与项目详情安全呈现（caution 保留排序+警示、blocked 退出统计但详情可访问、既有评分为安全事件前历史快照、官网外链停用、指标值惰性文本）。
+- **Task 11（下一任务）**：Golden Dataset 增补（明确/否定/错实体/prompt injection/locator 校验）、最终授权矩阵扩展、runbook 补章节、fresh 全仓 verify 与整分支收口复审。
 
 #### 执行方式与决策点
 
@@ -208,7 +231,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 5. 教程生成（tutorials，含 `last_verified_at`、链接白名单、状态联动）
 6. 任务管理（用户项目、watchlist、tasks）
 7. 通知系统（alerts、偏好）
-8. ~~安全风控（incidents、indicators、protect-first 工作流）~~ **🔄 Phase 7A 进行中**：spec/plan/workbook 已批准固化；Task 1 contracts、Task 2 domain 纯规则、Task 3 Security Ledger migration、Task 4 bearer repository 均已闭环并复审 Approved（见上表）；剩余 Task 5–11（extraction routing/Promotion guards、collection·scoring gates、public repositories、BFF/client、reviewer UI、public UI、Golden/E2E/runbook/full verify）
+8. ~~安全风控（incidents、indicators、protect-first 工作流）~~ **🔄 Phase 7A 进行中**：spec/plan/workbook 已批准固化；Task 1–6 均已闭环并复审 Approved（见上表）；剩余 Task 7–11（public repositories、BFF/client、reviewer UI、public UI、Golden/E2E/runbook/full verify）
 9. 用户认证与私有数据（profiles、RLS user_id 场景目前未启用）
 10. 运营/审核后台界面（目前只有 API）；详情页 score factors / reviewed Evidence 的本地实现已完成，生产未应用
 11. 多源扩展：X/Twitter、项目方公告页结构化解析等
@@ -481,7 +504,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 维度 | 状态 |
 |------|------|
 | 主线 | `codex/phase-0-1-foundation`，HEAD `0d16ecf`（docs: record phase 7a task 4 completion）；Phase 0–6B + 详情页 score/Evidence 功能全部在主线；仓库无 remote，纯本地 |
-| Phase 7A | 隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger`，HEAD `2d2c29b`，工作区干净；spec `Approved`；11 任务中 Task 1–4 已闭环且复审 Approved，剩余 Task 5–11；SDD ledger 与 workbook 随 worktree 维护 |
+| Phase 7A | 隔离 worktree `.worktrees/phase-7a-security-ledger` / 分支 `codex/phase-7a-security-ledger`，HEAD `0bda9ce`，工作区干净；spec `Approved`；11 任务中 Task 1–6 已闭环且复审 Approved，剩余 Task 7–11；SDD ledger 与 workbook 随 worktree 维护 |
 | 数据迁移台账 | 仓库 22 个 forward-only migration（最高 `20260826000100_phase_7a_security_incidents_indicators`，SHA `24d4b763…`）；生产最后可信快照仍为 2026-08-22 的 19 个已应用；第 20/21/22 个均 production unapplied |
 | 测试基线 | Node 22.22.2 / pnpm 11.16.0，worktree 上 fresh root `pnpm verify` exit 0（各包计数见 §2 测试基线段的新增记录行）；lint/typecheck/build/placeholders 全绿 |
 | disposable 栈 | `airdrop-intelligence-governance-test`（API 64321 / DB 64322）healthy；22 migrations + seed reset 通过；**只允许对它 reset**；本地隧道惯例 `16432→64322`、`16433→64321`（建隧道务必显式 `-L 127.0.0.1:…` 并逐条核验监听目标——本轮曾发现残留旧隧道目标不明并清理，且曾短暂误建指向生产端口的隧道后即刻拆除） |
@@ -744,6 +767,16 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-24 Project score Evidence local integration（DONE）**：用户选择 finishing workflow 的 option 1。主工作区确认基线分支 `codex/phase-0-1-foundation` 精确位于 `63f5278`，仅有三个既有未跟踪 `.DS_Store`，随后将 `codex/project-score-evidence-detail` 快进合并到 `a372880`；这些个人文件未触碰。合并后首次 `pnpm verify` 因主工作区 `node_modules` 重建并尝试访问 registry，命中 DNS `ENOTFOUND`，未进入代码测试；用本机既有 pnpm v11 store 执行 `--offline --frozen-lockfile` 恢复 196 个锁定包后，fresh 完整门禁 exit 0：contracts 107 + domain 222 + database 180 + worker 212 + web 140 = 861 non-skipped，46 gated skips，lint/typecheck/build/placeholders 全绿。该步骤只做本地 Git 集成与本地门禁，未访问生产、未应用第 21 个 migration；下一步是保留生产冻结边界并选择后续产品功能，而不是自动 rollout。
 
 **2026-08-24 Project score Evidence branch cleanup（DONE）**：在主线交接提交 `0293cd3` 后再次运行完整 `pnpm verify`，861 non-skipped / 46 gated skips 全绿。随后确认功能 worktree 无 tracked/untracked 改动、`a372880` 已是主线祖先，再移除 `.worktrees/project-score-evidence-detail`、执行 `git worktree prune` 并删除已合并分支 `codex/project-score-evidence-detail`。其他 Phase 2 / 6A / 6B worktree 与主工作区三个既有 `.DS_Store` 均未触碰；功能全部保留在主线，生产仍未应用。
+
+**2026-08-28 Phase 7A Task 7（主工作区交接同步）**：功能分支 `codex/phase-7a-security-ledger` 已完成 Task 7 public security repositories/project projections。实现提交为 `3f0e906 feat(database): expose safe public security projections`，Fix Round 1 为 `7b8c329 fix(database): close public security projection review gaps`，文档闭环为 `a36a9fe docs: close phase 7a task 7 review`。最终实现包括 anonymous-safe blocked/project security repositories、project/opportunity/signal strict parse-before-map 与安全错误包装、security-aware immutable score/factor/Evidence composition、完整 exact-ID fixture cleanup，以及为规避真实 `57014` statement timeout 而拆分的 per-page HEAD exact-count / ordered-data citation 请求；保留 1,001-row 完整性、count consistency、page-size、duplicate、strict schema 与 safe-error 门禁。
+
+**2026-08-28 Phase 7A Task 7（最终验收与下一步）**：marker/Auth 复验后的真实匿名 `project-repository.integration.test.ts` 为 1 file / 9 tests PASS（11.83s），transactional residue assertion 通过；未 reset、未访问生产，隧道关闭后 16432/16433 无 listener。独立复审 `3f0e906..7b8c329` 为 **Approved**，原 3 个 Important 全部 Resolved，新增 0 Critical / 0 Important / 0 Minor。Node 22.22.2 / pnpm 11.16.0 下 fresh `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 221 + web 140 = **1,127 non-skipped / 68 gated skips**，lint/typecheck/build/placeholders 全绿。**当前阶段：Task 7 complete；下一开发任务是 Task 8 authenticated security BFF/routes/browser client。**
+
+**2026-08-28 Phase 7A Task 8（主工作区交接同步）**：功能分支 `codex/phase-7a-security-ledger` 已完成 authenticated security BFF/routes/browser client。实现提交为 `0f303d9 feat(web): add security review bff`，Fix Round 1 为 `db05026 fix(web): tighten security review boundaries`，文档闭环为 `77190a1 docs: close phase 7a task 8`。新增八条 candidate/incident/indicator/public blocked-project routes；authenticated handlers 先认证再严格校验 query/path/body/idempotency，只调用对应 server repository；browser client 每次调用获取 fresh bearer、每次 mutation 生成 fresh key、保留显式 expected version，并将 409 映射为 typed conflict 且不重试。manual submit 与 candidate review 使用 operation-specific strict receipt schema，bundle fixture 显式拒绝 service-role/database/promotion/worker env、server repository constructors、Postgres 与 internal projection 字段。
+
+**2026-08-28 Phase 7A Task 8（最终验收与下一步）**：初次独立审查的 3 个 Important 已在 Fix Round 1 全部 Resolved，scoped re-review 对 `0f303d9..db05026` 为 **Approved**，新增 0 Critical / 0 Important / 0 Minor。Node 22.22.2 / pnpm 11.16.0 下 focused/full Web 均 189 tests PASS；fresh `CI=true pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 221 + web 189 = **1,176 non-skipped / 68 gated skips**，lint/typecheck/build/placeholders 全绿。未连接数据库、未 reset、未访问生产。**当前阶段：Task 8 complete；下一开发任务是 Task 9 complete reviewer security workflow UI。**
+
+**2026-08-29 Phase 7A Task 9（Reviewer security workflow UI — COMPLETE）**：在隔离 worktree `codex/phase-7a-security-ledger` 完成 `/review/security` 候选/事件列表、人工 Evidence-only 候选、候选 accept/open/attach、事件 adjust/attach/resolve/reopen、指标 publish/withdraw、不可变事件历史、共享 reviewer session/runtime 与四条页面路线。初版 `6a87a24` 的独立审查为 1 Critical / 1 Important；Fix Round 1 `b791210` 增加所有高影响命令的 affirmative confirmation gate，并要求 attach 先经 protected `getIncident` 加载可信 target/version/posture/category/severity/public summary。Fix Round 2 `70e8ebc` 将确认快照绑定 candidate identity/stateVersion 或完整 incident context，409 后清除确认、只刷新一次、不重试、不自动替换 expected version；disclosure version 仍由审核员显式输入。复审最终 **APPROVED**，新增 0 Critical / 0 Important / 0 Minor；关于 bare `source` 会被隐藏的中间 finding 经正则与 UI 行为测试正式证伪，未保留多余 literal allowlist。Node 22.22.2 / pnpm 11.16.0 下 fresh `CI=true pnpm verify` 一次 exit 0：contracts 133 + domain 376 + database 257 + worker 221 + web 217 = **1,204 non-skipped / 68 gated skips**，lint/typecheck/build/placeholders 全绿。文档收口提交 `7292903`；未连接数据库、未 reset、未访问生产。**当前阶段：Task 9 complete / review clean；下一开发任务是 Task 10 public blocked/caution/project security UI。**
 
 ---
 
