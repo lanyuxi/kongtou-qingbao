@@ -1,0 +1,54 @@
+# Phase 7B Verified Allowlisted References — Development Workbook
+
+> 日期：2026-08-29
+> 当前状态：**架构设计已批准，实施计划已产出；Task 1 未开始**；生产未访问
+> 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
+> 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
+> 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
+
+## 1. 固定边界
+
+- 分支与工作区：`codex/phase-7b-references`，worktree `.worktrees/phase-7b-references`（在 gitignore 的 `.worktrees/` 下）
+- 运行时：Node.js 22.22.2 / pnpm 11.16.0，声明路径 `/tmp/airdrop-node22-pnpm/bin`
+- 基线（2026-08-29 计划批准时）：主线 `pnpm verify` exit 0 = contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；22 migrations、13 个 pgTAP 文件
+- 迁移编号：`20260829000100`（第 23 个）；pgTAP 文件：`014_phase_7b_verified_allowlisted_references.test.sql`（第 14 个）
+- disposable 栈：`/root/airdrop-governance-test`，project `airdrop-intelligence-governance-test`，DB 64322 / Kong 64321，本地隧道 16432 / 16433；pinned CLI `./cli/node_modules/.bin/supabase`（2.112.0）
+- 生产 `airdrop-intelligence-os` 与端口 54321/54322 **永不访问**；生产仍为 19 个已应用迁移
+
+## 2. 已确认的产品决定
+
+1. **两层建模**：`project_domain_authorities`（域名归属性）+ `project_references`（具体 URL 条目）。已验证域名**不**验证其下的任意 URL。
+2. **复用 `reviewer` / `senior_reviewer` / `admin`**，不新增 `app_role` 值。
+3. **`projects.official_website_url` 保留为 Catalog 线索**，但渲染链接必须经已验证引用；否则惰性文本 + 显式「未验证」标记。
+4. **安全联动 protect-first**：Phase 7A indicator 命中即自动 `flagged` 并同步停止公开渲染；恢复只能由人工追加有 Evidence 支撑的核验决策，flag 行只置 `released_at` 不删除。
+
+**归一化补充决定（计划中已标注待实现时确认）**：归一化只做 scheme/host 小写、去尾部点、去默认端口、去 fragment、空路径归一；**不剥离 `www.`**、不折叠 query。因此 `www.example.com` 与 `example.com` 是两个独立权威，需分别授予——这对安全白名单是更保守的选择。
+
+## 3. 任务看板
+
+| Task | 交付物 | 状态 | 证据 / 关键提交 |
+|---|---|---|---|
+| 1 | Strict reference contracts | 待执行 | — |
+| 2 | Pure normalization / transition / derivation rules | 待执行 | — |
+| 3 | Reference Ledger migration + protected commands + RLS + 安全联动 SQL | 待执行 | — |
+| 4 | Bearer-scoped reference review repositories + race tests | 待执行 | — |
+| 5 | Phase 7A coupling under real races（仅集成测试，不改迁移） | 待执行 | — |
+| 6 | Strict public reference repositories and projections | 待执行 | — |
+| 7 | Authenticated reference BFF routes + browser client | 待执行 | — |
+| 8 | Reviewer reference workflow UI（`/review/references`） | 待执行 | — |
+| 9 | Public link resolution + unverified-link marking | 待执行 | — |
+| 10 | Golden Dataset / E2E / runbook / full verification | 待执行 | — |
+
+## 4. 执行约定
+
+- 每个任务独立 RED/GREEN/review/commit；评审结论必须写回本工作簿与 `docs/HANDOVER.md`
+- 需要远端数据库的操作（Task 4/5/10）必须**先取得用户显式授权**，并在 reset 前做 fail-closed 预检（workdir/project/端口/容器/marker/迁移与测试哈希）
+- 每轮提交都跑 `pnpm verify` 与 `pnpm check:placeholders`，两者都要 exit 0
+- 本地完成与生产可用性分开陈述，不得混用措辞
+
+## 5. 执行记录
+
+| 日期 | 阶段 | 内容 |
+|---|---|---|
+| 2026-08-29 | 设计批准 | 调研确认仓库不存在 canonical 引用对象（`official_website_url` 无验证；`project_sources.authority_domains` 为来源级、无历史、无 URL 粒度；7A indicator 明确不判定官方/可访问/白名单）。用户确认四项产品决策，规范 20 节定稿。 |
+| 2026-08-29 | 实施计划 | 产出 10 个任务、574 行计划；Task 5 由「改迁移」重构为「仅集成测试」，把安全联动 SQL 前移到 Task 3，避免任务间改写已 reset 的迁移；归一化例子修正为不剥离 `www.`。 |

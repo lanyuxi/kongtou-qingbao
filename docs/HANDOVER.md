@@ -20,7 +20,11 @@
 
 **产物**：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`（20 节，含目标/已确认决策/非目标/现状集成点/信任边界/契约/数据模型/流程/安全联动/幂等并发/同步门禁/公开读模型/仓储与 HTTP/审核 UI/公开 UI/授权 RLS/错误/测试/交付边界/验收）。
 
-**下一步**：待你确认规范后，按既有流程用 writing-plans 产出 Phase 7B 实施计划（预计 contracts → domain 纯规则 → 单一 forward migration/pgTAP → bearer repository → 安全联动 → 公开投影 → BFF/client → reviewer UI → 公开呈现 → Golden/runbook/收口）。
+**下一步（2026-08-29）**：实施计划已产出并获认可——`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`（10 个任务、574 行），工作簿 `docs/tasks/phase-7b-verified-allowlisted-references-workbook.md`。执行前需建分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references`；迁移编号 `20260829000100`（第 23 个），pgTAP 文件 `014`（第 14 个）。计划中的 Task 4/5/10 涉及远端 disposable 栈，仍需逐次显式授权。
+
+**计划定稿时修正的两处实现细节（避免后续返工）**
+1. **归一化不剥离 `www.`**：只做 scheme/host 小写、去尾部点、去默认端口、去 fragment、空路径归一；`www.example.com` 与 `example.com` 视为两个独立权威、需分别授予。对安全白名单这是更保守的选择；若产品后续要 apex 折叠，须作为显式决定并配套测试，不能作为归一化的隐式副作用。
+2. **安全联动 SQL 随 Task 3 迁移一次交付**：计划初稿让 Task 5 回头修改 Task 3 的迁移，会在该迁移已被 reset 应用后改写它，违反 forward-only；已重构为 Task 5 只做集成测试与双会话竞态证明。
 
 ### Phase 7A 全景看板（2026-08-29 更新，Task 1–11 全部完成并已合并主线）
 
@@ -53,8 +57,8 @@ Phase 7A 提交链：`fbf49d2..55d7f2b`（40 个提交，112 文件，`+18,231/-
 - **Task 7（已完成，提交 `3f0e906`/`7b8c329`）**：anon 安全仓库严格映射四个 public 视图（blocked 列表游标、posture、获批 incident 摘要、逐条 public-safe indicator 惰性文本），immutable score ID 作组合锚点，禁止 base-table fallback。
 - **Task 8（已完成，提交 `0f303d9`/`db05026`/`ada09c6`）**：thin `/api/v1/review/security/*` handlers 与 `/api/v1/security/blocked-projects` 公共端点 + strict browser API client（fresh token/idempotency key、expected version）；bundle isolation 已证明。
 - **Task 9（已完成，提交 `6a87a24`/`b791210`/`70e8ebc`/`7292903`）**：reviewer 安全工作流 UI（候选队列/详情/incident 创建与调整/历史/解除/披露），高影响命令 affirmatice 确认绑定权威 aggregate 版本、409 清除确认、惰性渲染测试。
-- **Task 10（本轮完成）**：公共侧 blocked 机会独立视图与项目详情安全呈现（caution 保留排序+警示、blocked 退出统计但详情可访问、既有评分为安全事件前历史快照、官网外链停用、指标值惰性文本）。
-- **Task 11（下一任务）**：Golden Dataset 增补（明确/否定/错实体/prompt injection/locator 校验）、最终授权矩阵扩展、runbook 补章节、fresh 全仓 verify 与整分支收口复审。
+- **Task 10（已完成，提交 `5258ca8`/`54cda0a`/`72a41b7`）**：公共侧 blocked 机会独立视图与项目详情安全呈现（caution 保留排序+警示、blocked 退出统计但详情可访问、既有评分为安全事件前历史快照、官网外链停用、指标值惰性文本）。
+- **Task 11（已完成，提交 `942ee9f`/`7dd3ee9`/`d38f9af`）**：Golden Dataset 增补（含变异检验）、最终授权矩阵扩展、runbook 补 Phase 7A 章节、经授权的 disposable 验收矩阵、敏感字段扫描与整分支收口复审。
 
 #### 执行方式与决策点
 
@@ -65,7 +69,7 @@ Phase 7A 提交链：`fbf49d2..55d7f2b`（40 个提交，112 文件，`+18,231/-
 #### 完成定义与遗留边界
 
 - Phase 7A 完成条件（spec §验收）：Evidence→Raw Item→Source 追溯、protect-first 原子性、即时门禁、公共零泄漏、clear 无回归、完整数据库与仓库门禁全绿并同步文档后，再做整分支 finishing review 与主线合并决策。
-- 本阶段明确不做：verified allowlisted references（Phase 7B 单独设计）、tutorials、notifications、钱包/交易、第三方威胁情报源、AI 自动 canonical 决策、scope 自动升级、实时推送、生产 rollout。
+- 本阶段明确不做：tutorials、notifications、钱包/交易、第三方威胁情报源、AI 自动 canonical 决策、scope 自动升级、实时推送、生产 rollout。（verified allowlisted references 曾列为不做项，现为 **Phase 7B**，已于 2026-08-29 完成架构设计与实施计划，尚未编码。）
 - 生产 rollout 冻结依旧：四前置（human reviewer 供给、Auth 恢复 200、迁移前备份演练、显式授权）齐备并重新 preflight 前，第 20–22 个 migration 不应用。
 
 ### 2026-08-28 本轮接续复核进度
