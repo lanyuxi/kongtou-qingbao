@@ -1,0 +1,16 @@
+'use client';
+
+import type { SecurityCandidateListQuery, SecurityIncidentListQuery } from '@airdrop/contracts';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+
+import { SecurityCandidateList, loadSecurityCandidateList, type SecurityCandidateListState, applySecurityCandidateCursor } from '../../../components/review/security-candidate-list.js';
+import { SecurityIncidentList, loadSecurityIncidentList, type SecurityIncidentListState, applySecurityIncidentCursor } from '../../../components/review/security-incident-list.js';
+import { useReviewBrowserRuntime } from '../../../lib/review-browser-runtime.js';
+import { createPendingActionGate } from '../../../lib/review-pending-action.js';
+import { ReviewShell, runReviewSignOutOnce, signOutAndRedirect } from '../review-shell.js';
+
+const candidateInitial: SecurityCandidateListQuery = { origin: 'all', state: 'all', targetType: 'all', cursor: null, limit: 25 };
+const incidentInitial: SecurityIncidentListQuery = { state: 'all', targetType: 'all', cursor: null, limit: 25 };
+export default function SecurityReviewPage() { const router = useRouter(); const runtime = useReviewBrowserRuntime(); const [candidateQuery, setCandidateQuery] = useState(candidateInitial); const [incidentQuery, setIncidentQuery] = useState(incidentInitial); const [candidateState, setCandidateState] = useState<SecurityCandidateListState>({ status: 'loading' }); const [incidentState, setIncidentState] = useState<SecurityIncidentListState>({ status: 'loading' }); const [signOutPending, setSignOutPending] = useState(false); const gate = useRef(createPendingActionGate()); useEffect(() => { if (runtime === null) return; let active = true; void loadSecurityCandidateList({ session: runtime.session, api: runtime.securityApi, query: candidateQuery, redirect: (path) => router.replace(path) }).then((next) => { if (active) setCandidateState(next); }); return () => { active = false; }; }, [candidateQuery, router, runtime]); useEffect(() => { if (runtime === null) return; let active = true; void loadSecurityIncidentList({ session: runtime.session, api: runtime.securityApi, query: incidentQuery, redirect: (path) => router.replace(path) }).then((next) => { if (active) setIncidentState(next); }); return () => { active = false; }; }, [incidentQuery, router, runtime]); async function signOut() { if (runtime === null) return; await runReviewSignOutOnce(gate.current, async () => { await signOutAndRedirect(runtime.session, (path) => router.replace(path)); }, setSignOutPending); } return <ReviewShell {...(runtime === null ? {} : { onSignOut: signOut, signOutPending })}><main><p className="review-back"><Link className="review-link" href="/review/security/candidates/new">提交人工安全候选</Link></p><SecurityCandidateList state={candidateState} query={candidateQuery} onQueryChange={setCandidateQuery} onNext={(cursor) => setCandidateQuery((query) => applySecurityCandidateCursor(query, cursor))} /><SecurityIncidentList state={incidentState} query={incidentQuery} onQueryChange={setIncidentQuery} onNext={(cursor) => setIncidentQuery((query) => applySecurityIncidentCursor(query, cursor))} /></main></ReviewShell>; }

@@ -5,6 +5,10 @@ import { useEffect, useState } from 'react';
 import { createReviewApiClient, type ReviewApiClient } from './review-api-client.js';
 import { createReviewSessionController, type ReviewSessionController } from './review-session.js';
 import {
+  createSecurityReviewApiClient,
+  type SecurityReviewApiClient,
+} from './security-review-api-client.js';
+import {
   createReviewBrowserAuthPort,
   createReviewBrowserSupabaseClient,
 } from './supabase-browser.js';
@@ -12,18 +16,21 @@ import {
 export interface ReviewBrowserRuntime {
   readonly session: ReviewSessionController;
   readonly api: ReviewApiClient;
+  readonly securityApi: SecurityReviewApiClient;
 }
 
 export function createReviewBrowserRuntime(): ReviewBrowserRuntime {
   const supabase = createReviewBrowserSupabaseClient();
   const session = createReviewSessionController(createReviewBrowserAuthPort(supabase.auth));
+  const dependencies = {
+    session,
+    fetch: globalThis.fetch.bind(globalThis),
+    ids: { generate: () => crypto.randomUUID() },
+  };
   return {
     session,
-    api: createReviewApiClient({
-      session,
-      fetch: globalThis.fetch.bind(globalThis),
-      ids: { generate: () => crypto.randomUUID() },
-    }),
+    api: createReviewApiClient(dependencies),
+    securityApi: createSecurityReviewApiClient(dependencies),
   };
 }
 
