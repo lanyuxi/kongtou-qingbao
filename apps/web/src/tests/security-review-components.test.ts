@@ -125,6 +125,31 @@ describe('security review components', () => {
     expect(html).not.toContain('<img');
   });
 
+  it('renders a contract-validated source target while keeping hostile candidate fields hidden', () => {
+    const html = renderToStaticMarkup(createElement(SecurityCandidateDetail, {
+      candidate: { ...candidate, target: { type: 'source', id: sourceId }, summary: '<script>alert(1)</script>', note: '<a href="https://unsafe.example">click</a>', indicator: { type: 'url', value: '<img src=x onerror=alert(1)>' } },
+    }));
+
+    expect(html).toContain(`source · ${sourceId}`);
+    expect(html).toContain('[内容已隐藏]');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<a href="https://unsafe.example">');
+    expect(html).not.toContain('<img');
+  });
+
+  it('renders contract-validated extraction context while keeping hostile candidate fields hidden', () => {
+    const extractionCandidate: ReviewerSecurityCandidateDetail = { version: 1, candidateId, origin: 'extraction', state: 'pending', stateVersion: 4, target: null, targetContext: { projectId: candidateId, sourceId }, indicator: null, evidenceId: null, summary: '<script>alert(1)</script>', note: null, submittedByUserId: null, createdAt: candidate.createdAt };
+    const html = renderToStaticMarkup(createElement(SecurityCandidateDetail, {
+      candidate: extractionCandidate,
+    }));
+
+    expect(html).toContain(`提取上下文 · project ${candidateId} · source ${sourceId}`);
+    expect(html).toContain('[内容已隐藏]');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<a href="https://unsafe.example">');
+    expect(html).not.toContain('<img');
+  });
+
   it('resets candidate filters and incident filters to the first page while preserving a supplied cursor only for next-page navigation', () => {
     expect(changeSecurityCandidateFilters({ origin: 'all', state: 'all', targetType: 'all', cursor: 'old', limit: 25 }, { origin: 'reviewer_manual', state: 'pending' })).toEqual({ origin: 'reviewer_manual', state: 'pending', targetType: 'all', cursor: null, limit: 25 });
     expect(applySecurityCandidateCursor({ origin: 'all', state: 'all', targetType: 'all', cursor: null, limit: 25 }, 'next')).toMatchObject({ cursor: 'next' });
@@ -192,7 +217,7 @@ describe('security review components', () => {
       api: { ...unavailableApi(), commandIncident: async () => ({ ok: false, state: 'forbidden' } as const) },
       incident: incident.incident,
       draft: { action: 'adjust', evidenceId, reasonCode: 'evidence_escalated', resultingPosture: 'blocked', resultingSeverity: 'critical', publicSummary: 'The verified phishing activity escalated in severity.', note: '' },
-      confirmation: { affirmed: true, snapshot: { action: 'adjust', evidenceId, reasonCode: 'evidence_escalated', resultingPosture: 'blocked', resultingSeverity: 'critical', publicSummary: 'The verified phishing activity escalated in severity.', note: '' } },
+      confirmation: { affirmed: true, snapshot: { action: 'adjust', evidenceId, reasonCode: 'evidence_escalated', resultingPosture: 'blocked', resultingSeverity: 'critical', publicSummary: 'The verified phishing activity escalated in severity.', note: '' }, incident: incident.incident },
       refresh: async () => {},
       sessionExpired: () => { expired += 1; },
     });
@@ -247,7 +272,7 @@ describe('security review components', () => {
         attachedIncident: null,
         refresh: async () => {},
         sessionExpired: () => { throw new Error('unexpected expiration'); },
-      } as Parameters<typeof submitCandidateReviewOnce>[1] & { readonly confirmation: unknown; readonly attachedIncident: unknown };
+      } as unknown as Parameters<typeof submitCandidateReviewOnce>[1] & { readonly confirmation: unknown; readonly attachedIncident: unknown };
       await expect(submitCandidateReviewOnce(createPendingActionGate(), input)).resolves.toMatchObject({ status: 'failed' });
       expect(calls).toBe(0);
     }
@@ -270,6 +295,58 @@ describe('security review components', () => {
     expect(values.proposedPosture).toContain('保持不变');
   });
 
+  it('refuses a candidate confirmation after the authoritative candidate version changed without calling the API', async () => {
+    let calls = 0;
+    const draft = candidateAcceptOpenDraft();
+    const confirmation = { affirmed: true, snapshot: draft, attachedIncident: null, candidate: { candidateId, stateVersion: 4 } };
+    const result = await submitCandidateReviewOnce(createPendingActionGate(), {
+      api: { ...unavailableApi(), reviewCandidate: async () => { calls += 1; return candidateReviewSuccess(); } },
+      candidate: { ...candidate, stateVersion: 5 },
+      draft,
+      attachedIncident: null,
+      confirmation,
+      refresh: async () => {},
+      sessionExpired: () => {},
+    } as Parameters<typeof submitCandidateReviewOnce>[1] & { readonly confirmation: unknown });
+    expect(result).toMatchObject({ status: 'failed' });
+    expect(calls).toBe(0);
+  });
+
+  it('refuses an incident confirmation after authoritative version or displayed context changed without calling the API', async () => {
+    let calls = 0;
+    const draft = incidentAdjustDraft();
+    const confirmation = { affirmed: true, snapshot: draft, incident: incident.incident };
+    const current = { ...incident.incident, incidentVersion: 4, currentPosture: 'caution' as const, publicSummary: 'A changed verified warning requires a fresh confirmation.' };
+    const result = await submitSecurityIncidentCommandOnce(createPendingActionGate(), {
+      api: { ...unavailableApi(), commandIncident: async () => { calls += 1; return incidentCommandSuccess(); } },
+      incident: current,
+      draft,
+      confirmation,
+      refresh: async () => {},
+      sessionExpired: () => {},
+    } as Parameters<typeof submitSecurityIncidentCommandOnce>[1] & { readonly confirmation: unknown });
+    expect(result).toMatchObject({ status: 'failed' });
+    expect(calls).toBe(0);
+  });
+
+  it('clears confirmation after a conflict without replacing a reviewer-entered disclosure version', () => {
+    const transition = (candidateDetailModule as unknown as {
+      clearConfirmationOnConflict: <T>(confirmation: T | null, state: { status: string }) => T | null;
+    }).clearConfirmationOnConflict;
+    const confirmation = { affirmed: true, snapshot: disclosureDraft() };
+    expect(transition(confirmation, { status: 'conflict' })).toBeNull();
+    expect(transition(confirmation, { status: 'saved' })).toEqual(confirmation);
+    expect(confirmation.snapshot.expectedIndicatorVersion).toBe('2');
+  });
+
+  it('renders a contract-validated source target while keeping hostile confirmation free text inert', () => {
+    const sourceIncident = { ...incident.incident, target: { type: 'source' as const, id: sourceId }, publicSummary: '<script>alert(1)</script>' };
+    const html = renderToStaticMarkup(createElement(SecurityIncidentCommandForm, { api: unavailableApi(), incident: sourceIncident, onRefresh: async () => {}, onSessionExpired: () => {} }));
+    expect(html).toContain(`source · ${sourceId}`);
+    expect(html).toContain('[内容已隐藏]');
+    expect(html).not.toContain('<script>');
+  });
+
   it('blocks every unconfirmed incident command and disclosure action, including their initial rendered submit controls', async () => {
     const incidentHtml = renderToStaticMarkup(createElement(SecurityIncidentCommandForm, { api: unavailableApi(), incident: incident.incident, onRefresh: async () => {}, onSessionExpired: () => {} }));
     const disclosureHtml = renderToStaticMarkup(createElement(SecurityIndicatorDisclosureForm, { api: unavailableApi(), indicatorId, onRefresh: async () => {}, onSessionExpired: () => {} }));
@@ -284,7 +361,7 @@ describe('security review components', () => {
       confirmation: { affirmed: false, snapshot: incidentAdjustDraft() },
       refresh: async () => {},
       sessionExpired: () => { throw new Error('unexpected expiration'); },
-    } as Parameters<typeof submitSecurityIncidentCommandOnce>[1] & { readonly confirmation: unknown };
+    } as unknown as Parameters<typeof submitSecurityIncidentCommandOnce>[1] & { readonly confirmation: unknown };
     await expect(submitSecurityIncidentCommandOnce(createPendingActionGate(), incidentInput)).resolves.toMatchObject({ status: 'failed' });
     expect(incidentCalls).toBe(0);
 
@@ -311,7 +388,7 @@ describe('security review components', () => {
       confirmation: { affirmed: true, snapshot: staleIncident },
       refresh: async () => {},
       sessionExpired: () => { throw new Error('unexpected expiration'); },
-    } as Parameters<typeof submitSecurityIncidentCommandOnce>[1] & { readonly confirmation: unknown };
+    } as unknown as Parameters<typeof submitSecurityIncidentCommandOnce>[1] & { readonly confirmation: unknown };
     await expect(submitSecurityIncidentCommandOnce(createPendingActionGate(), incidentInput)).resolves.toMatchObject({ status: 'failed' });
     expect(incidentCalls).toBe(0);
 
@@ -359,8 +436,8 @@ describe('security review components', () => {
     const candidateDraft = candidateAcceptOpenDraft();
     const incidentDraft = incidentAdjustDraft();
     const disclosure = disclosureDraft();
-    await expect(submitCandidateReviewOnce(createPendingActionGate(), { api: { ...unavailableApi(), reviewCandidate: async () => { candidateCalls += 1; return candidateReviewSuccess(); } }, candidate, draft: candidateDraft, attachedIncident: null, confirmation: { affirmed: true, snapshot: candidateDraft, attachedIncident: null }, refresh: async () => {}, sessionExpired: () => {} })).resolves.toMatchObject({ status: 'saved' });
-    await expect(submitSecurityIncidentCommandOnce(createPendingActionGate(), { api: { ...unavailableApi(), commandIncident: async () => { incidentCalls += 1; return incidentCommandSuccess(); } }, incident: incident.incident, draft: incidentDraft, confirmation: { affirmed: true, snapshot: incidentDraft }, refresh: async () => {}, sessionExpired: () => {} })).resolves.toMatchObject({ status: 'saved' });
+    await expect(submitCandidateReviewOnce(createPendingActionGate(), { api: { ...unavailableApi(), reviewCandidate: async () => { candidateCalls += 1; return candidateReviewSuccess(); } }, candidate, draft: candidateDraft, attachedIncident: null, confirmation: { affirmed: true, snapshot: candidateDraft, candidate: { candidateId: candidate.candidateId, stateVersion: candidate.stateVersion }, attachedIncident: null }, refresh: async () => {}, sessionExpired: () => {} })).resolves.toMatchObject({ status: 'saved' });
+    await expect(submitSecurityIncidentCommandOnce(createPendingActionGate(), { api: { ...unavailableApi(), commandIncident: async () => { incidentCalls += 1; return incidentCommandSuccess(); } }, incident: incident.incident, draft: incidentDraft, confirmation: { affirmed: true, snapshot: incidentDraft, incident: incident.incident }, refresh: async () => {}, sessionExpired: () => {} })).resolves.toMatchObject({ status: 'saved' });
     await expect(submitIndicatorDisclosureOnce(createPendingActionGate(), { api: { ...unavailableApi(), setIndicatorDisclosure: async () => { disclosureCalls += 1; return disclosureSuccess(); } }, draft: disclosure, confirmation: { affirmed: true, snapshot: disclosure }, refresh: async () => {}, sessionExpired: () => {} })).resolves.toMatchObject({ status: 'saved' });
     expect([candidateCalls, incidentCalls, disclosureCalls]).toEqual([1, 1, 1]);
   });
