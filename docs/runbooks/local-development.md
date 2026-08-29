@@ -264,9 +264,10 @@ caller's `auth.uid()` on every call. The reviewer UI treats `401` and `403` as
 3. **Incidents** — `open`, `adjust`, `attach_indicator`, `resolve`, and `reopen`
    each append a decision. Posture is always chosen explicitly as `caution` or
    `blocked`; `clear` is only ever derived when no active precaution remains.
-4. **Disclosure** — indicator values become public one row at a time through
-   `set_indicator_disclosure`, with an explicit version typed by the reviewer.
-   The UI never guesses or auto-increments it.
+4. **Disclosure** — indicator values become public one row at a time through the
+   `set_indicator_disclosure` **command operation** (submitted like any other
+   protected command, not a separate RPC), with an explicit version typed by the
+   reviewer. The UI never guesses or auto-increments it.
 5. High-impact commands require ticking an affirmative confirmation bound to the
    authoritative aggregate version. Editing any command field, or a `409`
    conflict, clears the confirmation rather than silently adopting the newer
@@ -279,24 +280,27 @@ The API returns stable domain codes; never branch on human-readable text.
 | Code | Meaning | Typical operator action |
 | --- | --- | --- |
 | `security_candidate_not_found` (`AS101`) | Candidate ID does not exist or is not visible to this session | Reload the queue |
-| `security_candidate_not_reviewable` (`AS102`) | Candidate already decided | Reload, do not resubmit |
+| `security_candidate_not_reviewable` (`AS102`) | Candidate is already `accepted`/`rejected`, or the command payload is malformed for its decision | Reload; do not resubmit a decided candidate |
 | `security_incident_not_found` (`AS103`) | Incident ID does not exist or is not visible | Reload the incident list |
-| `security_reviewer_required` (`AS104`) | Caller lacks an active `security_reviewer` / `admin` grant | Provision or restore the grant, then sign in again |
+| `security_reviewer_required` (`AS104`) | Either a protected command ran without an active `security_reviewer` / `admin` grant, **or** ordinary Promotion tried to approve a `caution`-posture target for a reviewer without one | Provision/restore the grant, or route the approval to a security reviewer |
 | `security_indicator_not_found` (`AS105`) | Indicator ID does not exist | Reload the incident detail |
 | `security_version_conflict` (`AS106`) | `expected_version` is stale | Reload and re-confirm; never auto-adopt the new version |
 | `security_idempotency_conflict` (`AS107`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |
 | `security_command_invalid` (`AS108`) | Command failed contract or reason/state validation | Fix the command payload |
 | `security_target_mismatch` (`AS109`) | Target does not match the incident scope | Re-select the target |
-| `security_review_required` (`AS111`) | Ordinary Promotion needs a security reviewer for a `caution` target | Escalate to a security reviewer |
+| `security_review_required` (`AS111`) | A `security_risk` / `scam_indicator` candidate reached the **ordinary** Promotion path (or the security routing function) | Route it to `/review/security`; never promote it as an ordinary signal |
 | `security_promotion_blocked` (`AS112`) | Target is `blocked`; no canonical intelligence may pass | Resolve or adjust the incident first |
 | `security_persistence_failed` (`AS199`) | Transaction failed and rolled back | Retry once; if it persists, inspect the database logs |
 
 ### Blocked-source queue behaviour
 
 A `blocked` source stops entering new collection, extraction, and ordinary
-Promotion, and its Evidence stops counting toward public validity. The queue
-cancels in-flight jobs with a typed `security_blocked` terminal state and does
-**not** retry them; cancelling is not a failure to be retried. Its already
+Promotion, and its Evidence stops counting toward public validity. The collector
+returns the typed outcome `security_blocked`; the queue then cancels the in-flight
+job with the terminal result code `source_security_blocked` and does **not** retry
+it — cancelling is not a failure to be retried. Do not read the outcome name and
+the cancellation code as interchangeable: `security_blocked` is what the collector
+reports, `source_security_blocked` is what the queue persists. Its already
 grounded Evidence stays available to the Security Ledger for investigation, but
 that never restores ordinary public eligibility. Only `score`s whose every
 score-linked signal still has at least one non-blocked Evidence remain public;

@@ -620,7 +620,15 @@ async function removeExactFixtures(
       ...decidedIndicatorRows.map((row) => row.id as string),
     ];
     const aggregateIds = [...candidateIds, ...incidentIds, ...indicatorIds, ...allFixtureProjectIds];
-    const ownedAggregateIds = [...candidateIds, ...incidentIds, ...indicatorIds];
+    const ownedAggregateIds = [
+      ...candidateIds,
+      ...incidentIds,
+      ...indicatorIds,
+      ...allFixtureProjectIds,
+      ...allFixtureSourceIds,
+      ...allFixtureRawItemIds,
+      ...allFixtureEvidenceIds,
+    ];
 
     if (aggregateIds.length > 0) {
       await transaction`delete from public.outbox_events where aggregate_id = any(${aggregateIds}::uuid[])`;
@@ -650,9 +658,10 @@ async function removeExactFixtures(
 
 /**
  * Runs after the cleanup transaction commits so a residue detection can never
- * roll the cleanup back. It only covers aggregates this file owns (random UUIDs
- * for candidates, incidents, and indicators); fixture project IDs are shared
- * with other integration suites and are out of scope here.
+ * roll the cleanup back. Every fixture aggregate this suite owns is a random
+ * UUID generated per run (candidates, incidents, indicators, projects, sources,
+ * raw items, and Evidence), so the filter can safely cover all of them without
+ * touching another suite's fixtures.
  */
 async function assertNoFixtureAggregateResidue(
   sql: postgres.Sql,
@@ -671,10 +680,27 @@ async function assertNoFixtureAggregateResidue(
     select count(*)::int as total from public.security_events
     where aggregate_id = any(${[...aggregateIds]}::uuid[])
   `;
+  const outboxRows = await sql`
+    select count(*)::int as total from public.outbox_events
+    where aggregate_id = any(${[...aggregateIds]}::uuid[])
+  `;
+  const incidentRows = await sql`
+    select count(*)::int as total from public.security_incidents
+    where id = any(${[...aggregateIds]}::uuid[])
+      or project_id = any(${[...aggregateIds]}::uuid[])
+  `;
+  const candidateRows = await sql`
+    select count(*)::int as total from public.security_indicator_candidates
+    where id = any(${[...aggregateIds]}::uuid[])
+      or project_id = any(${[...aggregateIds]}::uuid[])
+  `;
 
   const residue = {
     security_review_commands: commandRows[0]?.total ?? -1,
     security_events: eventRows[0]?.total ?? -1,
+    outbox_events: outboxRows[0]?.total ?? -1,
+    security_incidents: incidentRows[0]?.total ?? -1,
+    security_indicator_candidates: candidateRows[0]?.total ?? -1,
   };
   if (Object.values(residue).some((total) => total !== 0)) {
     throw new Error(`fixture_aggregate_residue:${label}:${JSON.stringify(residue)}`);

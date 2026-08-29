@@ -21,21 +21,31 @@ interface GoldenOutcome {
   readonly claimTypes: readonly ExtractionClaimType[];
   readonly groundedCount: number;
   readonly canonicalIncidentCount: number;
+  readonly processed: number;
+  readonly status: string | undefined;
   readonly runs: readonly RecordExtractionRunInput[];
   readonly insertedPayloads: readonly string[];
   readonly schemaInvalid: number;
   readonly providerErrors: number;
 }
 
+const safeTerminalStatuses: readonly string[] = [
+  'succeeded',
+  'grounding_failed',
+  'schema_invalid_after_repair',
+];
+
 describe('security extraction golden dataset', () => {
   for (const fixture of securityExtractionGoldenCases) {
     it(`${fixture.id}: ${fixture.intent}`, async () => {
       const outcome = await runGoldenCase(fixture);
 
+      expect(outcome.processed).toBe(1);
+      expect(outcome.providerErrors).toBe(0);
+      expect(safeTerminalStatuses).toContain(outcome.status);
       expect(outcome.claimTypes).toEqual(fixture.expectedClaimTypes);
       expect(outcome.groundedCount).toBe(fixture.expectedGrounded);
       expect(outcome.canonicalIncidentCount).toBe(0);
-      expect(outcome.providerErrors).toBe(0);
       for (const forbidden of fixture.forbiddenInPayloads ?? []) {
         for (const payload of outcome.insertedPayloads) {
           expect(payload).not.toContain(forbidden);
@@ -55,6 +65,22 @@ describe('security extraction golden dataset', () => {
         }
       }
     }
+  });
+
+  it('keeps an injected instruction out of the payload even when the injection produces a grounded candidate', async () => {
+    const fixture = securityExtractionGoldenCases.find((entry) => entry.id === 'prompt-injection');
+    expect(fixture).toBeDefined();
+
+    const outcome = await runGoldenCase(fixture as SecurityExtractionGoldenCase);
+
+    expect(outcome.groundedCount).toBeGreaterThan(0);
+    expect(outcome.insertedPayloads.length).toBeGreaterThan(0);
+    for (const forbidden of fixture?.forbiddenInPayloads ?? []) {
+      for (const payload of outcome.insertedPayloads) {
+        expect(payload).not.toContain(forbidden);
+      }
+    }
+    expect(outcome.canonicalIncidentCount).toBe(0);
   });
 
   it('keeps every conflicting grounded candidate instead of overwriting history', async () => {
@@ -121,6 +147,8 @@ async function runGoldenCase(fixture: SecurityExtractionGoldenCase): Promise<Gol
         (key) => key in (candidate.payload as unknown as Record<string, unknown>),
       ),
     ).length,
+    processed: summary.processed,
+    status: runs.at(-1)?.status,
     runs,
     insertedPayloads: inserted.map((candidate) => JSON.stringify(candidate.payload)),
     schemaInvalid: summary.schemaInvalid,
