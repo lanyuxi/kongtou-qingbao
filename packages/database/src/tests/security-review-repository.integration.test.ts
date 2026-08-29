@@ -121,7 +121,8 @@ describeIntegration('SecurityReviewRepository PostgREST integration', () => {
     revokedAccessToken = '';
     if (owner === null) return;
     try {
-      await removeExactFixtures(owner, [...createdUserIds]);
+      const ownedAggregateIds = await removeExactFixtures(owner, [...createdUserIds]);
+      await assertNoFixtureAggregateResidue(owner, ownedAggregateIds, 'afterAll');
     } finally {
       await owner.end({ timeout: 5 });
     }
@@ -585,8 +586,11 @@ async function assertFixturePausedMarker(sql: postgres.Sql | TransactionSql): Pr
   }
 }
 
-async function removeExactFixtures(owner: postgres.Sql, userIds: readonly string[]): Promise<void> {
-  await owner.begin(async (transaction) => {
+async function removeExactFixtures(
+  owner: postgres.Sql,
+  userIds: readonly string[],
+): Promise<readonly string[]> {
+  return owner.begin(async (transaction) => {
     await assertFixturePausedMarker(transaction);
     await transaction`set local session_replication_role = replica`;
 
@@ -616,6 +620,7 @@ async function removeExactFixtures(owner: postgres.Sql, userIds: readonly string
       ...decidedIndicatorRows.map((row) => row.id as string),
     ];
     const aggregateIds = [...candidateIds, ...incidentIds, ...indicatorIds, ...allFixtureProjectIds];
+    const ownedAggregateIds = [...candidateIds, ...incidentIds, ...indicatorIds];
 
     if (aggregateIds.length > 0) {
       await transaction`delete from public.outbox_events where aggregate_id = any(${aggregateIds}::uuid[])`;
@@ -624,10 +629,10 @@ async function removeExactFixtures(owner: postgres.Sql, userIds: readonly string
     await transaction`delete from public.security_incident_decisions where incident_id = any(${incidentIds}::uuid[])`;
     await transaction`delete from public.security_incidents where id = any(${incidentIds}::uuid[])`;
     await transaction`delete from public.security_candidate_review_decisions where candidate_id = any(${candidateIds}::uuid[])`;
-    await transaction`delete from public.security_review_commands where aggregate_id = any(${candidateIds}::uuid[])`;
+    await transaction`delete from public.security_review_commands where aggregate_id = any(${aggregateIds}::uuid[])`;
     await transaction`delete from public.security_indicator_evidence_links where indicator_id = any(${indicatorIds}::uuid[])`;
     await transaction`delete from public.security_indicators where id = any(${indicatorIds}::uuid[])`;
-    await transaction`delete from public.security_events where aggregate_id = any(${[...candidateIds, ...incidentIds]}::uuid[])`;
+    await transaction`delete from public.security_events where aggregate_id = any(${aggregateIds}::uuid[])`;
     await transaction`delete from public.security_indicator_candidates where id = any(${candidateIds}::uuid[])`;
     await transaction`delete from public.evidence where id in ${transaction(allFixtureEvidenceIds)}`;
     await transaction`delete from public.raw_items where id in ${transaction(allFixtureRawItemIds)}`;
@@ -638,7 +643,42 @@ async function removeExactFixtures(owner: postgres.Sql, userIds: readonly string
       await transaction`delete from public.profiles where id = any(${[...userIds]}::uuid[])`;
       await transaction`delete from auth.users where id = any(${[...userIds]}::uuid[])`;
     }
+
+    return ownedAggregateIds;
   });
+}
+
+/**
+ * Runs after the cleanup transaction commits so a residue detection can never
+ * roll the cleanup back. It only covers aggregates this file owns (random UUIDs
+ * for candidates, incidents, and indicators); fixture project IDs are shared
+ * with other integration suites and are out of scope here.
+ */
+async function assertNoFixtureAggregateResidue(
+  sql: postgres.Sql,
+  aggregateIds: readonly string[],
+  label: string,
+): Promise<void> {
+  if (aggregateIds.length === 0) {
+    return;
+  }
+
+  const commandRows = await sql`
+    select count(*)::int as total from public.security_review_commands
+    where aggregate_id = any(${[...aggregateIds]}::uuid[])
+  `;
+  const eventRows = await sql`
+    select count(*)::int as total from public.security_events
+    where aggregate_id = any(${[...aggregateIds]}::uuid[])
+  `;
+
+  const residue = {
+    security_review_commands: commandRows[0]?.total ?? -1,
+    security_events: eventRows[0]?.total ?? -1,
+  };
+  if (Object.values(residue).some((total) => total !== 0)) {
+    throw new Error(`fixture_aggregate_residue:${label}:${JSON.stringify(residue)}`);
+  }
 }
 
 function requireRepository(
