@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 4 本地完成并通过 fresh final gate**：1,342 PASS / 71 gated skips。**下一步：提交 Task 4，随后进入 Task 5**）
+> 最近更新：2026-08-31（**Phase 7B Task 4 已提交**：`93acfbf feat(database): add reference review repository`。**下一步：按计划进入 Task 5 security coupling races**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–3 已完成；Task 4 的 contracts、forward migration、pgTAP/typegen、bearer repository、disposable integration、max-page regression 与 fresh final gate 均完成；Task 5–10 尚未实现。生产仍为 19 个已应用迁移，第 20–24 个均按 production unapplied 处理。
@@ -15,6 +15,8 @@
 **2026-08-31 Task 4 max-page cursor focused GREEN**：先从 `packages/database` 工作区复跑，确认仅新增上限页断言失败（28 PASS / 1 expected FAIL），browser export 正常；随后以单一 `reviewerListMaximumLimit=100` 复用既有 RPC cap，并让共享 `pageOf` 在完整上限页保守返回最后一项游标。该策略不漏第101条，代价仅是总数恰为100时允许一个空末页。repository + entrypoints focused **2 files / 35 PASS / exit 0**；migration、RPC contract 与 generated types 均未改。下一步 fresh 全仓门禁与最终 diff 自审。
 
 **2026-08-31 Task 4 fresh final gate / local COMPLETE**：五 workspace lint/typecheck/build 全部 exit 0；Vitest 为 contracts 167 + domain 410 + database 287 + worker 236 + web 242 = **1,342 PASS**，database/worker 共 **71 gated skips**。placeholder scanner 与其 2 条自测、`git diff --check` 均通过；server-only repository 精确扫描无 service-role/base-table fallback，唯一 `service.role` 命中是测试中的泄漏拒绝正则。辅助清理复核发现旧 158,522-byte typegen 临时文件仍在 `/private/tmp`，已按 Task 4 cleanup 范围删除；integration env 与 typegen temp 均 absent，16432/16433 无监听。本轮未连接任何数据库或远端，生产未访问。独立 reviewer 仍因额度未能读 diff，故完成结论来自主任务逐项自审与 fresh gate，不宣称 independent review clean。下一步原子提交 Task 4。
+
+**2026-08-31 Task 4 commit COMPLETE**：Task 4 的 20 个实现/测试/迁移/文档文件已以 conventional subject `feat(database): add reference review repository` 提交为 **`93acfbf`**（4,693 insertions / 74 deletions）。提交只包含 Task 4 精确文件；生产未访问。下一步进入 Task 5，单独实现并证明 Phase 7A indicator → reference 的同步 security-coupling races。
 
 项目所有者已批准修订 Task 4：不改已 reset 的 `20260829000100`，新增 `20260830000100_phase_7b_reference_review_boundary.sql` + `015_phase_7b_reference_review_boundary.test.sql`，正面补齐 protected reviewer list/detail/history RPC、strict query/cursor/authority/receipt contracts、内部 note 落库、域名权威 revoke 后公开链接同步失效，以及 `(project_id, normalized_url)` 唯一性。自审还删除了旧 spec 中与已批准角色边界和 Task 3 实现冲突的 `security_reviewer` restore 例外；Phase 7B 命令统一只允许 active reviewer/senior/admin。实施顺序固定为 contracts RED→GREEN、015 pgTAP RED、forward migration GREEN、repository RED→GREEN、经独立授权后的 disposable repository integration；Task 5 单独证明 Phase 7A security-coupling races。
 
