@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   decideDomainAuthorityCommandV1Schema,
   decideReferenceCommandV1Schema,
+  domainAuthorityCommandReceiptV1Schema,
+  referenceCommandReceiptV1Schema,
   registerDomainAuthorityCommandV1Schema,
   registerReferenceCommandV1Schema,
 } from './commands.js';
@@ -242,5 +244,47 @@ describe('reference commands', () => {
         note: null,
       }).success,
     ).toBe(false);
+  });
+
+  it('parses exact domain-authority command receipts and rejects drift', () => {
+    const receipt = {
+      version: 1 as const,
+      commandId: '55555555-5555-4555-8555-555555555555',
+      authorityId,
+      authorityVersion: 2,
+      state: 'granted' as const,
+      replayed: false,
+    };
+
+    expect(domainAuthorityCommandReceiptV1Schema.parse(receipt)).toEqual(receipt);
+    for (const invalid of [
+      { ...receipt, authorityVersion: 0 },
+      { ...receipt, state: 'verified' },
+      { ...receipt, commandId: 'not-a-uuid' },
+      { ...receipt, decisionId: '66666666-6666-4666-8666-666666666666' },
+    ]) {
+      expect(domainAuthorityCommandReceiptV1Schema.safeParse(invalid).success).toBe(false);
+    }
+  });
+
+  it('parses exact reference command receipts and rejects drift', () => {
+    const receipt = {
+      version: 1 as const,
+      commandId: '55555555-5555-4555-8555-555555555555',
+      referenceId,
+      referenceVersion: 3,
+      state: 'flagged' as const,
+      replayed: true,
+    };
+
+    expect(referenceCommandReceiptV1Schema.parse(receipt)).toEqual(receipt);
+    for (const invalid of [
+      { ...receipt, referenceVersion: -1 },
+      { ...receipt, state: 'granted' },
+      { ...receipt, replayed: 'true' },
+      { ...receipt, actorUserId: '66666666-6666-4666-8666-666666666666' },
+    ]) {
+      expect(referenceCommandReceiptV1Schema.safeParse(invalid).success).toBe(false);
+    }
   });
 });

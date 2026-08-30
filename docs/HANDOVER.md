@@ -1,12 +1,194 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-30（**Phase 7B verified allowlisted references 实施进行中：Task 1–3 已完成并通过 disposable 验证**。分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references`，HEAD `9528a1e`；提交链 `f63f793`（contracts）→ `3cb69bf`（domain）→ `87cc070`（迁移）→ `0b3d721`（复检修复 3C/6I/4M 闭环）→ `5772ad5`（014 pgTAP + types）。验证证据：23 迁移 reset exit 0、full pgTAP **14 files / 1,424 PASS**（014 新增 74 断言）、集成矩阵 **9 files / 66 PASS**、typegen 两次一致并替换 generated types、清理回 seed 基线、生产 54321/54322 全程未访问。本地 `pnpm verify` exit 0 = **1,306 non-skipped / 68 gated skips**（contracts 161 / domain 410 / database 257 / worker 236 / web 242）。**下一步：Task 4（bearer repository + 双会话竞态集成），涉及 disposable 栈、需逐次显式授权**）
+> 最近更新：2026-08-31（**Phase 7B Task 4 本地完成并通过 fresh final gate**：1,342 PASS / 71 gated skips。**下一步：提交 Task 4，随后进入 Task 5**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-30 Phase 7B 实施中）**：Phase 0–7A 全部在主线 `codex/phase-0-1-foundation`；**Phase 7B（verified allowlisted references）在独立分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references` 上实施，Task 1–3 已完成**（contracts → domain 纯规则 → 第 23 个迁移 + 014 pgTAP + generated types，disposable 验证全绿），Task 4–10 待执行。生产仍为 19 个已应用迁移，第 20–23 个 migration 继续按 production unapplied 处理；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–3 已完成；Task 4 的 contracts、forward migration、pgTAP/typegen、bearer repository、disposable integration、max-page regression 与 fresh final gate 均完成；Task 5–10 尚未实现。生产仍为 19 个已应用迁移，第 20–24 个均按 production unapplied 处理。
 
-### Phase 7B verified allowlisted references（设计已批准；Task 1–3 完成，Task 4 待执行）
+### Phase 7B verified allowlisted references（设计及 Task 4 修订已批准；Task 1–3 完成）
+
+#### 2026-08-30 Task 4 修订设计落盘
+
+**2026-08-31 Task 4 max-page cursor focused RED**：收尾自审发现 reviewer list 的 `p_limit` 上限为 100，而 repository 只以 `rows.length > limit` 判断下一页；请求 `limit=100` 时无法 overfetch 第 101 条，因而会把仍有后续数据的完整上限页错误标记为末页。新增 100 行上限页具名回归后，目标断言精确 `expected cursor / received null`。同次从 monorepo 根直接运行的 browser export 用例因 Node 无法从根解析 workspace package 产生环境性第二失败，不属于产品 RED；正式 focused gate 将从 `packages/database` 工作区运行。下一步只改 `pageOf` 的上限页判断，不动 migration/RPC contract。
+
+**2026-08-31 Task 4 max-page cursor focused GREEN**：先从 `packages/database` 工作区复跑，确认仅新增上限页断言失败（28 PASS / 1 expected FAIL），browser export 正常；随后以单一 `reviewerListMaximumLimit=100` 复用既有 RPC cap，并让共享 `pageOf` 在完整上限页保守返回最后一项游标。该策略不漏第101条，代价仅是总数恰为100时允许一个空末页。repository + entrypoints focused **2 files / 35 PASS / exit 0**；migration、RPC contract 与 generated types 均未改。下一步 fresh 全仓门禁与最终 diff 自审。
+
+**2026-08-31 Task 4 fresh final gate / local COMPLETE**：五 workspace lint/typecheck/build 全部 exit 0；Vitest 为 contracts 167 + domain 410 + database 287 + worker 236 + web 242 = **1,342 PASS**，database/worker 共 **71 gated skips**。placeholder scanner 与其 2 条自测、`git diff --check` 均通过；server-only repository 精确扫描无 service-role/base-table fallback，唯一 `service.role` 命中是测试中的泄漏拒绝正则。辅助清理复核发现旧 158,522-byte typegen 临时文件仍在 `/private/tmp`，已按 Task 4 cleanup 范围删除；integration env 与 typegen temp 均 absent，16432/16433 无监听。本轮未连接任何数据库或远端，生产未访问。独立 reviewer 仍因额度未能读 diff，故完成结论来自主任务逐项自审与 fresh gate，不宣称 independent review clean。下一步原子提交 Task 4。
+
+项目所有者已批准修订 Task 4：不改已 reset 的 `20260829000100`，新增 `20260830000100_phase_7b_reference_review_boundary.sql` + `015_phase_7b_reference_review_boundary.test.sql`，正面补齐 protected reviewer list/detail/history RPC、strict query/cursor/authority/receipt contracts、内部 note 落库、域名权威 revoke 后公开链接同步失效，以及 `(project_id, normalized_url)` 唯一性。自审还删除了旧 spec 中与已批准角色边界和 Task 3 实现冲突的 `security_reviewer` restore 例外；Phase 7B 命令统一只允许 active reviewer/senior/admin。实施顺序固定为 contracts RED→GREEN、015 pgTAP RED、forward migration GREEN、repository RED→GREEN、经独立授权后的 disposable repository integration；Task 5 单独证明 Phase 7A security-coupling races。
+
+书面规格确认后已进入 TDD。contracts RED 只改 `packages/contracts/src/references/commands.test.ts` 与 `projections.test.ts`；reference-focused run 为 **16 files，160 passed / 7 failed，exit 1**。7 个失败均为批准缺口：2 个 strict receipt、2 个 reviewer query/cursor、1 个 authority list/detail、2 个 decision note/history；既有 160 个用例通过。下一步写最小 schema GREEN；仍未访问数据库、SSH、远端或生产。
+
+Contracts GREEN 最小修改 `commands.ts`、`projections.ts` 与根 `index.ts`：新增 domain/reference strict receipts、两套 `(updatedAt,id)` reviewer cursor/query、authority list/detail/history，以及 reference/authority history 的 strict decision/reason 和 bounded nullable note。focused 与完整 contracts 均为 **16 files / 167 PASS**，lint/typecheck exit 0；无依赖变更，仍未访问数据库、SSH、远端或生产。
+
+本地新增 104 行 `supabase/tests/015_phase_7b_reference_review_boundary.test.sql`（SHA-256 `561a83d84e4f832f0f67ebbc355ed930260da4daffff5f32dc8cce4dad0785e4`），结构断言覆盖两张 decision note 列、4 个 bearer review RPC、项目级 URL unique、authority-granted render gate 与 execute privilege。`git diff --check` 通过；尚未同步或运行。下一步只可在新授权后向 marker-verified disposable workdir 复制这一 test 并执行 focused RED，不 reset、不复制 migration、不访问生产。
+
+用户已授权 test-only focused RED。只读 fail-closed 预检确认 exact workdir/project、DB/Kong running+healthy 且只绑 64322/64321、paused marker、seed/第23迁移/014 SHA 全部匹配，remote 015 absent。首次 marker 查询因本地 shell 单引号剥离令 SQL 拼接字面量失真而 exit 1，发生在复制前；外层改双引号后同一只读查询 exit 0。下一步只复制 015 并核 SHA，不 reset、不复制 migration、不访问生产。
+
+随后仅复制本地 015 到 disposable 同名路径，远端 SHA-256 `561a83d84e4f832f0f67ebbc355ed930260da4daffff5f32dc8cce4dad0785e4` 与本地精确一致。未 reset、未复制 migration、未访问生产；下一步只运行 focused 015 RED。
+
+原 23-migration disposable 基线上 focused 015 为 **Files=1 / Tests=9 / Failed=9 / Result FAIL，exit 1**。失败 1–2 为 note 列，3–6 为四个 reviewer RPC，7 为 project-scoped unique，8 为 authority render gate，9 为 execute privilege；全部是批准缺口，无语法/fixture/环境噪声。未 reset、未复制/执行 migration、未 typegen、未访问生产。下一步本地扩充完整行为矩阵；更新版再次同步/RED 需新授权。
+
+本地 015 随后扩为 **858 行 / 51 assertions**（SHA-256 `e6f9369ff713974bdc02289f4f13460ee19f8afc10ebcb479568c2f517420e96`），加入四 RPC exact OUT 列、public unsafe-field exclusion、六角色读矩阵、四命令 note round-trip/outbox exclusion、空 note、同/跨项目 URL unique、stable cursor/state filter/detail history 与 authority revoke public suppression。实际为 11 次 `set local role` 与 11 次 `reset role` 成对，`git diff --check` 通过。远端仍是旧 SHA `561a83d8…785e4`；覆盖新版并再次 focused RED 需要新授权，仍不 reset/不复制 migration/不访问生产。
+
+新授权后重复只读预检全部通过：exact workdir/project、DB/Kong running+healthy 且只绑 64322/64321、paused marker、seed/第23迁移/014 SHA 均匹配；remote 015 精确仍为旧 SHA `561a83d8…785e4`。下一步仅覆盖该 test 并核新 SHA `e6f9369f…20e96`，不 reset/不复制 migration。
+
+随后仅覆盖 disposable 同名 015，远端 SHA-256 `e6f9369ff713974bdc02289f4f13460ee19f8afc10ebcb479568c2f517420e96` 与本地精确一致。未 reset、未复制 migration、未访问生产；下一步只运行新版 focused RED。
+
+新版旧基线首跑执行到 22 assertions，其中 19 failed 均为预期结构/note/unique 缺口；随后 line 483 在 pgTAP wrapper 外直接读取尚不存在的 `decision.note`，产生未捕获 SQL error 和 No plan found，余下授权/cursor/revoke 矩阵未执行。系统化定位根因为 test harness 未动态包装预期缺列查询，不是产品或环境。未 reset、未复制/执行 migration、未访问生产；下一步本地修复测试后重新授权 RED。
+
+本地已最小修复该 harness：两处 note round-trip 不再在顶层静态解析缺失列，而是由动态 SQL `lives_ok` 写入临时结果表，再用 `is()` 校验存储值；因此旧 schema 上缺列应作为 pgTAP 失败继续执行，而不会中止整份计划。修复版为 **875 行 / 53 assertions**，SHA-256 `ba1c0bb5819740886e0032ccd3cc398a44448db3b431473f310d553d98512aef`；11 次 `set local role` 与 11 次 `reset role` 精确成对，`git diff --check` 通过。远端仍为上次授权同步的旧 SHA `e6f9369f…20e96`；重新预检、覆盖和 focused RED 均需新授权，不 reset、不复制/执行 migration、不 typegen、不建隧道、不访问生产。
+
+用户已授权修复版 test-only focused RED。本地 source gate 复核 015 仍为 875 行、SHA `ba1c0bb5…12aef`，seed/第23 migration/014 SHA 仍分别为 `f1ceaddc…7e55` / `75e038d8…5966` / `31cee8dc…bd68`，diff check 通过。首次远端只读预检在 marker 查询处 fail-closed：SQL 误读不存在的 `projects.status`，返回 undefined column / exit 1；任何复制尚未发生。本地 `20260809000300_catalog.sql` 与 seed 已确认项目状态列实际为 `lifecycle`。下一步仅以该列名修正重复只读预检；授权范围不变。
+
+改用 `projects.lifecycle` 后重复只读预检 exit 0：`/root/airdrop-governance-test` / `airdrop-intelligence-governance-test` 精确匹配，DB/Kong 均 running+healthy 且唯一端口为 64322/64321，paused marker 精确返回；seed/第23 migration/014 SHA 与本地一致，remote 015 精确仍为旧 SHA `e6f9369f…20e96`。下一步仅覆盖这一同名 test 并校验新 SHA `ba1c0bb5…12aef`；其余禁止项不变。
+
+随后仅以 SCP 覆盖 disposable 同名 015，复制 exit 0；远端 SHA-256 `ba1c0bb5819740886e0032ccd3cc398a44448db3b431473f310d553d98512aef` 与本地精确一致。未 reset、未复制/执行 migration、未 typegen、未建隧道、未访问生产；下一步只运行 focused 015 RED。
+
+focused 015 在旧 23-migration 基线上 exit 1：已执行 49 assertions，其中 43 failed，均命中缺 note 列/四 RPC/exact outputs/命令 note/项目级 unique/角色授权/cursor/detail/revoke 等预期产品缺口，并已越过上轮 line 483 中止点。随后第 822 行 anon 公共渲染断言读取 `pg_temp.phase_7b_015_reference_one`，因该测试临时 ID 表只授予 authenticated 而 permission denied；余下 4 个断言未执行，TAP 因 No plan found。根因是 test harness 临时表 grant 缺口，不是产品或环境；未 reset、未复制/执行 migration、未 typegen、未建隧道、未访问生产。下一步本地最小补 anon SELECT，更新 SHA 后需再次授权 test-only RED。
+
+本地已做第二处最小 harness 修复：仅新增 `grant select on table pg_temp.phase_7b_015_reference_one to anon`，使 anon 公共投影断言可读取测试自有 ID，不改变任何 production table/view/RPC/grant。015 现为 **877 行 / 53 assertions**，SHA-256 `d7f4648a62f2c1eac1deb124d4c8c1dd765c61df1e4ac4f2deb9574802f0e9b9`；11 次 `set local role` 与 11 次 `reset role` 成对，`git diff --check` 通过。远端仍是上次同步的 SHA `ba1c0bb5…12aef`；重新预检、覆盖和 focused RED 需要新授权，其余禁止项不变。
+
+用户已授权二次修复版 test-only focused RED。本地 gate 再次确认 015 为 877 行、SHA `d7f4648a…e9b9`，seed/第23 migration/014 SHA 未漂移且 diff check 通过；远端只读 fail-closed 预检 exit 0，exact workdir/project、DB/Kong running+healthy、唯一端口 64322/64321、paused marker 与三项基础 SHA 均匹配，remote 015 精确仍为上一版 `ba1c0bb5…12aef`。下一步仅覆盖同名 test 并核新 SHA。
+
+随后仅 SCP 覆盖 disposable 同名 015，copy exit 0；远端 SHA-256 `d7f4648a62f2c1eac1deb124d4c8c1dd765c61df1e4ac4f2deb9574802f0e9b9` 与本地精确一致。未 reset、未复制/执行 migration、未 typegen、未建隧道、未访问生产；下一步仅运行 focused 015 RED。
+
+二次修复版 focused 015 完整 RED：**Files=1 / Tests=53 / Failed=46 / Result FAIL / exit 1**，TAP 正常完成，无 SQL 中止、parse error 或 No plan found。通过的 7 项是旧基线仍应保留的安全/fixture 约束；46 个失败精确覆盖两张 decision note、4 个 reviewer RPC 与 exact OUT、安全字段排除、命令 note 接受/落库、项目级 unique、active reviewer/senior/admin 与 ordinary/security-only/revoked/anon 矩阵、稳定 cursor/filter/detail/history，以及 authority revoke public suppression。未 reset、未复制/执行 migration、未 typegen、未建隧道、未访问生产。下一步只在本地编写第24个 forward-only migration；应用/验证数据库需新授权。
+
+本地已新增第24个 `20260830000100_phase_7b_reference_review_boundary.sql`，**1,233 行 / SHA-256 `04a912f937a923666557b58fb9de6cac3a6e4bc52ad34f2332edab7563561faa`**。最小范围包括：两张 append-only decision 表新增 bounded nullable note；global URL unique 改为 `(project_id, normalized_url)`；四个 mutation RPC 接受并持久化合法 note，同时仍以完整 payload 计算 input hash 且 receipt/outbox 不含 note；public render helper 加 matching granted authority；四个 security-definer reviewer list/detail RPC 逐次复核 `auth.uid()` + active reviewer/senior/admin，使用 `(latest decision created_at desc, id desc)` 游标并输出 exact allowlist/history；PUBLIC/anon/后台角色先 revoke，仅 authenticated execute。逐函数 diff 证明既有角色/Evidence/版本/幂等/事务性 outbox 逻辑未漂移；第23 migration SHA 仍 `75e038d8…5966`，015 SHA 仍 `d7f4648a…e9b9`，`git diff --check` 通过。本机无可用 PostgreSQL parser/runtime，故尚未证明 SQL 编译或 GREEN；下一步需要新授权只在 marker-verified disposable 栈同步 migration、reset、跑 focused/full pgTAP 并双次 typegen。生产未访问。
+
+用户已授权第24 migration disposable GREEN。只读 fail-closed 预检 exit 0：远端精确为 23 个已应用 migration / 最高 `20260829000100`，第24 migration 文件不存在；exact workdir/project、DB/Kong running+healthy、唯一端口 64322/64321、paused marker、seed/第23/014/015 SHA 全部匹配。本地 generated types 基线为 156,630 bytes / SHA `c5f5cbe70e0f0f7b7a95c1297fa89c523f3deea23abba6aee679a4317c8253bf`。下一步仅同步第24 migration 并核 SHA，通过后才执行授权 reset。
+
+随后只把本地第24 migration 同步到 `/root/airdrop-governance-test` 的同名路径，未复制其他文件；远端 SHA-256 `04a912f937a923666557b58fb9de6cac3a6e4bc52ad34f2332edab7563561faa` 与本地精确一致。下一步执行本次已授权的 disposable `db reset`；若 reset 失败则立即停止 focused/full pgTAP 与 typegen。
+
+授权的 disposable `db reset` 随后 exit 0：第1–24个 migration 依序应用，第24 migration 成功通过 PostgreSQL 编译/执行，seed 和容器重启成功。reset 后只读复核返回 `24|20260830000100`，测试 marker 仍精确为 `90000000-0000-4000-8000-000000000019|disposable-integration-database-marker|paused`。下一步运行 focused 015；若失败则停止 full pgTAP/typegen 并进入系统化调试。
+
+focused 015 随后按约定 fail-closed：前 8 条结构断言全部 PASS，但第100行 ACL 聚合调用 `has_function_privilege('PUBLIC', oid, 'EXECUTE')`，PostgreSQL 将 `PUBLIC` 当作真实角色名并报 `role "PUBLIC" does not exist`；run 为 Tests=8 / Failed=0 / SQL abort / No plan / exit 1。根因是测试 harness 的 PUBLIC ACL 检查写法，不是 migration 编译或前 8 个产品断言失败。full pgTAP 与 typegen 均未运行；下一步仅本地改用实际 ACL 展开检查，新的 015 字节需另行授权后才能覆盖/复跑。
+
+本地已最小修复该 ACL harness：用 `aclexplode(coalesce(proacl, acldefault('f', proowner)))` 展开函数有效 ACL，并以 `grantee=0` 检查 PUBLIC execute，同时原样保留 anon 禁止/authenticated 允许断言。015 现为 **887 行 / 53 assertions**，SHA-256 `d6cb9ced5d15d26180a7debc109cfbe01036a8789b15458ed2a7c4c7a2fea465`；11 次 `set local role` / 11 次 `reset role` 成对，`git diff --check` 通过。第24 migration 未改、远端数据库仍处于已应用24个 migration 的 seed 状态、远端 015 仍是旧 SHA；覆盖修复版并恢复 focused→full→双 typegen 链需新授权。
+
+用户授权修复版 015 GREEN 后，本地 source gate 再次确认 015 为 887 行 / 53 assertions / SHA `d6cb9ced…a465`，migration24、seed、014 SHA 未漂移，11 组 role 切换成对且 diff check 通过。首次远端 fail-closed 预检已通过 exact workdir/project、DB/Kong running+healthy 与唯一端口检查，但随后 SQL 字符串拼接中的单引号被 SSH 外层剥离，迁移计数语句变成非法 `|| | ||` 并 exit 1；任何复制尚未发生。下一步把 count/max 和 marker 字段拆成无拼接的独立只读查询后重复预检，原授权范围不变。
+
+改用独立 `count(*)` / `max(version)` / marker count 查询后，重复只读预检 exit 0：远端精确 workdir/project、DB/Kong running+healthy 与唯一 64322/64321 端口、24 migrations / 最高 `20260830000100`、paused marker、seed/migration24/014 SHA 全部匹配；remote 015 仍精确为旧 SHA `d7f4648a62f2c1eac1deb124d4c8c1dd765c61df1e4ac4f2deb9574802f0e9b9`。下一步只覆盖修复版 015 并核新 SHA，不 reset、不访问生产。
+
+随后只覆盖 disposable 同名 015，未复制其他文件、未 reset；远端 SHA-256 `d6cb9ced5d15d26180a7debc109cfbe01036a8789b15458ed2a7c4c7a2fea465` 与本地精确一致。下一步运行 focused 015；失败则立即停止 full pgTAP/typegen。
+
+修复版 focused 015 完整 GREEN：**Files=1 / Tests=53 / Result PASS / exit 0**，无 SQL 中止、TAP parse error 或 No plan。PUBLIC ACL 展开检查已在真实 PostgreSQL 上执行通过。下一步按授权运行全量 pgTAP；若失败则停止 typegen。
+
+随后全量 pgTAP 完整 GREEN：**Files=15 / Tests=1,477 / Result PASS / exit 0**，001–015 全部通过，证明第24 migration 未回归既有 schema/RLS/history/queue/governance/7A/7B ledger 行为。下一步按授权双次 typegen 并逐字节比较；仅一致时替换本地生成类型。
+
+同一 disposable schema 上用 pinned CLI 连续 typegen 两次，生成物均为 **158,522 bytes**，SHA-256 均为 `24733d6d4e2b5721839c04ed70cafad057be6fecf9bed91c1f3c01484e97cf11`，`cmp -s` exit 0，证明生成稳定。下一步只下载第一份到本地临时目录，复核 SHA 后机械替换 `packages/database/src/generated/database.types.ts`。
+
+第一份稳定生成物已下载到 `/private/tmp/phase7b-task4-database-types.ts`；本地复核仍为 158,522 bytes / SHA `24733d6d…cf11`。当前仓库 generated types 基线仍为 156,630 bytes / SHA `c5f5cbe7…53bf`；临时产物静态扫描包含四个 reviewer RPC 与两张 decision 表。下一步只机械替换该 generated 文件并运行本地静态/包级门禁。
+
+本地 `packages/database/src/generated/database.types.ts` 已用稳定产物机械替换，随后 `cmp` 精确一致；最终为 158,522 bytes / SHA `24733d6d4e2b5721839c04ed70cafad057be6fecf9bed91c1f3c01484e97cf11`，相对旧文件只新增 73 行。四个 reviewer RPC 均可检索，`git diff --check` 通过。下一步运行 database 包窄门禁，再继续 bearer repository RED→GREEN；本轮不再做远端数据库写操作。
+
+首次并行运行 database 包 lint/typecheck/test 均在代码执行前立即 exit 127，唯一错误为 `env: node: No such file or directory`；因此这不是源码或 generated types 的失败，也没有产生文件改动。当前非交互 shell 的 PATH 未包含此前基线使用的 Node 22。下一步只读定位既有 Node 22 安装路径，并通过 task-specific 显式 PATH 重跑三项门禁。
+
+已定位 WorkBuddy Node `v22.22.2`，与仓库 engines 匹配；显式用它执行现有 pnpm 入口后，pnpm 在任何脚本前触发 registry metadata/dependency-status install，并因网络不可达和非 TTY 拒绝 modules purge 而三项 exit 1。没有依赖或源码改动，lint/typecheck/test 仍未执行。下一步直接以 Node 22 调用仓库已安装的 ESLint、TypeScript、Vitest 入口，避免 pnpm 的安装副作用。
+
+随后用 Node 22.22.2 直接调用仓库现有 ESLint/TypeScript/Vitest，database 包窄门禁全部真实执行并通过：lint exit 0、typecheck exit 0、Vitest **13 passed / 9 environment-gated skipped，257 passed / 66 skipped**。未安装/清理依赖。至此第24 migration、focused/full pgTAP、stable typegen、本地 generated types 与 database 包门禁全部 GREEN；下一步进入 bearer-scoped reference review repository 的 RED→GREEN。
+
+Repository RED 已完成：新增 `reference-review-repository.test.ts` 覆盖 per-call bearer、四 read/四 mutation exact RPC、双 cursor/空页、strict read/receipt parse、note/idempotency 保留、aggregate mismatch、完整 AR2xx 映射与 browser denial；`entrypoints.test.ts` 同时加入 package browser 条件断言。focused 2 files exit 1：新 suite 精确因 repository module absent 无法加载，browser 用例精确因 package subpath 未导出而失败；其余 5 个既有 entrypoint PASS，`git diff --check` 通过。下一步最小实现 repository/entry/browser/package export。
+
+最小 GREEN 已实现：新增 `references/reference-review-repository.ts`、server-only `entry.ts`、直接抛错的 `browser-denied.ts`，package 增加条件 subpath，root 仅导出类型。repository 每次调用只使用入参 bearer、新建无持久 session 的 anon client，只调用 8 个 protected RPC；command 先 strict parse 并 canonical JSON，read/receipt 先 strict parse，错误仅映射 AR201/202/203/204/206/207/208/209/210/299。focused **2 files / 34 PASS**，`git diff --check` 通过。下一步 database 全量 test/lint/typecheck。
+
+Database 全量本地 GREEN：lint/typecheck 均 exit 0，Vitest **14 passed / 9 environment-gated skipped，286 passed / 66 skipped**。没有依赖修改；repository 的 conditional export 未回归既有模块。计划 Step 7 完成。下一步只在本地准备 `reference-review-repository.integration.test.ts` 的 active/revoked bearer、per-call separation、note、project duplicate、replay/version conflict、cleanup/zero-residue 矩阵；实际隧道/数据库执行需另行显式授权。
+
+本地 integration 准备完成：新增 3 条真实 PostgREST/PostgreSQL 测试，覆盖 authority/reference note round-trip、同 key replay、stale version、同项目 duplicate 与跨项目相同 URL、同 repository 的 bearer 分离、role revoke 后下一调用立即拒绝；fixture 全部为 run-scoped UUID，afterAll 先精确清理，再在提交后检查 references/authorities/commands/outbox/projects/auth users 零残留。无环境变量时 focused 为 1 file / 3 skipped；lint/typecheck exit 0，database full **14 passed / 10 gated skipped，286 passed / 69 skipped**。integration SHA `e213ab348061c68f154908273358cac31be6c638eeaca43e2d3cd01f88e1b2dd`，repository SHA `b7a54748ad38020c9356d967dfa31cfe474735c32ff7d826badda3b995eea440`，015/migration24 SHA 未漂移，`git diff --check` 通过。下一步需新授权后才可做远端 fail-closed preflight、临时 `16432/16433` 隧道、endpoint parity 与唯一 reference integration；无需 reset。
+
+用户授权 Task 4 repository integration GREEN 后，fail-closed source/identity 预检 exit 0：本地 integration/repository/015/migration24/seed SHA 未漂移，16432/16433 均空闲，diff check 通过；远端 exact workdir/project、DB/Kong running+healthy、唯一 64322/64321、24 migrations/最高 `20260830000100`、paused marker、seed/migration24/014/015 SHA 全部匹配。reference/authority/command/相关 outbox 基线均为 0；remote active/rumored projects 计数为 2，供 tunnel-side PostgREST parity 使用。下一步建立临时隧道，不 reset、不访问生产。
+
+临时 SSH 隧道已建立：同一 ssh 进程只以 IPv4 监听 `127.0.0.1:16432 → remote 64322` 与 `127.0.0.1:16433 → remote 64321`。首次 sandbox 内 `nc` 因本机策略返回 `Operation not permitted`，不代表远端拒绝；沙箱外重复相同只读 TCP 探测后两端均 succeeded。未读取凭据、未运行测试。下一步生成仅含四个授权变量的 0600 临时 env，并做 PostgREST/psql endpoint parity。
+
+临时 integration env 已生成到 `/private/tmp/phase7b-task4-reference-integration.env`：mode `600`、恰好 4 行，只含 `AIRDROP_DATABASE_TEST_URL`、`AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL`、`AIRDROP_ANON_SUPABASE_URL`、`AIRDROP_ANON_SUPABASE_KEY`；未包含 service-role/JWT secret，所有值均未输出。下一步使用这些变量只读比较 tunnel DB 与 anon PostgREST 对 active/rumored projects 的 exact count，预期均为远端值 2。
+
+Endpoint parity 已通过：使用 tunnel PostgreSQL 查询 active/rumored projects 得 2，使用 anon key 经 tunnel PostgREST 对相同 relation/filter 请求 exact count 也得 2，二者与远端 docker-exec psql 预检值一致。未输出凭据。下一步只运行 `reference-review-repository.integration.test.ts` 的 3 条测试，不执行其他 integration suite。
+
+唯一 reference repository integration 完整 GREEN：**Test Files=1 passed / Tests=3 passed / exit 0**。真实路径覆盖 authority/reference note round-trip、同 key replay、stale version、同项目 duplicate 与跨项目相同 URL、同 repository 的 bearer 分离、role revoke 后下一调用立即拒绝；afterAll 对 run-scoped fixture 做 exact cleanup，并在事务提交后验证 references/authorities/commands/outbox/projects/auth users 全部零残留。下一步再以远端 docker-exec psql 独立核对全局 reference residue=0 与 paused marker，随后关闭隧道并删除临时 env。
+
+独立远端只读 postcheck exit 0：paused marker 精确计数 1；migration 仍为 **24 / `20260830000100`**；`project_references`、`project_domain_authorities`、`reference_review_commands`、两张 decision 表、`reference_security_flags`、reference/domain-authority outbox、测试项目与测试用户均为 0；active/rumored 项目基线仍为 2。首次尝试只因交接记录中的旧私钥文件名不存在而未连接；第二次只读 SQL 误用不存在的 marker 表而在首句停止，修正为 seed 的 `projects` marker 后完整通过，均无写入。下一步关闭 `16432/16433` 隧道并删除 `/private/tmp/phase7b-task4-reference-integration.env`。
+
+清理 COMPLETE：现有 SSH tunnel 会话收到中断并退出；`/private/tmp/phase7b-task4-reference-integration.env` 已删除且复核 absent；`lsof` 确认 `16432` / `16433` 均无 listener。Task 4 Step 8 完成，下一步仅在本地执行 Step 9 门禁、diff 审查与提交。
+
+Task 4 Step 9 第一组 fresh 本地门禁：五个 workspace 的 lint 与 typecheck 全部 exit 0；完整 Vitest 最终 **contracts 167 + domain 410 + database 286 + worker 236 + web 242 = 1,341 non-skipped PASS**，database 69 / worker 2 为无 env 的预期 gated skips。首次误把根 `eslint .` 当作 `pnpm -r lint` 等价命令，额外扫描根 `scripts/*.mjs` 触发 12 个既有 Node-globals 配置错误；随后按正式五 workspace 边界重跑全绿，未改无关脚本。worker 首轮命中已知 SIGTERM 时序 flake（`exit.code=null`）；文件无 diff，独立 3 次 8/8 后原样全量复跑 236/236。下一步 workspace build、placeholder 与 final diff review。
+
+Task 4 Step 9 第二组 fresh 本地门禁：contracts/domain/database/worker 的 `tsc -p` 与 Web **Next.js 16.3.0 production build** 全部 exit 0；placeholder 检查与 `git diff --check` exit 0。首次 Web build 只因误用不存在的根 `node_modules/next` 路径而在加载入口前中止，改用 workspace 实际安装路径后完整 GREEN，未改依赖。generated types/repository/integration/migration24/015 SHA 仍分别为 `24733d6d…cf11` / `b7a54748…a440` / `e213ab34…b2dd` / `04a912f9…1faa` / `d6cb9ced…a465`。下一步等待独立 code review；无 Critical/Important 后提交。
+
+Task 4 提交前 review 未获独立结论：按 `requesting-code-review` 分派的只读 reviewer 因账户 usage limit 在读取中失败，未返回 findings、未改工作树；controller 不能伪称独立批准，遂按同一清单自审。自审确认 **Important aggregate-version 缺陷**：四个 reviewer list/detail RPC 的 `version` 均固定 `select 1`，但严格 contract 与后续高影响确认把该字段作为 authoritative aggregate version；grant/verify 后仍回 1 会让下一条 `expectedVersion` 命令产生错误 409。现已仅本地补 RED 规格：015 新增四条 list/detail 在 grant/verify 后必须 version=2 的断言（919 行 / SHA `30356c94…18c1`），真实 integration 同步增加四处 version=2 回归（503 行 / SHA `73150939…c77e`）。lint/typecheck/diff check 通过，无 env suite 3 skipped；migration24 尚未改，下一步需新授权只同步新版 015 并跑 focused RED，不 reset、不访问生产。
+
+用户已授权 Task 4 aggregate-version focused RED。本地 source gate 通过：015 919 行 / SHA `30356c94…18c1`，四条具名 version=2 断言存在，seed/第23/24 migration/014 SHA 未漂移且 diff check 通过。远端只读 fail-closed 预检 exit 0：exact workdir/project、DB/Kong running+healthy、唯一 64322/64321、24 migrations / 最高 `20260830000100`、paused marker=1，四项基础 SHA 与本地一致；remote 015 精确仍为旧 SHA `d6cb9ced…a465`。下一步仅覆盖同名 015 并核新 SHA，不 reset、不修改 migration、不建隧道、不访问生产。
+
+仅 SCP 新版 015 到 disposable 同名路径，copy exit 0；首次紧随其后的只读 SHA SSH 无输出而主动终止，未运行测试。改用显式 connect/keepalive 超时的独立 SSH 后校验 exit 0：远端 **919 行 / SHA `30356c94b31a80c6acb6fbc66dd3c3b4d19c96a821578b9fbb59099ee0ce18c1`** 与本地精确一致。未复制其他文件、未 reset；下一步只跑 focused 015 RED。
+
+aggregate-version focused 015 exit 1：前 38 条既有断言通过，**Test 39 精确 RED：reference detail version have 1 / want 2**，证明审查发现不是静态误判。随后第 727 行直接调用 list RPC 的 `version integer` 与测试期望 `2::bigint` 传给 pgTAP `is()` 时无同签名函数，SQL 中止，余下三条未执行并 No plan。根因是新增测试的类型 harness，不是产品/环境；未 reset、未改 migration、未跑 full。下一步仅本地把该期望改为 integer；新 SHA 远端复跑需再授权。
+
+本地只做最小 harness 修复：直接 list RPC 断言的 expected 从 `2::bigint` 改为 `2::integer`；另三条通过 bigint 临时表验证，原样保留。015 仍 **919 行**，新 SHA `37c09cad01b36368f0b745743b7e3375f4eaf8b27817b932b40487a2c27e4803`；11 组 set/reset role 成对，migration24 SHA 仍 `04a912f9…1faa`，`git diff --check` 通过。远端仍为上一版 `30356c94…18c1`；覆盖/复跑前需新授权，不 reset、不改 migration、不访问生产。
+
+用户授权修复版 aggregate-version focused RED 后，重复预检 exit 0：本地 015 仍 919 行 / SHA `37c09cad…e4803` 且 diff check 通过；远端 exact workdir/project、DB/Kong running+healthy、唯一 64322/64321、24 migrations / 最高第24、paused marker=1，seed/23/24/014 SHA 全部匹配，remote 015 仍为上一版 `30356c94…18c1`。下一步仅覆盖同名 015 并核字节，不 reset/改 migration/建隧道/访问生产。
+
+仅覆盖 disposable 同名 015，copy exit 0；独立 SHA/行数校验 exit 0，远端 **919 行 / SHA `37c09cad01b36368f0b745743b7e3375f4eaf8b27817b932b40487a2c27e4803`** 与本地精确一致。未复制其他文件、未 reset；下一步只运行 focused 015 RED。
+
+修复版 focused 015 完整 RED：**Files=1 / Tests=57 / Failed=4 / Result FAIL / exit 1**。原 53 条全部 PASS；新增 Test 39–42 分别证明 reference detail/list 与 authority detail/list 都是 `have 1 / want 2`。无 SQL 中止、TAP parse error、No plan 或额外失败；未 reset、未改 migration、未跑 full。下一步仅本地把四个 RPC 的常量 version 替换为权威 aggregate version；远端同步/reset/GREEN 需另行授权。
+
+实现前与 Phase 7A reviewer contract 交叉核对后校正语义：RPC 的 `version integer` 是协议 schema 版本，必须恒为 literal `1`；aggregate version 应独立命名为 `referenceVersion` / `authorityVersion`，不能覆盖协议字段。真正缺陷是四个 reviewer RPC/contract 缺少独立 aggregate-version，且 reference detail 内嵌 authority 仍把 aggregate version 错名为 `version`。先只改 contract tests：协议 version 改 1，新增两个 aggregate 字段。reference-focused RED **4 files / 34 tests：30 PASS / 4 FAIL / exit 1**，四个失败精确因 strict schema 尚不认识新字段；既有 30 条通过。migration/远端均未再修改或访问；下一步最小 contract GREEN。
+
+最小 contract GREEN：reviewer reference list/detail 改为 `version: z.literal(1)` + `referenceVersion`；authority list/detail 改为 `version: z.literal(1)` + `authorityVersion`；reference detail 内嵌 authority 将误名 aggregate `version` 改为 `authorityVersion`。reference-focused **4 files / 34 PASS**，完整 contracts **16 files / 167 PASS**，lint/typecheck 均 exit 0。下一步校正 015 与 integration 的 RED 字段，migration 尚未改。
+
+corrected database/integration RED 规格已本地完成：015 精确 OUT allowlist 为 protocol `version` + `referenceVersion`/`authorityVersion`，六处 read fixture 用 `to_jsonb` 兼容旧/new shape，避免缺列导致 SQL 中止；四条 aggregate value 断言继续要求 grant/verify 后为 2，并新增 nested authority `authorityVersion=2` 与禁止旧 `version` key。015 为 **957 行 / 预计 59 assertions / SHA `83a15ab336a0ab4a45f7ac270f15fb38a18a8a201ea349f4ced7f3f6c9770750`**；integration 为 **507 行 / SHA `7eba7f46…dcb9`**。database focused 28 PASS / 3 env-gated，lint/typecheck/diff check 通过，11 组 role 切换成对；migration24 仍旧 SHA `04a912f9…1faa`。远端仍为上一版 015 `37c09cad…e4803`，corrected focused RED 需新授权，不 reset/改 migration/访问生产。
+
+用户授权 corrected aggregate-version focused RED 后，重复只读预检 exit 0：本地 015 957 行 / SHA `83a15ab…70750` 且 diff check 通过；远端 exact workdir/project、健康容器/唯一 64322/64321、24 migrations / 最高第24、paused marker=1，seed/23/24/014 SHA 全匹配，remote 015 仍为 `37c09cad…e4803`。下一步仅覆盖 corrected 015 并核字节，不 reset/改 migration/建隧道/访问生产。
+
+仅覆盖 disposable 同名 corrected 015，copy exit 0；远端 **957 行 / SHA `83a15ab336a0ab4a45f7ac270f15fb38a18a8a201ea349f4ced7f3f6c9770750`** 与本地精确一致。未复制其他文件、未 reset；下一步只运行 focused RED。
+
+corrected focused RED exit 1：**Files=1 / Tests=59 / Failed=13**。Test 10–13 精确证明四 RPC OUT shape 缺 `referenceVersion` / `authorityVersion`；aggregate/nested naming 断言也为 NULL/旧 key，目标缺口成立。但 Test 31 的 detail fixture 因 `referenceVersion` 临时列仍为 NOT NULL 而插入失败，连带 Test 38/45 既有 state/history 断言产生 3 项级联噪声。源码复核确认 nullable 修改误命中 command receipt 临时表而漏掉 detail 表。未 reset、未改 migration/full；下一步只在本地恢复 receipt NOT NULL、把 detail aggregate 临时列改 nullable，新字节需再授权。
+
+本地 nullable harness 修复只改两处：command receipt 临时表 `referenceVersion` 恢复 NOT NULL；reviewer detail 临时表 `referenceVersion` 改 nullable，使旧 schema 缺字段只形成目标 RED 而不阻断 detail fixture。015 仍 **957 行**，新 SHA `a34cced69ca69a5247f0ff041851af2cdda47d61bf916098383fb29639e5dd5b`；migration24 未改，11 组 role set/reset 成对，diff check 通过。远端仍为 `83a15ab…70750`；覆盖/复跑需新授权，不 reset/访问生产。
+
+用户已授权修复版 corrected Task 4 aggregate-version focused RED。重复 fail-closed 预检 exit 0：本地 015 为 957 行 / SHA `a34cced69ca69a5247f0ff041851af2cdda47d61bf916098383fb29639e5dd5b`，远端 015 仍为旧 SHA `83a15ab336a0ab4a45f7ac270f15fb38a18a8a201ea349f4ced7f3f6c9770750`；exact workdir/project、DB/Kong running+healthy、唯一端口 64322/64321、24 migrations / 最高 `20260830000100`、paused marker，以及 seed/第23/第24/014 SHA 全部匹配。下一步只覆盖 disposable 同名 015 并独立核对 SHA/行数；不 reset、不复制 migration、不建隧道、不访问生产。
+
+随后仅以 SCP 覆盖 disposable 同名 015，copy exit 0；独立 SSH 核验返回 **957 行**、SHA-256 `a34cced69ca69a5247f0ff041851af2cdda47d61bf916098383fb29639e5dd5b`，与本地逐字节目标完全一致。未复制其他文件、未 reset、未建隧道、未访问生产；下一步只运行 focused 015 RED。
+
+修复版 corrected focused 015 完整 RED：**Files=1 / Tests=59 / Failed=10 / Result FAIL / exit 1**。失败精确为 Test 10–13（四 RPC exact OUT 缺 `referenceVersion` / `authorityVersion`）、Test 39–40（nested authority 缺显式 `authorityVersion` 且仍存在旧 `version` key）、Test 41–44（四个 list/detail aggregate version 值为 NULL）；其余 49 项全部 PASS，无 SQL 中止、parse error、No plan 或 fixture 级联噪声。未 reset、未复制/执行 migration、未跑 full/typegen、未建隧道、未访问生产。下一步只在本地最小修复 production-unapplied 第24 migration；再次同步/reset/GREEN 需新授权。
+
+本地最小 implementation 只修改 production-unapplied 第24 migration 的四个 reviewer read RPC：reference list/detail 在 state 后返回 `current_reference.version` 为 `referenceVersion bigint`；authority list/detail 返回 `authority_row.version` 为 `authorityVersion bigint`；reference detail nested authority 的 JSON key 从含混的 `version` 改为 `authorityVersion`；各 RPC 顶层 protocol `version integer` 仍固定返回 1。migration 现为 **1,241 行 / SHA-256 `570e6b89a7bbb2b48c1356fd0b210b741a46bc64ee4d4283a54431c9b509aad8`**，015 仍为 957 行 / SHA `a34cced6…5dd5b`，`git diff --check` 与静态 select/RETURNS 对位通过。尚未同步、reset、typegen 或访问生产；下一步本地窄门禁。
+
+本地 aggregate-version GREEN 门禁全部通过：Node 22.22.2 直接执行现有工具，contracts lint/typecheck exit 0、**16 files / 167 PASS**；database lint/typecheck exit 0，focused entrypoints/reference repository 为 **2 files PASS / 1 integration gated，34 PASS / 3 skipped**。未安装依赖，未连接数据库；generated types 仍是旧 disposable schema 的稳定产物，必须等新 schema reset 后双次 typegen 再机械替换。下一步需要新授权：在 marker-verified disposable 环境同步已修改的第24 migration、reset、focused 015、full pgTAP、双 typegen、更新 generated types，并重跑真实 repository integration 与清理；生产不访问。
+
+用户已授权 Task 4 aggregate-version disposable GREEN。现有隔离 worktree/branch 复核通过；重复 fail-closed 预检 exit 0：远端精确 workdir/project、pinned CLI 2.112.0、DB/Kong running+healthy、唯一端口 64322/64321、24 migrations / 最高 `20260830000100`、paused marker 均匹配；seed/第23/014/015 SHA 与本地一致，远端第24为预期旧 SHA `04a912f9…561faa` / 1,233 行，本地新版为 `570e6b89…aad8` / 1,241 行；本地 16432/16433 均未监听。下一步仅同步新版第24并独立核验，不复制其他文件；核验通过后才 reset。生产未访问。
+
+随后仅同步修改后的第24 migration，SCP exit 0；独立 SSH 核验返回 **1,241 行**、SHA-256 `570e6b89a7bbb2b48c1356fd0b210b741a46bc64ee4d4283a54431c9b509aad8`，与本地完全一致。未复制其他文件、尚未 reset；下一步执行本次已授权的 disposable `db reset`，失败则停止 focused/full/typegen/integration。生产未访问。
+
+授权的 disposable `db reset --yes` 随后完成：第1–24个 migration 依序应用，修改后的第24 migration 在真实 PostgreSQL 上编译/执行成功，seed 与容器重启完成。reset 后只读复核：DB/Kong running+healthy，migration count **24**、max `20260830000100`、paused marker count **1**，远端第24 SHA 仍为 `570e6b89…aad8`。下一步只运行 focused 015；失败则停止 full pgTAP/typegen/integration。生产未访问。
+
+aggregate-version focused 015 随后完整 GREEN：**Files=1 / Tests=59 / Result PASS / exit 0**。四 RPC exact OUT、nested authority 正确命名、四个 aggregate value，以及原有 49 个 note/ACL/角色/cursor/history/unique/render-gate 断言全部通过；无 SQL/TAP 噪声。下一步运行全量 pgTAP，失败则停止 typegen/integration。生产未访问。
+
+全量 pgTAP 随后完整 GREEN：**Files=15 / Tests=1,483 / Result PASS / exit 0**，001–015 全部通过；相较旧版 1,477 项，6 个新增 corrected aggregate-version 断言已进入完整矩阵，既有 schema/RLS/history/queue/governance/7A/7B 行为无回归。下一步在同一 disposable schema 连续 typegen 两次并逐字节比较；仅稳定一致才替换本地 generated types。生产未访问。
+
+同一 disposable schema 上使用 pinned CLI 2.112.0 连续 typegen 两次，两份产物均为 **158,662 bytes**、SHA-256 `e5dc3861ebab1eda8206f7fca1a23d760d7c5a75b01b9ff3732bd734f17aedef`，`cmp -s` exit 0。远端临时目录为 `/tmp/task4-aggregate-types.jv3BjT`，只含两份生成物；下一步仅下载第一份至本地临时路径并复核 SHA/字段，确认后机械替换 generated types，最终清理临时目录。生产未访问。
+
+第一份稳定生成物已下载至 `/private/tmp/phase7b-task4-aggregate-database-types.ts`；本地复核仍为 **158,662 bytes / SHA `e5dc3861…aedef`**。静态扫描确认 `get/list_reference_review_*` 均含 `referenceVersion: number`，`get/list_domain_authority_review_*` 均含 `authorityVersion: number`；当前仓库 generated types 仍为旧的 158,522 bytes / SHA `24733d6d…cf11`，差异符合预期。下一步只机械替换 generated 文件并用 `cmp` 证明一致。
+
+本地 `packages/database/src/generated/database.types.ts` 已用稳定产物机械替换，随后 `cmp -s` exit 0；文件现为 **158,662 bytes / SHA `e5dc3861…aedef`**，相对 Task 3 跟踪基线累计新增 77 行，`git diff --check` 通过。下一步运行 database 全包 lint/typecheck/test；未安装依赖、未连接生产。
+
+database 全包本地门禁全部真实执行并通过：lint exit 0、typecheck exit 0、Vitest **14 files PASS / 10 integration files gated，286 PASS / 69 skipped**。未提供 integration 环境变量，故 69 项仅按设计跳过；下一步建立临时 16432→64322 / 16433→64321 隧道，先以远端 DB 与隧道 PostgREST 同关系 count 对照证明端点，再只运行 reference review integration，完成 exact cleanup/zero-residue 后关闭隧道。生产未访问。
+
+临时 SSH 双隧道已建立：同一 PID 仅以 IPv4 监听 `127.0.0.1:16432 → remote 64322` 与 `127.0.0.1:16433 → remote 64321`。首次把两个 `-iTCP` 与单个 `-sTCP:LISTEN` 合并的本地 `lsof` 命令被工具自身拒绝，未发起探测；拆分为两个只读 `lsof` 后均精确返回同一 SSH PID。下一步生成只含四个授权变量、mode 0600 的临时 env，值不输出，再执行 DB/PostgREST endpoint parity。生产未访问。
+
+临时 integration env 已生成至 `/private/tmp/phase7b-task4-reference-integration.env`：mode **0600**、405 bytes、恰好 4 行，仅含 `AIRDROP_DATABASE_TEST_URL`、`AIRDROP_QUEUE_ADMIN_DATABASE_TEST_URL`、`AIRDROP_ANON_SUPABASE_URL`、`AIRDROP_ANON_SUPABASE_KEY`；两条 URL 被 test 自身限制为 loopback 16432/16433，文件不含 service-role/JWT secret，所有值均未输出。下一步以远端 docker psql、隧道 PostgreSQL、隧道 anon PostgREST 对同一 active/rumored projects count 做三方一致性证明。
+
+Endpoint parity 完整通过：远端 `docker exec psql` 查询 active/rumored projects 为 **2**，同一关系经 `127.0.0.1:16432` 隧道 PostgreSQL 查询为 **2**，经 `127.0.0.1:16433` 与 anon key 的 PostgREST exact count 也为 **2**；三方精确一致且未输出凭据。下一步只运行 `reference-review-repository.integration.test.ts` 的 3 条测试，不运行其他 integration suite。
+
+唯一 reference repository integration 完整 GREEN：**Test Files=1 passed / Tests=3 passed / exit 0**，测试文件 SHA `7eba7f4637d6dbbc0994ae8cf40b3070a42486273e1a29d136a01bd1a113dcb9`。真实路径验证 `referenceVersion` / `authorityVersion` 在 list/detail 与 nested authority 均为 authoritative 2，并覆盖 note round-trip、same-key replay、stale version、同项目 duplicate/跨项目相同 URL、同 repository bearer 分离、role revoke 后下一调用拒绝；测试内 afterAll exact cleanup 与提交后 zero-residue 全部通过。下一步远端 docker psql 独立复核全局 reference residue、marker 与 migration，再关闭隧道/删除临时文件。
+
+独立远端只读 postcheck exit 0：`project_references`、两张 decision 表、`project_domain_authorities`、`reference_review_commands`、`reference_security_flags`、reference/domain-authority outbox，以及测试 project/source/raw/evidence/auth user 全部为 **0**；paused marker count **1**，migration count **24** / max `20260830000100`。下一步关闭 tunnel session，删除本地 0600 env、本地下载 typegen 临时文件和远端 `/tmp/task4-aggregate-types.jv3BjT`，并复核路径与 16432/16433 均清空。
+
+清理 COMPLETE：SSH tunnel session 已终止；本地 16432/16433 均无 listener；`/private/tmp/phase7b-task4-reference-integration.env` 与 `/private/tmp/phase7b-task4-aggregate-database-types.ts` 均 absent；远端 `/tmp/task4-aggregate-types.jv3BjT` 已删除并只读复核 absent。disposable fixture 零残留，生产未访问。下一步只在本地运行最终 Task 4 门禁与 diff 自审。
+
+Task 4 fresh 最终本地门禁：五 workspace lint/typecheck 全部 exit 0；完整 Vitest 为 **contracts 167 + domain 410 + database 286 + worker 236 + web 242 = 1,341 non-skipped PASS**，database 69 / worker 2 为无 env 的预期 gated skips。contracts/domain/database/worker build 均 exit 0；Web build 首次仅因命令错误指向不存在的根级 Next 入口而在源码执行前 exit 1，系统化定位确认 Next 只安装在 `apps/web/node_modules`，改用 workspace-local Next 16.3.0 后 production build exit 0、11 个静态页面生成完成。placeholder、`git diff --check` 均 exit 0；敏感扫描只命中四处 migration 对 `service_role` 的显式 revoke，无凭据、service-role 使用或 internal-field 泄漏。独立 scoped code review 已发起且只读，下一步等待 findings；生产未访问。
+
+**2026-08-31 continuation / review availability**：按 `requesting-code-review` 发起的原 Task 4 reviewer 与本次 aggregate-version scoped reviewer 均在读取 diff 前因子代理账户额度限制失败；两者均没有 findings，也没有任何文件修改，故不能伪称独立 review clean。用户指示继续后，主任务按 `verification-before-completion` 执行逐文件要求对照、敏感边界分类与 fresh final gate；如发现缺口则回到 RED→GREEN。生产未访问。
 
 **背景与定位**：按 `canonical-intelligence-governance-design.md` §17 的既定顺序第 3 项，「Security incidents, indicators, and verified allowlisted references」共同构成 tutorials 的前置条件。7A 已完成前两项，7B 即第三项，也是 tutorials 之前的最后一环。Gap 很具体：`AGENTS.md` 要求 tutorials 暴露 `last_verified_at`、使用 allowlisted 链接引用，并要求标记任何未经已验证引用解析的用户可见官方链接——但仓库里**不存在 canonical 引用对象**。`projects.official_website_url` 是无验证、无历史的自由文本；`project_sources.authority_domains` 只是**来源级**域名权限，无历史、无 URL 粒度；Phase 7A 的 indicator 明确声明「不判定某值官方、可安全访问或已加入白名单」。
 
@@ -16,11 +198,11 @@
 3. **`projects.official_website_url` 保留为 Catalog 线索，但渲染链接必须经已验证引用**；否则渲染为惰性文本并显式标注「未验证」。
 4. **安全联动 protect-first**：Phase 7A indicator 命中即自动 `flagged` 并同步停止公开渲染；恢复只能由人工追加新的、有 Evidence 支撑的核验决策，且 flag 行不删除、只置 `released_at`（冲突保持可见）。
 
-**设计要点**：五张追加式表（2 张 canonical 当前行 + 2 张决策历史 + 1 张 `reference_security_flags`）+ 3 个视图；当前状态由最新决策推导，但未释放的 flag 强制覆盖为 `flagged`（使联动同步生效、无需后台任务）；`last_verified_at` 由最近一次成功 verify 决策推导；verify/reverify/restore 必须引用未被 7A 封锁来源的 Evidence；注册时做共享的确定性 URL/域名归一化，避免「一种形式通过验证、另一种形式被 flag」；稳定错误码走 `AR2xx` 新波段；明确不做：tutorials、合约地址、DNS/WHOIS 自动所有权证明、AI 创建 canonical 验证、改写 sources 信誉或项目生命周期。
+**设计要点**：五张 ledger 表（2 张 canonical 当前行 + 2 张决策历史 + 1 张 `reference_security_flags`）+ 1 张 append-only command receipt 表 + 3 个视图；当前状态由最新决策推导，但未释放的 flag 强制覆盖为 `flagged`（使联动同步生效、无需后台任务）；`last_verified_at` 由最近一次成功 verify 决策推导；verify/reverify/restore 必须引用未被 7A 封锁来源的 Evidence；注册时做共享的确定性 URL/域名归一化，避免「一种形式通过验证、另一种形式被 flag」；稳定错误码走 `AR2xx` 新波段；明确不做：tutorials、合约地址、DNS/WHOIS 自动所有权证明、AI 创建 canonical 验证、改写 sources 信誉或项目生命周期。
 
 **产物**：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`（20 节，含目标/已确认决策/非目标/现状集成点/信任边界/契约/数据模型/流程/安全联动/幂等并发/同步门禁/公开读模型/仓储与 HTTP/审核 UI/公开 UI/授权 RLS/错误/测试/交付边界/验收）。
 
-**下一步（2026-08-29）**：实施计划已产出并获认可——`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`（10 个任务、574 行），工作簿 `docs/tasks/phase-7b-verified-allowlisted-references-workbook.md`。执行前需建分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references`；迁移编号 `20260829000100`（第 23 个），pgTAP 文件 `014`（第 14 个）。计划中的 Task 4/5/10 涉及远端 disposable 栈，仍需逐次显式授权。
+**计划状态（2026-08-30）**：原 10-task 计划已按获批的 Task 4 修订扩充。第 23 个 migration / 014 保持 immutable；计划新增第 24 个 `20260830000100_phase_7b_reference_review_boundary.sql` 与第 15 个 `015_phase_7b_reference_review_boundary.test.sql`。Task 4/5/10 的 disposable 操作仍需逐次显式授权。
 
 **计划定稿时修正的两处实现细节（避免后续返工）**
 1. **归一化不剥离 `www.`**：只做 scheme/host 小写、去尾部点、去默认端口、去 fragment、空路径归一；`www.example.com` 与 `example.com` 视为两个独立权威、需分别授予。对安全白名单这是更保守的选择；若产品后续要 apex 折叠，须作为显式决定并配套测试，不能作为归一化的隐式副作用。
@@ -72,7 +254,7 @@
 
 **Phase 7A 分支状态（2026-08-29，已合并主线）**：`codex/phase-7a-security-ledger` 上 Task 1–11 **全部完成并通过独立复审**，提交链 `fbf49d2..55d7f2b`，已以 merge 提交并入主线 `codex/phase-0-1-foundation`；功能 worktree `.worktrees/phase-7a-security-ledger` 按既有惯例保留。最终 `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；lint、typecheck、build、placeholders 与 `git diff --check` 全绿。生产仍为 19 个已应用迁移，Phase 7A 迁移继续按 production unapplied 处理。
 
-**下一步决策点（需项目所有者决定）**：① **继续 Phase 7B 实施**——Task 4（bearer repository + 双会话竞态集成）起涉及 disposable 栈，需逐次显式授权；② 或转向生产 rollout（四前置：human reviewer 供给、生产 Auth `/auth/v1/health` 恢复 200、迁移前备份演练、显式授权——目前均未满足）。
+**下一步决策点（需项目所有者决定）**：复核已修订的书面 spec/plan；确认后先执行不接触远端的 contracts RED→GREEN。到 `015` pgTAP RED、reset/typegen 或 repository integration 动作前，再单独申请 disposable 授权。生产 rollout 的四项前置仍未满足。
 
 Phase 7A 提交链：`fbf49d2..55d7f2b`（40 个提交，112 文件，`+18,231/-384`），现已全部并入主线；备份引用 `backup/pre-7a-merge-main` 与 `backup/pre-7a-merge-7a` 保留合并前两端状态。
 

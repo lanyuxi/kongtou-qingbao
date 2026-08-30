@@ -4,7 +4,7 @@
 
 **Goal:** Deliver a canonical, append-only reference ledger so every user-visible official link resolves from a verified allowlisted reference, with synchronous Phase 7A security coupling, `last_verified_at` derivation, and complete reviewer and public Web flows.
 
-**Architecture:** Add strict reference contracts and pure normalization/transition rules, one forward-only PostgreSQL Reference Ledger migration, bearer-scoped protected commands, safe public projections, and a synchronous indicator→reference flag coupling. The Catalog keeps `projects.official_website_url` as a stored lead; link rendering is gated by the ledger. Phase 7B reads Phase 7A posture and indicators read-only and never rewrites Catalog, scores, collection history, or security state.
+**Architecture:** Add strict reference contracts and pure normalization/transition rules, a forward-only PostgreSQL Reference Ledger foundation plus a forward-only Task 4 boundary correction, bearer-scoped protected commands and reviewer reads, safe public projections, and a synchronous indicator→reference flag coupling. The Catalog keeps `projects.official_website_url` as a stored lead; link rendering is gated by the ledger and a currently granted matching domain authority. Phase 7B reads Phase 7A posture and indicators read-only and never rewrites Catalog, scores, collection history, or security state.
 
 **Tech Stack:** Node.js 22.22.2, pnpm 11.16.0, TypeScript strict mode, Zod 4, PostgreSQL/Supabase RLS and PostgREST, pgTAP, Vitest, Next.js 16 App Router, React 19.
 
@@ -21,7 +21,7 @@
 - `last_verified_at` is derived from the most recent successful verify decision, never from registration time and never from a mutable column.
 - Only canonical-row URLs may become `href`. Candidate payload text, notes, and indicator values stay inert.
 - Use the existing Promotion Service boundary, command receipt, audit, transactional outbox, cursor, idempotency, and expected-version patterns.
-- Use one forward-only migration after the existing 22 migrations (`20260829000100`); never edit an already applied migration.
+- Keep the already-reset foundation migration (`20260829000100`) byte-stable. Add `20260830000100_phase_7b_reference_review_boundary.sql` as the 24th forward-only migration and `015_phase_7b_reference_review_boundary.test.sql` as its pgTAP proof; never edit an already applied migration.
 - Add no production dependency and perform no network call inside a transaction. No DNS, WHOIS, or chain lookup.
 - Run resets/integration only against the marker-verified disposable Supabase stack (remote tunnels `16432 -> 64322` / `16433 -> 64321`). Never access or mutate production or ports `54321`/`54322`.
 - Preserve unrelated `.DS_Store` and all other user changes.
@@ -37,6 +37,8 @@
 - `packages/domain/src/references/rules.ts` — decision/state transition matrix and `last_verified_at` derivation.
 - `packages/domain/src/references/flag-match.ts` — Phase 7A indicator ↔ reference matching rules.
 - `supabase/migrations/20260829000100_phase_7b_verified_allowlisted_references.sql` — five ledger objects, protected commands, RLS, outbox, flag coupling, and public read models.
+- `supabase/migrations/20260830000100_phase_7b_reference_review_boundary.sql` — reviewer read RPCs, decision-note persistence, granted-authority render gate, and project-scoped URL uniqueness correction.
+- `supabase/tests/015_phase_7b_reference_review_boundary.test.sql` — strict reviewer read/privilege/note/uniqueness/render-gate regression matrix.
 - `supabase/tests/014_phase_7b_verified_allowlisted_references.test.sql` — catalog, RLS, atomicity, projection, coupling, and gate matrix.
 - `packages/database/src/references/reference-review-repository.ts` — bearer-scoped reviewer RPC repository.
 - `packages/database/src/references/entry.ts` / `browser-denied.ts` — server-only package export.
@@ -227,9 +229,17 @@ git commit -m "feat(db): add verified reference ledger"
 
 ---
 
-### Task 4: Build bearer-scoped reference review repositories and real race tests
+### Task 4: Correct the reviewer boundary and build bearer-scoped repositories
 
 **Files:**
+- Modify: `packages/contracts/src/references/commands.ts`
+- Modify: `packages/contracts/src/references/commands.test.ts`
+- Modify: `packages/contracts/src/references/projections.ts`
+- Modify: `packages/contracts/src/references/projections.test.ts`
+- Modify: `packages/contracts/src/index.ts`
+- Create: `supabase/migrations/20260830000100_phase_7b_reference_review_boundary.sql`
+- Create: `supabase/tests/015_phase_7b_reference_review_boundary.test.sql`
+- Modify after authorized typegen: `packages/database/src/generated/database.types.ts`
 - Create: `packages/database/src/references/reference-review-repository.ts`
 - Create: `packages/database/src/references/entry.ts`
 - Create: `packages/database/src/references/browser-denied.ts`
@@ -239,22 +249,69 @@ git commit -m "feat(db): add verified reference ledger"
 - Modify: `packages/database/package.json`
 
 **Interfaces:**
-- Consumes: the protected RPCs and the strict projection schemas from Task 1.
-- Produces: a per-call-bearer reviewer repository, stable `AR2xx` error mapping, and a browser-denied export boundary.
+- Consumes: the Task 3 append-only ledger and protected mutation RPCs.
+- Produces: strict reviewer query/cursor/domain-authority/decision-note/command-receipt contracts; protected bearer-scoped list/detail/history RPCs; corrected project-scoped URL uniqueness and granted-authority public-render gate; a per-call-bearer reviewer repository with stable `AR2xx` error mapping; and a browser-denied export boundary.
+- Prohibits: editing `20260829000100`, granting authenticated users the internal view/base tables, service-role fallback, browser export of the reviewer repository, or silently dropping a contract-valid note.
 
-- [ ] **Step 1: Write repository RED tests**
+- [x] **Step 1: Write and run contract RED tests**
 
-Cover: strict parse-before-map, exact selected columns, safe error mapping, cursor order `(created_at desc, id desc)`, empty pages, fresh bearer per call, fresh idempotency key per mutation, and browser export denial.
+Add strict schemas for reference and authority list queries/cursors, authority list/detail/history, internal decision history with bounded nullable `note`, and the exact receipt returned by each protected mutation RPC. Reject extra keys, malformed cursors, invalid bounds, leaked actor/Evidence locator/raw fields, and malformed receipt values.
 
-- [ ] **Step 2: Run database RED**
+```bash
+pnpm --filter @airdrop/contracts test -- references
+```
+
+The named new cases must fail against the current Task 1 contracts before implementation.
+
+- [x] **Step 2: Implement the minimum contract GREEN**
+
+```bash
+pnpm --filter @airdrop/contracts test
+pnpm --filter @airdrop/contracts lint
+pnpm --filter @airdrop/contracts typecheck
+```
+
+- [x] **Step 3: Write the `015` pgTAP RED matrix before SQL implementation**
+
+Cover: all four reviewer read RPCs absent/denied before the correction; active reviewer/senior-reviewer/admin access; anon/ordinary-auth/security-reviewer/revoked-role denial; exact output columns; stable `(updated_at desc, id desc)` cursor behavior; note persistence with public exclusion; same URL allowed for two projects but rejected within one project; and immediate public suppression after matching authority revocation.
+
+Running this RED requires the separately authorized disposable stack. Sync only the new `015` test first, prove its expected failure against the 23-migration foundation, then stop before writing remote state beyond the approved test action.
+
+- [x] **Step 4: Implement the forward-only correction migration**
+
+Local implementation is drafted and statically checked. It remains incomplete until the
+separately authorized disposable reset, focused/full pgTAP run, and byte-identical double
+type generation prove that the migration compiles and satisfies both `014` and `015`.
+
+The migration must:
+
+1. replace global `project_references_url_key` with a unique constraint on `(project_id, normalized_url)`;
+2. add nullable bounded `note` columns to both append-only decision tables and persist the four command payload notes without changing replay hashing or public/outbox payloads;
+3. make `reference_is_publicly_renderable_v1()` require a matching `project_domain_authorities` row whose derived state is `granted`;
+4. add protected reference list/detail and authority list/detail RPCs that re-check `auth.uid()` plus the active reference-review role on every call and return exact allowlisted columns/history; and
+5. revoke broad execution first, then grant only `authenticated`, while leaving internal views/base tables inaccessible.
+
+Reset the authorized disposable stack, run full pgTAP, typegen twice, require byte-identical generated output, and replace generated types only from that proof.
+
+- [x] **Step 5: Write repository RED tests**
+
+Cover: strict parse-before-map for every read and receipt, exact RPC names/arguments, stable cursor order, empty pages, safe `AR2xx` mapping, malformed-row failure, fresh bearer per call, caller-supplied fresh idempotency key per mutation, no service-role/base-table fallback, and browser export denial.
+
+- [x] **Step 6: Run database RED**
 
 ```bash
 pnpm --filter @airdrop/database test
 ```
 
-- [ ] **Step 3: Implement the repository and export boundary**
+- [x] **Step 7: Implement the repository and export boundary, then run local GREEN**
 
-- [ ] **Step 4: Run authorized disposable integration**
+```bash
+pnpm --filter @airdrop/database test
+pnpm --filter @airdrop/database lint
+pnpm --filter @airdrop/database typecheck
+```
+
+- [x] **Step 8: Run authorized disposable repository integration**
 
 Require explicit user authorization. Fail-closed preflight before any reset: remote workdir `/root/airdrop-governance-test`, project `airdrop-intelligence-governance-test`, database/Kong ports `64322`/`64321`, local tunnels `16432`/`16433`, the paused seed marker, and the migration/test/seed hashes. Prove the tunnel endpoint by comparing a tunnel-side PostgREST count with a remote `docker exec psql` count of the same relation.
 
@@ -262,13 +319,16 @@ Require explicit user authorization. Fail-closed preflight before any reset: rem
 pnpm --filter @airdrop/database test:integration
 ```
 
-Two-session races to cover: flag-vs-verify serialization, revoked domain authority un-verifying its URLs, and concurrent duplicate registration collapsing to one canonical row.
+Task 4 integration covers active-role reads, role revocation taking effect on the next call, per-call bearer separation, note round-trip, project-scoped duplicate registration, idempotent replay, version conflict, exact cleanup, and zero fixture residue. The security coupling races remain isolated in Task 5.
 
-- [ ] **Step 5: Update workbook/HANDOVER and commit**
+- [x] **Step 9: Update workbook/HANDOVER, run the task gate, and commit**
 
 ```bash
-git add packages/database/src/references packages/database/src/tests packages/database/src/index.ts \
-  packages/database/package.json docs
+git add packages/contracts/src/references packages/contracts/src/index.ts \
+  supabase/migrations/20260830000100_phase_7b_reference_review_boundary.sql \
+  supabase/tests/015_phase_7b_reference_review_boundary.test.sql \
+  packages/database/src/generated/database.types.ts packages/database/src/references \
+  packages/database/src/tests packages/database/src/index.ts packages/database/package.json docs
 git commit -m "feat(database): add reference review repository"
 ```
 

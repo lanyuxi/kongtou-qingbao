@@ -56,4 +56,18 @@ describe('@airdrop/database entry points', () => {
     );
     expect(result.stderr).not.toMatch(/supabase|bearer|token/i);
   });
+
+  it('rejects the reference review package export under browser module resolution', () => {
+    const result = spawnSync(
+      process.execPath,
+      ['--conditions=browser', '--import=tsx', '--eval', "import('@airdrop/database/reference-review')"],
+      { encoding: 'utf8' },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      '@airdrop/database/reference-review is unavailable in browser code.',
+    );
+    expect(result.stderr).not.toMatch(/supabase|bearer|token|service.role/i);
+  });
 });

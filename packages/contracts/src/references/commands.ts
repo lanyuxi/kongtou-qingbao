@@ -2,9 +2,11 @@ import { z } from 'zod';
 
 import {
   domainAuthorityDecisionSchema,
+  domainAuthorityStateSchema,
   referenceDecisionSchema,
   referenceKindSchema,
   referenceReasonCodeSchema,
+  referenceStateSchema,
   type DomainAuthorityDecision,
   type ReferenceDecision,
 } from './enums.js';
@@ -106,6 +108,24 @@ export const decideDomainAuthorityCommandV1Schema = z
     { message: 'grant and regrant require evidence' },
   );
 
+export const domainAuthorityCommandReceiptV1Schema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  authorityId: uuidSchema,
+  authorityVersion: positiveVersionSchema,
+  state: domainAuthorityStateSchema,
+  replayed: z.boolean(),
+});
+
+export const referenceCommandReceiptV1Schema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  referenceId: uuidSchema,
+  referenceVersion: positiveVersionSchema,
+  state: referenceStateSchema,
+  replayed: z.boolean(),
+});
+
 export type ReferenceUrl = z.infer<typeof referenceUrlSchema>;
 export type ReferenceDomain = z.infer<typeof referenceDomainSchema>;
 export type RegisterReferenceCommandV1 = z.infer<typeof registerReferenceCommandV1Schema>;
@@ -114,3 +134,7 @@ export type RegisterDomainAuthorityCommandV1 = z.infer<
   typeof registerDomainAuthorityCommandV1Schema
 >;
 export type DecideDomainAuthorityCommandV1 = z.infer<typeof decideDomainAuthorityCommandV1Schema>;
+export type DomainAuthorityCommandReceiptV1 = z.infer<
+  typeof domainAuthorityCommandReceiptV1Schema
+>;
+export type ReferenceCommandReceiptV1 = z.infer<typeof referenceCommandReceiptV1Schema>;

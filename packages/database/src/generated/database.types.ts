@@ -1110,6 +1110,7 @@ export type Database = {
           evidence_id: string | null
           id: string
           idempotency_key: string
+          note: string | null
           reason_code: string
           resulting_state: string
         }
@@ -1122,6 +1123,7 @@ export type Database = {
           evidence_id?: string | null
           id?: string
           idempotency_key: string
+          note?: string | null
           reason_code: string
           resulting_state: string
         }
@@ -1134,6 +1136,7 @@ export type Database = {
           evidence_id?: string | null
           id?: string
           idempotency_key?: string
+          note?: string | null
           reason_code?: string
           resulting_state?: string
         }
@@ -1184,6 +1187,7 @@ export type Database = {
           evidence_id: string | null
           id: string
           idempotency_key: string
+          note: string | null
           reason_code: string
           reference_id: string
           resulting_state: string
@@ -1196,6 +1200,7 @@ export type Database = {
           evidence_id?: string | null
           id?: string
           idempotency_key: string
+          note?: string | null
           reason_code: string
           reference_id: string
           resulting_state: string
@@ -1208,6 +1213,7 @@ export type Database = {
           evidence_id?: string | null
           id?: string
           idempotency_key?: string
+          note?: string | null
           reason_code?: string
           reference_id?: string
           resulting_state?: string
@@ -4138,12 +4144,43 @@ export type Database = {
           schedule_version: number
         }[]
       }
+      get_domain_authority_review_detail: {
+        Args: { p_authority_id: string }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          decisions: Json
+          domain: string
+          projectId: string
+          state: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       get_failed_ai_run: {
         Args: { p_ai_run_id: string }
         Returns: {
           decisions: Json
           input: Json
           run: Json
+          version: number
+        }[]
+      }
+      get_reference_review_detail: {
+        Args: { p_reference_id: string }
+        Returns: {
+          activeIndicatorId: string
+          decisions: Json
+          domainAuthority: Json
+          kind: string
+          label: string
+          lastVerifiedAt: string
+          projectId: string
+          referenceId: string
+          referenceVersion: number
+          state: string
+          updatedAt: string
+          url: string
           version: number
         }[]
       }
@@ -4182,6 +4219,24 @@ export type Database = {
         Args: { project_id: string; source_id: string }
         Returns: boolean
       }
+      list_domain_authority_review_items: {
+        Args: {
+          p_cursor_id: string
+          p_cursor_updated_at: string
+          p_limit: number
+          p_project_id: string
+          p_state: string
+        }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          domain: string
+          projectId: string
+          state: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       list_failed_ai_runs: {
         Args: {
           p_cursor_created_at: string
@@ -4214,6 +4269,28 @@ export type Database = {
         Returns: {
           candidate_id: string
           candidate_version: number
+        }[]
+      }
+      list_reference_review_items: {
+        Args: {
+          p_cursor_id: string
+          p_cursor_updated_at: string
+          p_limit: number
+          p_project_id: string
+          p_state: string
+        }
+        Returns: {
+          activeIndicatorId: string
+          kind: string
+          label: string
+          lastVerifiedAt: string
+          projectId: string
+          referenceId: string
+          referenceVersion: number
+          state: string
+          updatedAt: string
+          url: string
+          version: number
         }[]
       }
       list_security_candidates: {
