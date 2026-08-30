@@ -1,12 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-29（**Phase 7A Task 1–11 全部完成、整分支 review clean，并已合并回主线 `codex/phase-0-1-foundation`**。Task 10 复审 0C/3I/3M 与 Task 11 收口复审 0C/2I/4M 均已闭环；Task 11 Step 3 经授权执行 disposable 矩阵：reset exit 0、full pgTAP **13 files / 1,338 PASS**、集成矩阵 **9 files / 66 tests PASS**、清理后回到 seed 基线零残留、隧道已关闭、生产 54321/54322 全程未访问。合并后 `pnpm verify` exit 0 = **1,244 non-skipped / 68 gated skips**。**下一步：Phase 7B verified allowlisted references 架构设计**）
+> 最近更新：2026-08-30（**Phase 7B verified allowlisted references 实施进行中：Task 1–3 已完成并通过 disposable 验证**。分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references`，HEAD `9528a1e`；提交链 `f63f793`（contracts）→ `3cb69bf`（domain）→ `87cc070`（迁移）→ `0b3d721`（复检修复 3C/6I/4M 闭环）→ `5772ad5`（014 pgTAP + types）。验证证据：23 迁移 reset exit 0、full pgTAP **14 files / 1,424 PASS**（014 新增 74 断言）、集成矩阵 **9 files / 66 PASS**、typegen 两次一致并替换 generated types、清理回 seed 基线、生产 54321/54322 全程未访问。本地 `pnpm verify` exit 0 = **1,306 non-skipped / 68 gated skips**（contracts 161 / domain 410 / database 257 / worker 236 / web 242）。**下一步：Task 4（bearer repository + 双会话竞态集成），涉及 disposable 栈、需逐次显式授权**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-29 Phase 7A 已完成并合并主线）**：Phase 0–6B、详情页评分因子/证据引用与 **Phase 7A 安全事件与指标**全部在主线 `codex/phase-0-1-foundation` 上。Phase 7A 提供追加式 Security Ledger、protect-first 门禁、reviewer 审核工作流与公共 blocked/caution 呈现；worktree `.worktrees/phase-7a-security-ledger` 按既有惯例保留未删除。生产仍为 19 个已应用迁移，第 20–22 个 migration 继续按 production unapplied 处理；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
+> **当前一句话状态（2026-08-30 Phase 7B 实施中）**：Phase 0–7A 全部在主线 `codex/phase-0-1-foundation`；**Phase 7B（verified allowlisted references）在独立分支 `codex/phase-7b-references` / worktree `.worktrees/phase-7b-references` 上实施，Task 1–3 已完成**（contracts → domain 纯规则 → 第 23 个迁移 + 014 pgTAP + generated types，disposable 验证全绿），Task 4–10 待执行。生产仍为 19 个已应用迁移，第 20–23 个 migration 继续按 production unapplied 处理；任何 rollout 仍须实时 preflight、备份、Auth/reviewer readiness 与显式授权。
 
-### Phase 7B 架构设计（2026-08-29，spec 已产出待你签字后进入计划）
+### Phase 7B verified allowlisted references（设计已批准；Task 1–3 完成，Task 4 待执行）
 
 **背景与定位**：按 `canonical-intelligence-governance-design.md` §17 的既定顺序第 3 项，「Security incidents, indicators, and verified allowlisted references」共同构成 tutorials 的前置条件。7A 已完成前两项，7B 即第三项，也是 tutorials 之前的最后一环。Gap 很具体：`AGENTS.md` 要求 tutorials 暴露 `last_verified_at`、使用 allowlisted 链接引用，并要求标记任何未经已验证引用解析的用户可见官方链接——但仓库里**不存在 canonical 引用对象**。`projects.official_website_url` 是无验证、无历史的自由文本；`project_sources.authority_domains` 只是**来源级**域名权限，无历史、无 URL 粒度；Phase 7A 的 indicator 明确声明「不判定某值官方、可安全访问或已加入白名单」。
 
@@ -25,6 +25,32 @@
 **计划定稿时修正的两处实现细节（避免后续返工）**
 1. **归一化不剥离 `www.`**：只做 scheme/host 小写、去尾部点、去默认端口、去 fragment、空路径归一；`www.example.com` 与 `example.com` 视为两个独立权威、需分别授予。对安全白名单这是更保守的选择；若产品后续要 apex 折叠，须作为显式决定并配套测试，不能作为归一化的隐式副作用。
 2. **安全联动 SQL 随 Task 3 迁移一次交付**：计划初稿让 Task 5 回头修改 Task 3 的迁移，会在该迁移已被 reset 应用后改写它，违反 forward-only；已重构为 Task 5 只做集成测试与双会话竞态证明。
+
+#### Task 1–3 执行状态（2026-08-30 更新，接手者从这里继续）
+
+| Task | 交付物 | 状态 | 证据 / 提交 |
+|---|---|---|---|
+| 1 | Strict reference contracts（`packages/contracts/src/references/` 四模块） | ✅ 完成 | `f63f793`；contracts 16 files / 161 tests（+28），变异检验通过（strict 放宽 → 泄漏用例失败） |
+| 2 | 纯归一化 / 状态机 / 派生规则（`packages/domain/src/references/` 三模块） | ✅ 完成（含复检修复） | `3cb69bf` + `0b3d721`；domain 410 tests（+26 后复检再 +8）；TS 侧**不用 `new URL`**、与 SQL 同一纯字符串解析算法 |
+| 3 | Reference Ledger 迁移 + 受保护命令 + RLS + 安全联动 SQL + 014 pgTAP + types | ✅ 完成（disposable 验证全绿） | `87cc070` + `0b3d721` + `5772ad5`；迁移 1,992 行 / 37 对象（第 23 个）；full pgTAP 14 files / 1,424 PASS（014 = 74 断言）；集成矩阵 66 PASS；typegen 两次一致；清理回 seed 基线 |
+| 4 | Bearer-scoped reference review repository + 双会话竞态集成 | ⬜ 待执行 | 涉及 disposable 栈，**需用户逐次显式授权** |
+| 5 | 7A 联动集成测试（双会话竞态证明） | ⬜ 待执行 | 同上；SQL 已随 Task 3 交付，Task 5 只做集成测试 |
+| 6–10 | 公共投影仓储 / BFF / reviewer UI / 公开链接解析 / Golden+收口 | ⬜ 待执行 | 详见实施计划 |
+
+**已落地的关键设计事实（接手者必读）**：
+- 数据模型实际为 **6 张表**（规范写 5 张）：额外加了 `reference_review_commands` 独立回执表（`security_review_commands` 的列与 aggregate 校验是安全专用，硬塞会扭曲语义）；决策历史表各含 `aggregate_version bigint` 列，状态推导按 `aggregate_version desc` 排序（同事务内 `transaction_timestamp()` 恒定，按时间排会退化为随机 UUID 序）。
+- 受保护命令 4 个：`submit_register_domain_authority` / `submit_decide_domain_authority` / `submit_register_reference` / `submit_decide_reference`；命令 payload 同时携带 aggregateId 与 expectedVersion 并在 SQL 内比对一致。稳定错误码 `AR201/202/203/204/206/207/208/209/210/299`，与 `packages/contracts/src/references/enums.ts` 一一对应。
+- 公开读模型：`reference_is_publicly_renderable_v1()`（security definer）是「可否公开渲染」的**单一判定点**（verified + `lifecycle in (active,rumored)` + 7A posture 非 blocked），RLS 策略与公共视图共用；不要把 7A 的 posture 函数授权给 anon。RLS 按 7A 约定**每角色独立策略**（`to anon` / `to authenticated` 分开、带 `comment on policy`），006 的精确策略矩阵已同步 4 条新策略。
+- outbox 白名单新增 4 个 reference 事件，**7A 对 ai_run/security 事件的 payload 校验分支逐字保留**；`occurredAt` 必须用 `to_char(… 'MS"Z"')` 格式化后写入。
+
+**复检与验证沉淀的 plpgsql/工程教训（写 Task 4+ 时直接引用，勿重蹈）**：
+1. plpgsql `RETURNS TABLE(version …)` 的列名就是变量：`returning … version into` / `set version = version + 1` 会 42702 且被 `when others` 吞成 AR299——列引用必须限定（`update t as x set version = x.version + 1`），register 命令避免 `INSERT … RETURNING`。
+2. **plpgsql `RETURN QUERY` 不退出函数**：replay 分支 `return query select …` 后必须显式 `return;`，否则直落进版本检查抛 AR206（此 bug 曾让四个命令的 replay 全部不可用）。
+3. `position(x in y)` 是特殊语法不能加 schema 前缀（42601，改 `strpos`）；`coalesce/least/nullif` 是语法结构、同样不能写 `pg_catalog.` 前缀。
+4. flag 创建与 release 可发生在同一事务：`released_at` 用 `clock_timestamp()`，不能用 `transaction_timestamp()`。
+5. 归一化两层一致性铁律：TS 侧禁用 `new URL()`（过于宽容），与 SQL 逐行同算法的纯字符串解析；两侧都拒绝非 ASCII、`%` 编码 host、IDN/IPv6/下划线 host 与 dot-segment；不剥离 `www.`。
+6. replay/幂等检查必须前移到 normalization/evidence 校验之前（否则证据事后被封时回放误报 AR209）；`unique_violation → AR208`。
+7. 调试：psql `-q` 吞 SELECT 输出，用 pgTAP `select diag(...)`；查 RLS 拒绝的内部表先 `reset role`、查完重设 claim+role；pgTAP `is()` 无跨类型重载（bigint 需显式 cast）。
 
 ### Phase 7A 全景看板（2026-08-29 更新，Task 1–11 全部完成并已合并主线）
 
@@ -46,7 +72,7 @@
 
 **Phase 7A 分支状态（2026-08-29，已合并主线）**：`codex/phase-7a-security-ledger` 上 Task 1–11 **全部完成并通过独立复审**，提交链 `fbf49d2..55d7f2b`，已以 merge 提交并入主线 `codex/phase-0-1-foundation`；功能 worktree `.worktrees/phase-7a-security-ledger` 按既有惯例保留。最终 `pnpm verify` exit 0：contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；lint、typecheck、build、placeholders 与 `git diff --check` 全绿。生产仍为 19 个已应用迁移，Phase 7A 迁移继续按 production unapplied 处理。
 
-**下一步决策点（需项目所有者决定）**：① **Phase 7B verified allowlisted references** 的架构设计（原定排在 7A 之后、tutorials 之前，为教程功能的前置条件）；② 或转向生产 rollout（四前置：human reviewer 供给、生产 Auth `/auth/v1/health` 恢复 200、迁移前备份演练、显式授权——目前均未满足）。
+**下一步决策点（需项目所有者决定）**：① **继续 Phase 7B 实施**——Task 4（bearer repository + 双会话竞态集成）起涉及 disposable 栈，需逐次显式授权；② 或转向生产 rollout（四前置：human reviewer 供给、生产 Auth `/auth/v1/health` 恢复 200、迁移前备份演练、显式授权——目前均未满足）。
 
 Phase 7A 提交链：`fbf49d2..55d7f2b`（40 个提交，112 文件，`+18,231/-384`），现已全部并入主线；备份引用 `backup/pre-7a-merge-main` 与 `backup/pre-7a-merge-7a` 保留合并前两端状态。
 
@@ -69,7 +95,7 @@ Phase 7A 提交链：`fbf49d2..55d7f2b`（40 个提交，112 文件，`+18,231/-
 #### 完成定义与遗留边界
 
 - Phase 7A 完成条件（spec §验收）：Evidence→Raw Item→Source 追溯、protect-first 原子性、即时门禁、公共零泄漏、clear 无回归、完整数据库与仓库门禁全绿并同步文档后，再做整分支 finishing review 与主线合并决策。
-- 本阶段明确不做：tutorials、notifications、钱包/交易、第三方威胁情报源、AI 自动 canonical 决策、scope 自动升级、实时推送、生产 rollout。（verified allowlisted references 曾列为不做项，现为 **Phase 7B**，已于 2026-08-29 完成架构设计与实施计划，尚未编码。）
+- 本阶段明确不做：tutorials、notifications、钱包/交易、第三方威胁情报源、AI 自动 canonical 决策、scope 自动升级、实时推送、生产 rollout。（verified allowlisted references 曾列为不做项，现为 **Phase 7B**：设计已批准，Task 1–3 已完成并通过 disposable 验证，Task 4–10 待执行。）
 - 生产 rollout 冻结依旧：四前置（human reviewer 供给、Auth 恢复 200、迁移前备份演练、显式授权）齐备并重新 preflight 前，第 20–22 个 migration 不应用。
 
 ### 2026-08-28 本轮接续复核进度
@@ -208,7 +234,7 @@ Phase 7A 设计铁律：安全态与 opportunity/risk/confidence/score recommend
 
 ## 1. 项目定位（一段话版）
 
-Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前四个（情报采集 → AI 抽取 → 确定性评分 → 页面展示）已端到端打通，采集之外的两个 AI 阶段（抽取、评分）由 worker 内编排循环自动驱动；Phase 6A 又把「AI 候选 → 人工审核 → Evidence 证据链 → 公开可见」的最后一环硬化为可执行的数据库边界（专用 promotion_service 角色、受保护幂等命令、审计与事务性 outbox，公开数据一律 Evidence 门禁）；Phase 7A 则在其上叠加了独立、追加式的安全事件与指标覆盖层（protect-first 门禁、审核工作流、公共 blocked/caution 呈现），已于 2026-08-29 合并主线。教程、任务管理、通知、verified allowlisted references（Phase 7B）尚未开始。
+Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天该参与哪几个空投」。**不是**资讯聚合站，**不是**自动撸毛机器人。六大系统中的前四个（情报采集 → AI 抽取 → 确定性评分 → 页面展示）已端到端打通，采集之外的两个 AI 阶段（抽取、评分）由 worker 内编排循环自动驱动；Phase 6A 又把「AI 候选 → 人工审核 → Evidence 证据链 → 公开可见」的最后一环硬化为可执行的数据库边界（专用 promotion_service 角色、受保护幂等命令、审计与事务性 outbox，公开数据一律 Evidence 门禁）；Phase 7A 则在其上叠加了独立、追加式的安全事件与指标覆盖层（protect-first 门禁、审核工作流、公共 blocked/caution 呈现），已于 2026-08-29 合并主线。教程、任务管理、通知尚未开始；verified allowlisted references（Phase 7B）实施中——Task 1–3（契约 / 纯规则 / 迁移与 pgTAP）已完成并通过 disposable 验证。
 
 核心铁律（详见 AGENTS.md）：永不接触私钥/助记词；永不自动签名；机会分、风险分、置信度三者独立不得合成单一总分；AI 输出只是候选数据，写入正式事实必须走 Promotion Service 并留审计；冲突证据保持可见，不静默覆盖。
 
@@ -266,7 +292,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 9. 用户认证与私有数据（profiles、RLS user_id 场景目前未启用）
 10. 运营/审核后台界面（目前只有 API）；详情页 score factors / reviewed Evidence 的本地实现已完成，生产未应用
 11. 多源扩展：X/Twitter、项目方公告页结构化解析等
-12. **verified allowlisted references（Phase 7B）**：教程功能的前置条件，下一步单独做架构设计
+12. **verified allowlisted references（Phase 7B）**：教程功能的前置条件，实施进行中——Task 1–3 已完成（contracts / domain / 迁移+pgTAP+types），Task 4（repository）起待执行
 
 ---
 

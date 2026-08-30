@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**架构设计已批准，实施计划已产出；Task 1 未开始**；生产未访问
+> 当前状态：**Task 1–3 已完成（含复检修复与 disposable 验证全绿）；下一任务 Task 4（repository，需授权）**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -33,6 +33,8 @@
 | 3 | Reference Ledger migration + protected commands + RLS + 安全联动 SQL | ✅ 完成（014 pgTAP 74/74、disposable 验证全绿） | 迁移 1,992 行 / 37 个对象。**disposable 验证（2026-08-30，用户授权）**：同步迁移+014（SHA 逐个核对）、reset exit 0（23 迁移）、full pgTAP **14 files / 1,424 tests PASS**（含 014 的 74 个新断言）、typegen 两次一致（156,630 字节）并替换 generated types；集成矩阵 **9 files / 66 tests PASS**（155.6s）；清理后回到 seed 基线（4 projects / 2 opps / 全部引用·安全表与 outbox = 0）、marker 完好；隧道关闭、凭据删除、54321/54322 全程未访问。**验证期修掉的 4 个真缺陷**：① `pg_catalog.position(x in y)` 限定名与 `IN` 语法不兼容（42601），改 `strpos`；② `pg_catalog.coalesce/least/nullif` 是语法结构不能带 schema 前缀；③ **plpgsql `RETURN QUERY` 不退出函数**——replay 分支返回后直落进版本检查抛 AR206，四个命令的 replay 全部不可用，补 `return;`；④ restore 用 `transaction_timestamp()` 使同事务 flag+release 的 `released_at > created_at` 恒假（AR299），改 `clock_timestamp()`。另：决策表新增 `aggregate_version` 列（同事务内时间戳恒定导致「最新决策」按随机 UUID 排序的不确定性）与 006 精确策略矩阵更新（4 条新策略）。 |
 | 4 | Bearer-scoped reference review repositories + race tests | 待执行 | — |
 | 5 | Phase 7A coupling under real races（仅集成测试，不改迁移） | 待执行 | — |
+| 4 | Bearer-scoped reference review repository + 双会话竞态集成 | 待执行 | 涉及 disposable 栈，需用户逐次显式授权 |
+| 5 | 7A 联动集成测试（双会话竞态证明；SQL 已随 Task 3 交付） | 待执行 | 同上 |
 | 6 | Strict public reference repositories and projections | 待执行 | — |
 | 7 | Authenticated reference BFF routes + browser client | 待执行 | — |
 | 8 | Reviewer reference workflow UI（`/review/references`） | 待执行 | — |
