@@ -23,9 +23,10 @@ begin
   if p_value <> pg_catalog.btrim(p_value) then
     return null;
   end if;
-  -- Printable ASCII only: rejects control characters, whitespace (including
-  -- non-breaking space), and every non-ASCII byte so both layers agree.
-  if p_value ~ '[^ -~]' then
+  -- Printable ASCII only: rejects control characters and every non-ASCII byte
+  -- so both layers agree. Whitespace is rejected separately because a plain
+  -- space is printable.
+  if p_value ~ '[^ -~]' or p_value ~ '[[:space:]]' then
     return null;
   end if;
   if p_value ~ '[/:@?#%]' then
@@ -77,7 +78,8 @@ begin
     return null;
   end if;
   -- Printable ASCII only, matching the TypeScript normalizer exactly.
-  if p_value ~ '[^ -~]' then
+  -- Whitespace is rejected separately because a plain space is printable.
+  if p_value ~ '[^ -~]' or p_value ~ '[[:space:]]' then
     return null;
   end if;
   if p_value !~ '^https://' then
@@ -92,11 +94,11 @@ begin
   end if;
   -- Percent-encoding in the authority would decode to a different host than
   -- the raw string suggests; more than one colon means an IPv6 literal.
-  if pg_catalog.position('%' in v_rest) between 1 and pg_catalog.coalesce(
-    pg_catalog.least(
-      pg_catalog.nullif(pg_catalog.position('/' in v_rest), 0),
-      pg_catalog.nullif(pg_catalog.position('?' in v_rest), 0),
-      pg_catalog.nullif(pg_catalog.position('#' in v_rest), 0)
+  if pg_catalog.strpos(v_rest, '%') between 1 and coalesce(
+    least(
+      nullif(pg_catalog.strpos(v_rest, '/'), 0),
+      nullif(pg_catalog.strpos(v_rest, '?'), 0),
+      nullif(pg_catalog.strpos(v_rest, '#'), 0)
     ) - 1,
     pg_catalog.length(v_rest)
   ) then
@@ -106,10 +108,10 @@ begin
     return null;
   end if;
 
-  v_end := pg_catalog.least(
-    pg_catalog.nullif(pg_catalog.position('/' in v_rest), 0),
-    pg_catalog.nullif(pg_catalog.position('?' in v_rest), 0),
-    pg_catalog.nullif(pg_catalog.position('#' in v_rest), 0)
+  v_end := least(
+    nullif(pg_catalog.strpos(v_rest, '/'), 0),
+    nullif(pg_catalog.strpos(v_rest, '?'), 0),
+    nullif(pg_catalog.strpos(v_rest, '#'), 0)
   );
 
   if v_end is null then
@@ -122,7 +124,7 @@ begin
 
   v_host := v_authority;
   v_port := null;
-  if pg_catalog.position(':' in v_authority) > 0 then
+  if pg_catalog.strpos(v_authority, ':') > 0 then
     v_host := pg_catalog.split_part(v_authority, ':', 1);
     v_port := pg_catalog.split_part(v_authority, ':', 2);
     if v_port !~ '^[0-9]+$' or v_port::integer < 0 or v_port::integer > 65535 then
@@ -150,7 +152,7 @@ begin
     if pg_catalog.substring(v_path_with_query, 1, 1) = '?' then
       v_query := v_path_with_query;
     else
-      v_query_at := pg_catalog.position('?' in v_path_with_query);
+      v_query_at := pg_catalog.strpos(v_path_with_query, '?');
       if v_query_at = 0 then
         v_path := v_path_with_query;
       else
@@ -169,8 +171,8 @@ begin
   -- Dot-segments are rejected instead of silently rewritten: the TypeScript
   -- layer rejects them too, so both layers agree on the same raw input.
   if v_path = '/.' or v_path = '/..'
-    or pg_catalog.position('/./' in v_path) > 0
-    or pg_catalog.position('/../' in v_path) > 0
+    or pg_catalog.strpos(v_path, '/./') > 0
+    or pg_catalog.strpos(v_path, '/../') > 0
     or pg_catalog.right(v_path, 2) = '/.'
     or pg_catalog.right(v_path, 3) = '/..'
   then
@@ -260,29 +262,6 @@ $function$;
 
 alter function public.reference_evidence_is_usable(uuid) owner to postgres;
 
-create function public.match_references_for_indicator(
-  p_indicator_type text,
-  p_value text
-)
-returns table (reference_id uuid)
-language sql
-stable
-security definer
-set search_path = pg_catalog, public, extensions
-as $function$
-  select reference_row.id
-  from public.project_references as reference_row
-  where case
-    when p_indicator_type = 'url'
-      then public.normalize_reference_url_v1(p_value) = reference_row.normalized_url
-    when p_indicator_type = 'domain'
-      then public.normalize_reference_domain_v1(p_value) = reference_row.normalized_domain
-    else false
-  end;
-$function$;
-
-alter function public.match_references_for_indicator(text, text) owner to postgres;
-
 create table public.project_domain_authorities (
   id uuid primary key default extensions.gen_random_uuid(),
   project_id uuid not null
@@ -307,6 +286,7 @@ create table public.project_domain_authority_decisions (
   decision text not null,
   resulting_state text not null,
   reason_code text not null,
+  aggregate_version bigint not null,
   evidence_id uuid null
     constraint project_domain_authority_decisions_evidence_id_fkey
     references public.evidence (id) on delete restrict,
@@ -399,6 +379,7 @@ create table public.project_reference_decisions (
   decision text not null,
   resulting_state text not null,
   reason_code text not null,
+  aggregate_version bigint not null,
   evidence_id uuid null
     constraint project_reference_decisions_evidence_id_fkey
     references public.evidence (id) on delete restrict,
@@ -505,6 +486,29 @@ create index reference_security_flags_reference_idx
 on public.reference_security_flags (reference_id)
 where released_at is null;
 
+create function public.match_references_for_indicator(
+  p_indicator_type text,
+  p_value text
+)
+returns table (reference_id uuid)
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, extensions
+as $function$
+  select reference_row.id
+  from public.project_references as reference_row
+  where case
+    when p_indicator_type = 'url'
+      then public.normalize_reference_url_v1(p_value) = reference_row.normalized_url
+    when p_indicator_type = 'domain'
+      then public.normalize_reference_domain_v1(p_value) = reference_row.normalized_domain
+    else false
+  end;
+$function$;
+
+alter function public.match_references_for_indicator(text, text) owner to postgres;
+
 -- Command receipts mirror the security_review_commands shape so replay,
 -- idempotency conflicts, and audit stay uniform across ledgers.
 
@@ -567,7 +571,7 @@ as $function$
         select decision.resulting_state
         from public.project_reference_decisions as decision
         where decision.reference_id = p_reference_id
-        order by decision.created_at desc, decision.id desc
+        order by decision.aggregate_version desc, decision.created_at desc, decision.id desc
         limit 1
       ),
       'candidate'
@@ -606,7 +610,7 @@ as $function$
       select decision.resulting_state
       from public.project_domain_authority_decisions as decision
       where decision.authority_id = p_authority_id
-      order by decision.created_at desc, decision.id desc
+      order by decision.aggregate_version desc, decision.created_at desc, decision.id desc
       limit 1
     ),
     'candidate'
@@ -650,7 +654,7 @@ as $function$
   from public.project_domain_authority_decisions as decision
   where decision.authority_id = p_authority_id
     and decision.resulting_state = 'granted'
-  order by decision.created_at desc, decision.id desc
+  order by decision.aggregate_version desc, decision.created_at desc, decision.id desc
   limit 1;
 $function$;
 
@@ -838,13 +842,14 @@ begin
       v_existing.resulting_version,
       v_existing.result_payload ->> 'state',
       true;
+    -- RETURN QUERY appends without exiting, so the replay branch must return
+    -- explicitly or it would fall through into the version checks.
+    return;
   end if;
 
   v_domain := p_command_payload ->> 'domain';
   v_normalized_domain := public.normalize_reference_domain_v1(v_domain);
-  if v_normalized_domain is null
-    or v_normalized_domain <> v_domain
-  then
+  if v_normalized_domain is null then
     raise exception 'reference_normalization_invalid' using errcode = 'AR210';
   end if;
 
@@ -877,10 +882,10 @@ begin
       and authority.normalized_domain = v_normalized_domain;
 
     insert into public.project_domain_authority_decisions (
-      authority_id, decision, resulting_state, reason_code,
+      authority_id, decision, resulting_state, reason_code, aggregate_version,
       evidence_id, actor_user_id, idempotency_key, created_at
     ) values (
-      v_authority_id, 'register', 'candidate', 'insufficient_context',
+      v_authority_id, 'register', 'candidate', 'insufficient_context', v_version,
       v_evidence_id, v_actor, p_idempotency_key, v_now
     ) returning id into v_decision_id;
 
@@ -1070,6 +1075,9 @@ begin
       v_existing.resulting_version,
       v_existing.result_payload ->> 'state',
       true;
+    -- RETURN QUERY appends without exiting, so the replay branch must return
+    -- explicitly or it would fall through into the version checks.
+    return;
   end if;
 
   select authority.version into v_current_version
@@ -1106,10 +1114,10 @@ begin
   where authority_row.id = p_authority_id;
 
   insert into public.project_domain_authority_decisions (
-    authority_id, decision, resulting_state, reason_code,
+    authority_id, decision, resulting_state, reason_code, aggregate_version,
     evidence_id, actor_user_id, idempotency_key, created_at
   ) values (
-    p_authority_id, v_decision, v_next_state, v_reason,
+    p_authority_id, v_decision, v_next_state, v_reason, v_current_version + 1,
     v_evidence_id, v_actor, p_idempotency_key, v_now
   ) returning id into v_decision_id;
 
@@ -1265,13 +1273,15 @@ begin
       v_existing.resulting_version,
       v_existing.result_payload ->> 'state',
       true;
+    -- RETURN QUERY appends without exiting, so the replay branch must return
+    -- explicitly or it would fall through into the version checks.
+    return;
   end if;
 
   v_normalized_url := public.normalize_reference_url_v1(v_url);
   v_normalized_domain := public.reference_url_host_v1(coalesce(v_normalized_url, ''));
   if v_normalized_url is null
     or v_normalized_domain is null
-    or v_normalized_url <> v_url
     or pg_catalog.char_length(v_label) < 1
     or pg_catalog.char_length(v_label) > 160
     or v_label <> pg_catalog.btrim(v_label)
@@ -1306,10 +1316,10 @@ begin
     where reference_row.normalized_url = v_normalized_url;
 
     insert into public.project_reference_decisions (
-      reference_id, decision, resulting_state, reason_code,
+      reference_id, decision, resulting_state, reason_code, aggregate_version,
       evidence_id, actor_user_id, idempotency_key, created_at
     ) values (
-      v_reference_id, 'register', 'candidate', 'insufficient_context',
+      v_reference_id, 'register', 'candidate', 'insufficient_context', v_version,
       v_evidence_id, v_actor, p_idempotency_key, v_now
     ) returning id into v_decision_id;
 
@@ -1482,6 +1492,9 @@ begin
       v_existing.resulting_version,
       v_existing.result_payload ->> 'state',
       true;
+    -- RETURN QUERY appends without exiting, so the replay branch must return
+    -- explicitly or it would fall through into the version checks.
+    return;
   end if;
 
   select reference_row.version into v_current_version
@@ -1527,16 +1540,19 @@ begin
   where reference_row.id = p_reference_id;
 
   insert into public.project_reference_decisions (
-    reference_id, decision, resulting_state, reason_code,
+    reference_id, decision, resulting_state, reason_code, aggregate_version,
     evidence_id, actor_user_id, idempotency_key, created_at
   ) values (
-    p_reference_id, v_decision, v_next_state, v_reason,
+    p_reference_id, v_decision, v_next_state, v_reason, v_current_version + 1,
     v_evidence_id, v_actor, p_idempotency_key, v_now
   ) returning id into v_decision_id;
 
   if v_decision = 'restore' then
+    -- clock_timestamp() rather than transaction_timestamp(): a flag and its
+    -- release can happen in the same transaction, and the release-complete
+    -- check requires released_at to be strictly after created_at.
     update public.reference_security_flags
-    set released_at = v_now,
+    set released_at = pg_catalog.clock_timestamp(),
         released_by = v_actor,
         release_evidence_id = v_evidence_id
     where reference_id = p_reference_id
@@ -1669,21 +1685,32 @@ alter table public.reference_review_commands enable row level security;
 -- references under catalog-visible projects. Candidate, flagged, and withdrawn
 -- rows stay internal; every other table denies direct access entirely.
 
-create policy project_references_select_public
+create policy project_references_select_anon
 on public.project_references
 for select
-to anon, authenticated
+to anon
 using (public.reference_is_publicly_renderable_v1(project_references.id));
+
+create policy project_references_select_authenticated
+on public.project_references
+for select
+to authenticated
+using (public.reference_is_publicly_renderable_v1(project_references.id));
+
+comment on policy project_references_select_anon on public.project_references is
+  'Anonymous users may read only verified references for catalog-visible projects.';
+comment on policy project_references_select_authenticated on public.project_references is
+  'Authenticated browser users may read only verified references for catalog-visible projects.';
 
 revoke all on table public.project_references
 from anon, authenticated;
 grant select (id, project_id, kind, label, normalized_url)
 on public.project_references to anon, authenticated;
 
-create policy project_domain_authorities_select_public
+create policy project_domain_authorities_select_anon
 on public.project_domain_authorities
 for select
-to anon, authenticated
+to anon
 using (
   public.domain_authority_current_state_v1(project_domain_authorities.id) = 'granted'
   and exists (
@@ -1693,6 +1720,25 @@ using (
       and project.lifecycle in ('active', 'rumored')
   )
 );
+
+create policy project_domain_authorities_select_authenticated
+on public.project_domain_authorities
+for select
+to authenticated
+using (
+  public.domain_authority_current_state_v1(project_domain_authorities.id) = 'granted'
+  and exists (
+    select 1
+    from public.projects as project
+    where project.id = project_domain_authorities.project_id
+      and project.lifecycle in ('active', 'rumored')
+  )
+);
+
+comment on policy project_domain_authorities_select_anon on public.project_domain_authorities is
+  'Anonymous users may read only granted authorities for catalog-visible projects.';
+comment on policy project_domain_authorities_select_authenticated on public.project_domain_authorities is
+  'Authenticated browser users may read only granted authorities for catalog-visible projects.';
 
 revoke all on table public.project_domain_authorities
 from anon, authenticated;
@@ -1731,6 +1777,7 @@ revoke all on function public.reference_evidence_is_usable(uuid) from public;
 revoke all on function public.normalize_reference_domain_v1(text) from public, anon, authenticated;
 revoke all on function public.normalize_reference_url_v1(text) from public, anon, authenticated;
 revoke all on function public.reference_url_host_v1(text) from public, anon, authenticated;
+grant execute on function public.reference_url_host_v1(text) to anon, authenticated;
 
 -- Retain every pre-existing outbox contract while adding a separate strict
 -- branch for the four safe reference events.
