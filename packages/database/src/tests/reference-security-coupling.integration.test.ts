@@ -30,7 +30,8 @@ const fixtureTargets = [
 const projectIds = fixtureTargets.map((target) => target.projectId);
 const sourceIds = fixtureTargets.map((target) => target.sourceId);
 const rawItemIds = fixtureTargets.map((target) => target.rawItemId);
-const evidenceIds = fixtureTargets.map((target) => target.evidenceId);
+const mismatchedEvidenceId = randomUUID();
+const evidenceIds = [...fixtureTargets.map((target) => target.evidenceId), mismatchedEvidenceId];
 const integrationEnvironment = readIntegrationEnvironment();
 const describeIntegration = integrationEnvironment === null ? describe.skip : describe;
 
@@ -242,14 +243,49 @@ describeIntegration('reference security coupling PostgREST integration', () => {
     await expectReferenceProjection(database, target.referenceId, 'flagged', false);
     const before = await readReferenceMutationCounts(database, target.referenceId);
     const historyBeforeRestore = await readReferenceDecisionHistory(database, target.referenceId);
+    const flagsBeforeRestore = await database`
+      select released_at, released_by, release_evidence_id
+      from public.reference_security_flags where reference_id = ${target.referenceId}::uuid
+    `;
+    expect(flagsBeforeRestore).toEqual([
+      { released_at: null, released_by: null, release_evidence_id: null },
+    ]);
 
-    await expect(callDecideReferenceWithoutEvidence(
+    await expect(callDecideReferenceRestore(
       authClients[1]!,
       target.referenceId,
       `restore-missing-evidence-${randomUUID()}`,
+      null,
     )).rejects.toMatchObject({ code: 'AR209' });
     expect(await readReferenceMutationCounts(database, target.referenceId)).toEqual(before);
     expect(await readReferenceDecisionHistory(database, target.referenceId)).toEqual(historyBeforeRestore);
+
+    const mismatchedRawItem = fixtureTargets[5];
+    expect(mismatchedRawItem.sourceId).not.toBe(target.sourceId);
+    await insertMismatchedEvidence(database, target.sourceId, mismatchedRawItem);
+    const mismatchedEvidence = await database`
+      select evidence_row.source_id as evidence_source_id,
+        raw_item_row.source_id as raw_item_source_id
+      from public.evidence as evidence_row
+      join public.raw_items as raw_item_row on raw_item_row.id = evidence_row.raw_item_id
+      where evidence_row.id = ${mismatchedEvidenceId}::uuid
+    `;
+    expect(mismatchedEvidence).toEqual([{
+      evidence_source_id: target.sourceId,
+      raw_item_source_id: mismatchedRawItem.sourceId,
+    }]);
+    await expect(callDecideReferenceRestore(
+      authClients[1]!,
+      target.referenceId,
+      `restore-mismatched-evidence-${randomUUID()}`,
+      mismatchedEvidenceId,
+    )).rejects.toMatchObject({ code: 'AR209' });
+    expect(await readReferenceMutationCounts(database, target.referenceId)).toEqual(before);
+    expect(await readReferenceDecisionHistory(database, target.referenceId)).toEqual(historyBeforeRestore);
+    expect(await database`
+      select released_at, released_by, release_evidence_id
+      from public.reference_security_flags where reference_id = ${target.referenceId}::uuid
+    `).toEqual(flagsBeforeRestore);
 
     await expect(review.decideReference({
       accessToken: reviewerAccessToken,
@@ -469,6 +505,23 @@ async function seedFixtures(sql: postgres.Sql, adminUserId: string, reviewerUser
       )
     `;
   }
+}
+
+async function insertMismatchedEvidence(
+  sql: postgres.Sql,
+  evidenceSourceId: string,
+  rawItemTarget: FixtureTarget,
+): Promise<void> {
+  const quote = `Task 5 mismatched evidence for ${rawItemTarget.projectId}.`;
+  await sql`
+    insert into public.evidence (
+      id, source_id, raw_item_id, source_field, quote_text,
+      normalized_quote_sha256, verified_at, created_at
+    ) values (
+      ${mismatchedEvidenceId}::uuid, ${evidenceSourceId}::uuid, ${rawItemTarget.rawItemId}::uuid,
+      'article_raw_text', ${quote}, ${await quoteSha256(sql, quote)}, now(), now()
+    )
+  `;
 }
 
 function authorityDecision(
@@ -701,10 +754,11 @@ async function expectBlockerRollback(
   throw new Error(`reference_security_blocker_committed_during_rollback:${expectedMessage}`);
 }
 
-async function callDecideReferenceWithoutEvidence(
+async function callDecideReferenceRestore(
   client: SupabaseClient<Database>,
   referenceId: string,
   idempotencyKey: string,
+  evidenceId: string | null,
 ): Promise<void> {
   const response = await client.rpc('submit_decide_reference', {
     p_reference_id: referenceId,
@@ -714,13 +768,13 @@ async function callDecideReferenceWithoutEvidence(
       expectedVersion: 2,
       decision: 'restore',
       reasonCode: 'security_flag_cleared',
-      evidenceId: null,
+      evidenceId,
       note: null,
     },
     p_idempotency_key: idempotencyKey,
   });
   if (response.error !== null) throw response.error;
-  throw new Error('reference_security_restore_without_evidence_succeeded');
+  throw new Error('reference_security_restore_with_invalid_evidence_succeeded');
 }
 
 async function readReferenceMutationCounts(

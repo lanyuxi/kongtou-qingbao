@@ -364,9 +364,11 @@ Follow detailed-plan Steps 1–4. The integration suite is the load-bearing beha
 
 Follow detailed-plan Steps 5–6. Sync 016 only, do not reset/sync migration, and clean every fixture/tunnel/temp artifact before implementation.
 
-- [x] **Step 3: Implement migration 25 and local GREEN**
+- [ ] **Step 3: Implement migration 25 and local GREEN**
 
 > **2026-08-31 COMPLETE:** migration25 is 583 lines / SHA `2e8013ccd041be9de2ed7910a707401ee96e051d132fa47b34bf90011242ce37`; it replaces only the three specified bodies with source→authority→reference target locking and post-wait checks. Immutable hashes, `git diff --check`, direct Node 22.22.2 database lint/typecheck, and focused tests passed (**29 passed / 5 gated skipped**). No database/remote/production access occurred; disposable GREEN remains the next authorization boundary.
+
+> **2026-08-31 Fix Round 1 Phase A — REOPENED:** a strict Evidence/raw-item/source mismatch regression now requires `AR209` and no restore mutation. The test precedes the SQL guard; migration25 is intentionally unchanged, behavioral RED is not yet authorized, and this master step remains unchecked.
 
 Follow detailed-plan Steps 7–8. Replace exactly the indicator trigger and two decision RPC bodies; preserve signatures/contracts/owners/grants.
 
