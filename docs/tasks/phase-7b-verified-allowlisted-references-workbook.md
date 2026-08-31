@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**Task 1–4 已完成；Task 5 corrected spec 已确认、独立实施计划已完成，等待执行方式选择**；生产未访问
+> 当前状态：**Task 1–4 已完成；Task 5 1A 本地 RED 工件与门控已完成，等待仅 disposable behavioral RED 授权**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -155,3 +155,6 @@
 | 2026-08-31 | Task 5 corrected implementation plan complete | 新增独立 272 行 plan，并把主计划 Task 5 改为五步入口。计划包含 5 条 integration、18 条 016、test-only RED 与 migration GREEN 两个授权停点、三函数最小替换、full pgTAP、typegen no-drift、真实竞态、cleanup、fresh gate/review/commit。placeholder/type/scope 自审通过；未写 RED/SQL、未访问远端/生产。下一步选择 Subagent-Driven（推荐）或 Inline。 |
 | 2026-08-31 | Task 5 plan final self-review / commit | Node 22.22.2、diff check、直接占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全绿；第23/24 migration、015、generated types SHA 未漂移。pnpm wrapper 两次在脚本前因 PATH 及 registry/TTY 自检阻断且未改依赖，改为同一检查入口直跑通过。计划提交 **`c28f6a2`**；未写 RED/SQL、未连接数据库/远端/生产，等待执行方式选择。 |
 | 2026-08-31 | Task 5 SDD Step 1 baseline COMPLETE | 已选 Subagent-Driven；linked worktree/branch/HEAD=`3f688e3` 精确，建立 plan-owned ledger。第23/24 migration、015、generated types SHA 未漂移，types 158,662 bytes；Node 22.22.2 database lint/typecheck 0，Vitest 287 PASS / 69 gated。首次命令因 cwd 相对路径错误在门禁前中止，分离 cwd 后全绿。单 Task 按授权停点拆为 1A/1B/1C 串行审查单元；016 结构检查只作补充，真实 wait integration 为主证据。未写 RED/SQL、未连库/远端/生产；下一步 1A。 |
+| 2026-08-31 | Task 5 SDD 1A Step 2 integration RED artifact COMPLETE | 新增 self-contained `reference-security-coupling.integration.test.ts`：五个具名 real-race/history/Evidence/cleanup cases；`owner`/`blocker`/`inserter` 均 `max:1`，fresh auth + real `ReferenceReviewRepository`，blocker 只作观察屏障。未提供四变量，未执行 DB 行为。 |
+| 2026-08-31 | Task 5 SDD 1A Step 3 local gated checks COMPLETE | `test:integration` 仅追加新文件。Node 22.22.2 direct eslint/tsc 均 exit 0；focused Vitest **1 file / 5 tests skipped / exit 0**，证明 env gate。integration SHA `4679ebd8df2de37debc49b75dd46a0a3430ce6fc34ff6b23896456268a7212aa`。behavioral RED 未运行，需 disposable 明确授权。 |
+| 2026-08-31 | Task 5 SDD 1A Step 4 pgTAP 016 structural RED artifact COMPLETE | 新增完整 `begin; plan(18); finish(); rollback;` 的 016，覆盖三函数 lock/order/post-lock re-check 与 aggregate security/privilege 边界；016 SHA `6d26ad0acecc7ebd9f69b6daec0d821cf717896365a3b366f0a676cfb4151ada`，`git diff --check` exit 0。迁移25未创建，23/24 SHA 未漂移；函数定义断言仅作结构补充。 |

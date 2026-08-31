@@ -352,7 +352,7 @@ git commit -m "feat(database): add reference review repository"
 - Produces: shared `source → domain_authority → reference → row lock` serialization, lock-after-wait security re-checks, and disposable proof for both winner orders, restore history, blocked Evidence, type-shape stability, and exact cleanup.
 - Prohibits: project-wide coupling locks, test-only fake production locks, edits to migrations 23/24, new public RPC/schema shape, generated-type drift, or any production access.
 
-- [ ] **Step 1: Write integration + pgTAP RED and run local gates**
+- [x] **Step 1: Write integration + pgTAP RED and run local gates**
 
 Follow detailed-plan Steps 1–4. The integration suite is the load-bearing behavioral RED; 016 adds structural regression coverage.
 

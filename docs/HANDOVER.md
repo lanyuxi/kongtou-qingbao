@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 corrected implementation plan 已完成**。**下一步：选择 Subagent-Driven 或 Inline 执行方式**）
+> 最近更新：2026-08-31（**Phase 7B Task 5 1A 本地 RED 工件已完成**。**下一步：仅请求 disposable behavioral RED 授权**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 corrected design 已批准，明确以第25个 forward-only migration 补齐共享 Phase 7A target locks，尚未写 implementation RED/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 已完成 1A 本地 integration/pgTAP RED 工件与门控，尚未运行 behavioral RED、未写 migration25/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
@@ -15,6 +15,12 @@
 **2026-08-31 Task 5 plan final self-review / commit**：声明 Node 22.22.2、`git diff --check`、仓库占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全部 exit 0；第23/24 migration、015、generated types SHA 分别保持 `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`。两次通过 pnpm wrapper 启动检查分别在脚本前被缺失 Node PATH、registry/TTY 依赖自检阻断，未改依赖；随后直接执行同一 `scripts/check-placeholders.mjs` 通过。计划已以 `docs: plan phase 7b task 5 locking` 提交为 **`c28f6a2`**。尚未写 RED/SQL、未连接数据库或远端、生产未访问；下一步仅等待执行方式选择。
 
 **2026-08-31 Task 5 SDD Step 1 baseline COMPLETE**：项目所有者选择 Subagent-Driven；已确认当前目录是 linked worktree、分支 `codex/phase-7b-references`、起始 HEAD `3f688e3`，并建立本计划独立 gitignored ledger。第23/24 migration、015、generated types 分别保持 SHA `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`，types 为 158,662 bytes。声明 Node 22.22.2 下 database lint/typecheck exit 0，Vitest **14 passed / 10 gated files，287 PASS / 69 gated tests**。首次组合命令仅因从 database 目录使用仓库根相对哈希路径而在测试前中止；拆分正确 cwd 后全绿。执行裁定：单一 Task 依授权停点分为 1A local RED、1B migration GREEN、1C final verification/commit，串行代理、逐单元规格+质量复核；016 的函数定义检查仅作结构补充，真实 advisory wait integration 为行为主证据。未写 RED/SQL、未连接数据库/远端/生产；下一步派发 1A。
+
+**2026-08-31 Task 5 SDD 1A Step 2 integration RED artifact COMPLETE**：新增环境门控 `packages/database/src/tests/reference-security-coupling.integration.test.ts`，含五个具名真实路径：同 reference key 的 flag-first/verify-first、同 authority key 的 revoke-first/verify-first、Evidence-required restore/history、source-key wait 后 block-wins、exact cleanup/zero-residue。该套件使用 `owner`/`blocker`/`inserter` 三个 `max:1` PostgreSQL 连接、fresh Supabase auth clients 与真实 `ReferenceReviewRepository`；blocker 仅为观察屏障，生产 trigger/RPC 必须自己成为同 key waiter。未提供四个 integration 变量，故未执行任何数据库行为。
+
+**2026-08-31 Task 5 SDD 1A Step 3 local gated RED checks COMPLETE**：`test:integration` 显式追加新文件；Node 22.22.2 直接入口 database eslint 与 `tsc --noEmit` 均 exit 0。focused Vitest 为 **1 file skipped / 5 tests skipped / exit 0**，确认环境门控而非行为通过。integration SHA-256 为 `4679ebd8df2de37debc49b75dd46a0a3430ce6fc34ff6b23896456268a7212aa`。真正 behavioral RED 仍未运行，必须先获得仅 disposable 的明确授权；未连接数据库、远端或生产。
+
+**2026-08-31 Task 5 SDD 1A Step 4 pgTAP 016 structural RED artifact COMPLETE**：新增 `supabase/tests/016_phase_7b_reference_security_locking.test.sql`，`begin; plan(18); finish(); rollback;` 完整，含 trigger/reference/authority lock order 与 post-lock re-check、security-definer/owner/signature/privilege/direct-ledger denial 断言。016 SHA-256 为 `6d26ad0acecc7ebd9f69b6daec0d821cf717896365a3b366f0a676cfb4151ada`；`git diff --check` exit 0。函数定义断言仅为结构补充，load-bearing behavioral RED 仍待 disposable 授权；migration25 未创建，第23/24 SHA 仍为 `75e038d8…5966` / `570e6b89…aad8`。
 
 #### 2026-08-30 Task 4 修订设计落盘
 
