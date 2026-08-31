@@ -157,7 +157,7 @@ Use `pg_get_functiondef()` only as a structural supplement. The integration RED 
 
 Run `git diff --check`, verify 016 contains a complete plan/finish/rollback, and update the three handover/workbook locations. Do not create migration 25 yet.
 
-- [ ] **Step 5: Obtain explicit test-only disposable RED authorization**
+- [x] **Step 5: Obtain explicit test-only disposable RED authorization**
 
 Stop and request authorization for only these actions: read-only fail-closed remote preflight; sync 016 only; open temporary tunnels and a 0600 four-variable environment; run focused 016 and the one new integration file against the current 24-migration schema; exact cleanup; close tunnels/remove temp files. Do not reset or sync a migration during RED.
 

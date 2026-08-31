@@ -28,6 +28,8 @@
 
 **2026-08-31 Task 5 SDD 1A scoped review CLEAN**：首个 reviewer 在返回 verdict 前因额度失败，未产生 findings；替补 reviewer 对 `06416a9..a08518c` 判定 scope/spec 合规、质量 0 Critical / 3 Important / 1 Minor。Round 1 提交 `d74ab87` 关闭 016 token-existence 与 restore append-only 两项，复审发现 residue 仅 select 未 assert；Round 2 提交 `e92d115` 增加五项直接零断言，最终 scoped re-review 判定全部 Important **ADDRESSED**、无新 Critical/Important。1A 实现链为 `a08518c` / `d74ab87` / `e92d115`；integration / 016 最终 SHA 为 `87b0a4ff…e9657` / `0fa44939…bd20`。唯一 Minor（主计划措辞未显式重复“behavioral RED 未运行”）按 SDD ledger 延后给 final review。详细计划 Steps 1–4 已勾选；behavioral RED 仍未运行，migration25 不存在，未连接数据库/远端/生产。下一步只请求 Step 5 test-only disposable RED 授权。
 
+**2026-08-31 Task 5 Step 5 test-only disposable RED AUTHORIZED**：项目所有者已明确授权本轮仅执行：disposable 只读 fail-closed 预检、只同步最终 016、临时 IPv4 16432/16433 隧道与 0600 四变量环境、在当前 24-migration schema 上运行 focused 016 和唯一新 integration、exact fixture cleanup、关闭隧道并删除临时文件。明确禁止 reset、同步/应用 migration25、typegen、生产 `airdrop-intelligence-os` 与端口 54321/54322。详细计划 Step 5 已勾选；下一步从 exact identity/health/marker/hash/port/absence 预检开始，任一不一致立即停止。
+
 #### 2026-08-30 Task 4 修订设计落盘
 
 **2026-08-31 Task 4 max-page cursor focused RED**：收尾自审发现 reviewer list 的 `p_limit` 上限为 100，而 repository 只以 `rows.length > limit` 判断下一页；请求 `limit=100` 时无法 overfetch 第 101 条，因而会把仍有后续数据的完整上限页错误标记为末页。新增 100 行上限页具名回归后，目标断言精确 `expected cursor / received null`。同次从 monorepo 根直接运行的 browser export 用例因 Node 无法从根解析 workspace package 产生环境性第二失败，不属于产品 RED；正式 focused gate 将从 `packages/database` 工作区运行。下一步只改 `pageOf` 的上限页判断，不动 migration/RPC contract。
