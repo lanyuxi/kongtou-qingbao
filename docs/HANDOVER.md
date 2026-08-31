@@ -12,7 +12,7 @@
 
 **2026-08-31 Task 5 corrected implementation plan**：书面规格确认后已新增独立 272 行实施计划 `2026-08-31-phase-7b-task-5-reference-security-locking.md`，并把主 Phase 7B 计划的旧 tests-only Task 5 段落替换为五步入口。详细计划锁定：clean/hash preflight；5 条 self-contained integration 行为测试；18 条 016 pgTAP；test-only disposable RED 授权停点；migration25 最小三函数替换；local GREEN；第二次 disposable GREEN 授权；reset→focused/full pgTAP→无漂移双 typegen→两文件 real-race integration→独立清理；fresh 五 workspace gate、review 与两次提交。placeholder/type/scope 自审通过，尚未写 RED 或 SQL、未访问远端/数据库/生产。下一步按 writing-plans 技能由项目所有者选择 Subagent-Driven（推荐）或 Inline execution。
 
-**2026-08-31 Task 5 plan final self-review**：声明 Node 22.22.2、`git diff --check`、仓库占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全部 exit 0；第23/24 migration、015、generated types SHA 分别保持 `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`。两次通过 pnpm wrapper 启动检查分别在脚本前被缺失 Node PATH、registry/TTY 依赖自检阻断，未改依赖；随后直接执行同一 `scripts/check-placeholders.mjs` 通过。尚未写 RED/SQL、未连接数据库或远端、生产未访问；下一步仅等待执行方式选择。
+**2026-08-31 Task 5 plan final self-review / commit**：声明 Node 22.22.2、`git diff --check`、仓库占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全部 exit 0；第23/24 migration、015、generated types SHA 分别保持 `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`。两次通过 pnpm wrapper 启动检查分别在脚本前被缺失 Node PATH、registry/TTY 依赖自检阻断，未改依赖；随后直接执行同一 `scripts/check-placeholders.mjs` 通过。计划已以 `docs: plan phase 7b task 5 locking` 提交为 **`c28f6a2`**。尚未写 RED/SQL、未连接数据库或远端、生产未访问；下一步仅等待执行方式选择。
 
 #### 2026-08-30 Task 4 修订设计落盘
 
