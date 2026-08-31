@@ -1,10 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 mismatched-Evidence disposable RED 已精确完成并清理**；migration25 guard 尚待本地修复。）
+> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 Phase B 已加入 mismatched-Evidence AR209 guard 并通过 local GREEN**；disposable SQL/behavioral GREEN 尚待明确授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence disposable RED 现以精确 4 failed/1 passed 证明 migration24 缺少 AR209 guard；详细 Steps 7–8 和 master Task 5 Step 3 仍 reopen/unchecked，migration25 SHA `2e8013cc…ce37` 尚未加 guard。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence RED 已以精确 4 failed/1 passed 证明缺 guard；Phase B 已在两个 decision RPC 加入最小 AR209 guard 并通过 local GREEN，详细 Steps 7–8 与 master Task 5 Step 3 已重新完成，disposable SQL/behavioral GREEN 尚待明确授权。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+
+**2026-08-31 Task 5 Fix Round 1 Phase B — local GREEN COMPLETE**：仅在 `submit_decide_domain_authority` 与 `submit_decide_reference` 的 strict Evidence→Raw Item→Source resolution 后、各自条件 source lock 前加入 exact `v_evidence_id is not null and v_evidence_source_id is null` → `reference_evidence_required` / `AR209` guard。migration25 现 **591 lines / SHA-256 `e0f1f5bf4bb00ca029f954cfe1084412d8ea3dd83e24d5a03a44e621c8d88f29`**；静态检查确认恰好两处 guard，均为 resolution < guard < source lock。integration 保持 SHA `1d6e7c97…f601b`；23/24、016、generated types、scripts 未改。Node 22.22.2 direct eslint/`tsc --noEmit` exit 0，focused Vitest 为 **1 passed / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。无 DB/remote/tunnel/reset/typegen/production；详细 Steps 7–8/master Step 3 已重新勾选，disposable SQL/behavioral GREEN 仍需单独授权。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 

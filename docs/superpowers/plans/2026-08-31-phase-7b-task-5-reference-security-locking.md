@@ -173,11 +173,13 @@ After authorization, verify exact remote workdir/project/CLI/healthy ports/pause
 
 Sync only 016 and verify its SHA. Run focused 016: expected failure only on the three missing lock-order assertions. Establish tunnels/env, prove remote psql = tunnel DB = anon PostgREST parity, then run only the new integration file. Expected: lock-wait/race assertions fail because current production functions do not acquire the shared reference/authority/source keys; restore/history and already-existing fail-closed behavior may pass. Record exact counts and failure names. Always run exact cleanup and close/remove all temporary state before continuing.
 
-- [ ] **Step 7: Implement migration 25 minimally**
+- [x] **Step 7: Implement migration 25 minimally**
 
 > **2026-08-31 local implementation COMPLETE:** `20260831000100_phase_7b_reference_security_locking.sql` is 583 lines / SHA-256 `2e8013ccd041be9de2ed7910a707401ee96e051d132fa47b34bf90011242ce37`. It replaces only the three specified function bodies, keeps owner/signature/security-definer semantics, locks with the exact target classes/order, rechecks after waits, and does not access a database, remote, or production.
 
 > **2026-08-31 Fix Round 1 Phase A — REOPENED:** review I1 requires an explicit `AR209` guard when a non-null Evidence cannot resolve through the strict Evidence→Raw Item→Source identity join. The test was added first; migration25 remains byte-identical pending review and separately authorized RED/guard work.
+
+> **2026-08-31 Fix Round 1 Phase B — local GREEN COMPLETE:** exactly two guards now reject non-null Evidence with unresolved strict source identity as `AR209`, each after resolution and before conditional source locking. Migration25 is 591 lines / SHA-256 `e0f1f5bf4bb00ca029f954cfe1084412d8ea3dd83e24d5a03a44e621c8d88f29`; no other migration body content changed.
 
 Create `supabase/migrations/20260831000100_phase_7b_reference_security_locking.sql`. Copy the current function bodies from migration 23 (`flag_references_for_new_indicator`) and migration 24 (`submit_decide_reference`, `submit_decide_domain_authority`) verbatim, then make only these changes:
 
@@ -211,11 +213,13 @@ Skip the source call when Evidence is null and the authority call when no matchi
 
 The trigger must select matched reference IDs ordered by UUID text, acquire each reference key, re-read its current version after the wait, and only then insert the idempotent flag/outbox event.
 
-- [ ] **Step 8: Run local GREEN/static alignment**
+- [x] **Step 8: Run local GREEN/static alignment**
 
 > **2026-08-31 local GREEN/static alignment COMPLETE:** `git diff --check`, immutable migration/test/type hashes, and static three-body/lock/order/no-schema checks passed. Under direct Node 22.22.2, database eslint and `tsc --noEmit` exited 0; focused Vitest was **1 passed file / 1 gated skipped file; 29 passed / 5 skipped tests / exit 0**. This is local/static evidence only: disposable SQL compile and behavioral GREEN remain unauthorized.
 
 > **2026-08-31 Fix Round 1 Phase A — REOPENED:** the new mismatch regression is environment-gated locally (**1 file / 5 skipped / exit 0**), so behavioral RED remains unproved. Keep this step unchecked until the test has narrow disposable RED evidence and a later guard receives GREEN evidence.
+
+> **2026-08-31 Fix Round 1 Phase B — local GREEN COMPLETE:** `git diff --check`, immutable hashes, and a static exact-two-guard order check passed. Node 22.22.2 direct database eslint/`tsc --noEmit` exited 0; focused Vitest was **1 passed file / 1 gated skipped file; 29 passed / 5 skipped tests / exit 0**. Disposable SQL compilation and behavioral GREEN remain unauthorized.
 
 Run:
 

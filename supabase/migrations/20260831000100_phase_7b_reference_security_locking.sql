@@ -199,6 +199,10 @@ begin
     where evidence_row.id = v_evidence_id;
   end if;
 
+  if v_evidence_id is not null and v_evidence_source_id is null then
+    raise exception 'reference_evidence_required' using errcode = 'AR209';
+  end if;
+
   if v_evidence_source_id is not null then
     perform pg_catalog.pg_advisory_xact_lock(
       public.security_target_lock_key_v1('source', v_evidence_source_id)
@@ -440,6 +444,10 @@ begin
     join public.sources as source_row
       on source_row.id = evidence_row.source_id
     where evidence_row.id = v_evidence_id;
+  end if;
+
+  if v_evidence_id is not null and v_evidence_source_id is null then
+    raise exception 'reference_evidence_required' using errcode = 'AR209';
   end if;
 
   select authority_row.id into v_authority_id
