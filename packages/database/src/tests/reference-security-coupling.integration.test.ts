@@ -263,8 +263,10 @@ describeIntegration('reference security coupling PostgREST integration', () => {
       from public.reference_security_flags where reference_id = ${target.referenceId}::uuid
     `;
     expect(flags).toHaveLength(1);
+    const releasedAt = flags[0]?.released_at;
+    expect(releasedAt).toBeInstanceOf(Date);
+    expect(releasedAt?.getTime()).toSatisfy(Number.isFinite);
     expect(flags[0]).toMatchObject({
-      released_at: expect.any(String),
       released_by: reviewerUserId,
       release_evidence_id: target.evidenceId,
     });
