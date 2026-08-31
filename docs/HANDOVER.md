@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 Phase A 已新增 mismatched-Evidence RED 回归**；migration25 guard 与 disposable RED 尚待明确授权。）
+> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 mismatched-Evidence disposable RED 已精确完成并清理**；migration25 guard 尚待本地修复。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 的 second-repaired disposable RED 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并完成清理。review I1 已使详细 Steps 7–8 与 master Task 5 Step 3 重新打开：Phase A 已新增 mismatched-Evidence AR209 回归，migration25 仍为 SHA `2e8013cc…ce37` 且未加 guard；disposable RED/production guard 均待明确授权。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence disposable RED 现以精确 4 failed/1 passed 证明 migration24 缺少 AR209 guard；详细 Steps 7–8 和 master Task 5 Step 3 仍 reopen/unchecked，migration25 SHA `2e8013cc…ce37` 尚未加 guard。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
@@ -17,6 +17,16 @@
 **2026-08-31 Task 5 Fix Round 1 Phase A test review CLEAN**：独立 reviewer 对 `b696b82..f07207b` 返回 **Test readiness APPROVED / 0C / 0I / 0M**。确认 mismatch 行的 Evidence source 与 raw-item source 均为真实 FK target 且值不同；migration24/未 guard draft 会错误成功，使 `.rejects {code: AR209}` 必然失败而非空转；version/decision/outbox/history/flag release 全部受保护，有效 restore 与 exact cleanup/residue 仍保留。migration25 未改、详细 Steps 7–8/master Step 3 保持 unchecked。本地 skipped 不构成 behavioral RED；下一步只请求不含 sync/reset 的 narrow disposable integration RED 授权。
 
 **2026-08-31 Task 5 mismatched-Evidence focused RED AUTHORIZED**：项目所有者明确授权仅做 disposable read-only preflight、临时 IPv4 16432/16433 tunnels + 0600 四变量 env/parity、在原 24-migration schema 上运行一次 SHA `1d6e7c97…f601b` integration，以及 20 类 residue/temp exact cleanup/final read-only check。明确禁止任何 file sync、016、reset、pgTAP、migration25/任何 migration operation、typegen、第二次 run、生产/54321/54322。验收形状为 **5 tests / 4 failed / 1 passed**：三条 named missing-waiter + mismatched Evidence 被错误接受的 helper error，cleanup PASS；任一不同清理后 BLOCKED。
+
+**2026-08-31 Task 5 mismatched-Evidence RED local preflight COMPLETE**：授权记录 HEAD `e97293b` 且 tracked worktree clean；SSH key mode `0600`、local `16432/16433` closed。integration SHA `1d6e7c97…f601b`、local draft migration25 `2e8013cc…ce37`、016 `0fa44939…bd20`、migration23/24 hashes 均与简报精确一致；draft migration25/016 仅本地只读核验，绝不复制或应用。尚未连接远端、建隧道或访问生产；下一步仅 remote read-only preflight。
+
+**2026-08-31 Task 5 mismatched-Evidence RED remote preflight COMPLETE**：只读 disposable preflight exit 0：exact workdir/project/CLI `2.112.0`、DB/Kong running+healthy 且 only `64322/64321`、24 migrations/max `20260830000100`、paused marker=1、remote migration25/016 absent。未 sync/copy/reset/pgTAP/migration operation/tunnel/production；下一步仅 IPv4 tunnel/env/parity。
+
+**2026-08-31 Task 5 mismatched-Evidence RED tunnel/env/parity COMPLETE**：仅 IPv4 `127.0.0.1:16432→64322` 与 `127.0.0.1:16433→64321`；local env `/private/tmp/phase7b-task5-mismatched-evidence-red.env` mode `0600`、恰好四个授权变量名，未输出值。先前 runtime 目录轮换使旧 Node 22 path absent，自动 cleanup、无 integration/sync/copy；经 `task-1b-report.md` 记录确认新 `/Users/xixi/.workbuddy/binaries/node/versions/22.22.2-2/bin/node` 为 `v22.22.2` 后继续。remote psql、tunnel PostgreSQL、anon PostgREST active/rumored count 都为 **2**，parity PASS；下一步唯一 integration。
+
+**2026-08-31 Task 5 mismatched-Evidence RED integration ACCEPTED**：唯一 Node `v22.22.2` / `--no-file-parallelism` run 为 **1 file / 5 tests / 4 failed / 1 passed / exit 1**。flag-first/verify-first（1.985s）、revoke-first/verify-first（1.398s）、source-block-first（1.492s）均快速精确 `reference_security_advisory_wait_not_observed:1`；restore/history 以新 helper error `reference_security_restore_with_invalid_evidence_succeeded` 失败，证明 migration24 错误接受 source/raw mismatch（应 AR209）；exact cleanup test PASS。无 timeout、SQL/connection/harness/TAP 或额外失败；立即 cleanup，Steps7/8/master Step3 仍 unchecked。
+
+**2026-08-31 Task 5 mismatched-Evidence RED cleanup COMPLETE / ACCEPTED**：remote 独立 **20/20** owned fixture residue categories 均为 zero；SSH master closed，local `16432/16433` closed，env/control socket absent。最终远端只读为 24 migrations/max `20260830000100`、paused marker=1、remote migration25/016 absent。无 sync/copy/reset/pgTAP/migration operation/typegen/production/source change/second run；精确 RED 已接受，但只授权后续本地 AR209 guard 修复，Steps7/8/master Step3 保持 unchecked。
 
 **2026-08-31 Task 5 corrected locking design**：预检确认原计划“仅集成测试、不改迁移”与已批准 spec/最终验收的 shared target lock 要求冲突：现有 reference/authority 函数只有各自 aggregate row `FOR UPDATE`，没有调用 Phase 7A `security_target_lock_key_v1()`；仅在测试夹具手动加锁会形成假证明。项目所有者已批准 corrected 方案：保持第23/24 migration 字节不变，新增第25个 `20260831000100_phase_7b_reference_security_locking.sql` + `016` pgTAP。规格自审进一步排除了 project-wide keys：一个全局域名 indicator 可跨项目命中，而 Phase 7A 事务可能预持有不同 project/source key，继续锁其他 project 会产生反序死锁。最终顺序收紧为同一 helper namespace 内 Evidence `source` → matching `domain_authority` → `reference` → aggregate row locks；indicator trigger 按 reference UUID 排序。migration25 只替换 trigger + 两个 decision RPC，不改注册命令/schema/RPC shape；双 typegen必须与 Task 4 逐字节一致。真实 integration 覆盖两个竞争顺序、restore/history、blocked-source Evidence 与零残留，并加入显式 `test:integration` 列表。当前仅写入设计与交接文档，未写测试/SQL、未连接 disposable/远端/生产；下一步等待书面规格复核。
 
