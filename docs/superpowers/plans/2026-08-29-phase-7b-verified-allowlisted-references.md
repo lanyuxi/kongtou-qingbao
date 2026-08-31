@@ -356,9 +356,11 @@ git commit -m "feat(database): add reference review repository"
 
 Follow detailed-plan Steps 1–4. The integration suite is the load-bearing behavioral RED; 016 adds structural regression coverage.
 
-- [ ] **Step 2: Run authorized disposable RED against migration 24**
+- [x] **Step 2: Run authorized disposable RED against migration 24**
 
 > **2026-08-31 repaired rerun — BLOCKED:** structural RED and cleanup were exact, but the integration's restore timestamp uses a String assertion for a raw-driver Date, yielding 4 failed / 1 passed rather than the required 3 / 2. This step remains unchecked pending an authorized test-only repair and fresh disposable RED authorization.
+
+> **2026-08-31 second-repaired rerun — COMPLETE:** exact preflight, single 016-only sync, structural **18/14** RED, IPv4 tunnel/env three-endpoint parity, and one behavioral **3 failed / 2 passed** RED all met the approved shape. All 20 independent residue categories were zero; remote 016 and all local temporary state were removed; final remote state remained 24 migrations/max `20260830000100`, marker=1, with migration25/016 absent. No reset, migration sync, typegen, production access, source edit, or second sync/run occurred.
 
 Follow detailed-plan Steps 5–6. Sync 016 only, do not reset/sync migration, and clean every fixture/tunnel/temp artifact before implementation.
 

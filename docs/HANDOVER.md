@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 1A 本地 RED 工件已完成**。**下一步：仅请求 disposable behavioral RED 授权**）
+> 最近更新：2026-08-31（**Phase 7B Task 5 Step 6 disposable structural + behavioral RED 已精确完成并清理**。migration25 尚未写入。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 的 repaired Step 6 disposable rerun 已清理，但因 restore timestamp harness 类型断言 BLOCKED，未取得精确 behavioral RED、未写 migration25/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 的 second-repaired disposable RED 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并完成清理，master Task 5 Step 2 已完成；未写 migration25/production SQL。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
@@ -1279,3 +1279,17 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-08-31 Task 5 Step 6 released_at repair scoped review CLEAN**：独立 reviewer 审查 `065f9b9..f0d771b`，结论 **APPROVED，0 Critical / 0 Important / 0 Minor**。确认 `released_at` 同时验证 raw-driver `Date` instance 与 finite epoch，未序列化或弱化；released-by/Evidence、历史、计数、投影、竞态、waiter、cleanup 均保持；未改 timeout、016、第23/24 migration、generated types、生产代码或 package scripts，migration25 仍不存在。本地 5 skipped 只被记录为 gate evidence。下一步必须重新获得单次 disposable RED 明确授权。
 
 **2026-08-31 Task 5 Step 6 second-repaired test-only disposable RED AUTHORIZED**：项目所有者明确授权“授权二次修复版 Task 5 test-only disposable RED”。新单次授权仅含 fail-closed preflight、一次 016-only sync/focused 016、临时 IPv4 16432/16433 tunnels + 0600 四变量 env/parity、一次 SHA `946c475d…23b2` integration、20 类 residue/remote016/temp exact cleanup 与 final read-only state。明确排除 reset、migration25/任何 migration sync、typegen/full pgTAP、生产/54321/54322、测试/源码修改、第二次 sync 或 integration rerun。精确验收为结构 18/14 与 integration **3 failed / 2 passed**；任一不符清理后 BLOCKED。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED local preflight COMPLETE**：授权记录 HEAD `2d1afea` 且 tracked worktree clean；SSH key mode `0600`、local `16432/16433` closed、migration25 absent。seed/23/24/014/015/016 与 second-repaired integration SHA `946c475d…23b2` 均与简报精确一致，016 为 292 行。尚未连接远端、同步、建隧道或访问生产；下一步仅只读远端预检。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED remote preflight COMPLETE**：只读 disposable 远端预检 exit 0：exact workdir/project/CLI `2.112.0`；DB/Kong running+healthy，且精确只绑定 `64322/64321`；24 migrations / max `20260830000100`、paused marker=1；seed/23/24/014/015 SHA exact，remote 016 与 migration25 absent。未 sync/reset/tunnel/production；下一步单次仅 016 sync。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED 016 sync COMPLETE**：已执行本轮唯一远端写入，仅复制 `supabase/tests/016_phase_7b_reference_security_locking.test.sql`；独立核验 remote SHA-256 `0fa44939475ac0a3ac43c8caabc791c82a51589656dfe727e52517d0c011bd20`、292 lines，均与本地精确一致。未复制 migration/其他文件、未 reset/typegen/tunnel/production；下一步仅 focused 016。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED focused 016 ACCEPTED**：focused pgTAP 为 **Files=1 / Tests=18 / Failed=14 / exit 1**。Test 1–14 精确为 trigger reference key/order/insert（1–3）、reference source/authority/reference key/order/aggregate/recheck（4–9）、authority source/authority key/order/aggregate/recheck（10–14）的预期 missing-lock structural failures；15–18 security-definer/owner/signature/privilege PASS。无 SQL abort、TAP parse、No plan 或额外失败；下一步临时 tunnel/env/parity。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED tunnel/env/parity COMPLETE**：仅一 SSH master 的 IPv4 `127.0.0.1:16432→64322` 与 `127.0.0.1:16433→64321` 已验证；local env `/private/tmp/phase7b-task5-reference-security-red-second-rerun.env` mode `0600`、恰好四个授权变量名、未输出值。remote psql、tunnel PostgreSQL（已安装 `postgres` driver，连接已关闭）与 anon PostgREST 的 active/rumored projects count 均为 **2**，endpoint parity PASS。初次本地监听器 regex 误拒绝自身有效 IPv4 行，自动 cleanup 后以无 regex 的精确字符串校验重建；未访问生产/54321/54322。下一步唯一 second-repaired integration。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED integration ACCEPTED**：唯一 Node 22.22.2 / `--no-file-parallelism` run 为 **1 file / 5 tests / 3 failed / 2 passed / exit 1**。失败精确为 flag-first/verify-first、revoke-first/verify-first、source-block-first 三条 race/source case，均快速且具名 `reference_security_advisory_wait_not_observed:1`（1.643s / 1.358s / 1.329s）；restore/history（含 public projection、Evidence、`released_at` Date/finite timestamp、released-by/Evidence、append-only history）与 exact cleanup PASS。无 timeout、SQL/harness、TAP 或额外噪声；立即进入强制 residue/remote016/temp cleanup。
+
+**2026-08-31 Task 5 Step 6 second-repaired RED cleanup COMPLETE / ACCEPTED**：remote 独立查询 **20/20** owned fixture residue categories 均为 zero；本轮 remote 016 已删除并复核 absent。SSH master 已关闭，local `16432/16433` closed，env/control socket absent。最终只读远端为 24 migrations/max `20260830000100`、paused marker=1、remote 016/migration25 absent。未 reset/migration sync/typegen/production、未改 test/source、无第二次 sync/integration run。结构 **18/14** 与行为 **3 failed/2 passed** 精确，详细 Step 6 和 master Task 5 Step 2 已勾选；migration25 仍未写入。
