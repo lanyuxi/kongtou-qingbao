@@ -1,14 +1,18 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 corrected locking design 已批准并写入 spec**。**下一步：项目所有者复核书面规格后修订实施计划**）
+> 最近更新：2026-08-31（**Phase 7B Task 5 corrected implementation plan 已完成**。**下一步：选择 Subagent-Driven 或 Inline 执行方式**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 corrected design 已批准，明确以第25个 forward-only migration 补齐共享 Phase 7A target locks，尚未写 implementation RED/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
-### Phase 7B verified allowlisted references（设计及 Task 4 修订已批准；Task 1–3 完成）
+### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
 **2026-08-31 Task 5 corrected locking design**：预检确认原计划“仅集成测试、不改迁移”与已批准 spec/最终验收的 shared target lock 要求冲突：现有 reference/authority 函数只有各自 aggregate row `FOR UPDATE`，没有调用 Phase 7A `security_target_lock_key_v1()`；仅在测试夹具手动加锁会形成假证明。项目所有者已批准 corrected 方案：保持第23/24 migration 字节不变，新增第25个 `20260831000100_phase_7b_reference_security_locking.sql` + `016` pgTAP。规格自审进一步排除了 project-wide keys：一个全局域名 indicator 可跨项目命中，而 Phase 7A 事务可能预持有不同 project/source key，继续锁其他 project 会产生反序死锁。最终顺序收紧为同一 helper namespace 内 Evidence `source` → matching `domain_authority` → `reference` → aggregate row locks；indicator trigger 按 reference UUID 排序。migration25 只替换 trigger + 两个 decision RPC，不改注册命令/schema/RPC shape；双 typegen必须与 Task 4 逐字节一致。真实 integration 覆盖两个竞争顺序、restore/history、blocked-source Evidence 与零残留，并加入显式 `test:integration` 列表。当前仅写入设计与交接文档，未写测试/SQL、未连接 disposable/远端/生产；下一步等待书面规格复核。
+
+**2026-08-31 Task 5 corrected implementation plan**：书面规格确认后已新增独立 272 行实施计划 `2026-08-31-phase-7b-task-5-reference-security-locking.md`，并把主 Phase 7B 计划的旧 tests-only Task 5 段落替换为五步入口。详细计划锁定：clean/hash preflight；5 条 self-contained integration 行为测试；18 条 016 pgTAP；test-only disposable RED 授权停点；migration25 最小三函数替换；local GREEN；第二次 disposable GREEN 授权；reset→focused/full pgTAP→无漂移双 typegen→两文件 real-race integration→独立清理；fresh 五 workspace gate、review 与两次提交。placeholder/type/scope 自审通过，尚未写 RED 或 SQL、未访问远端/数据库/生产。下一步按 writing-plans 技能由项目所有者选择 Subagent-Driven（推荐）或 Inline execution。
+
+**2026-08-31 Task 5 plan final self-review**：声明 Node 22.22.2、`git diff --check`、仓库占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全部 exit 0；第23/24 migration、015、generated types SHA 分别保持 `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`。两次通过 pnpm wrapper 启动检查分别在脚本前被缺失 Node PATH、registry/TTY 依赖自检阻断，未改依赖；随后直接执行同一 `scripts/check-placeholders.mjs` 通过。尚未写 RED/SQL、未连接数据库或远端、生产未访问；下一步仅等待执行方式选择。
 
 #### 2026-08-30 Task 4 修订设计落盘
 

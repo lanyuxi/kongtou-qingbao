@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**Task 1–4 已完成；Task 5 corrected locking design 已批准并写入 spec，等待书面复核后修订实施计划**；生产未访问
+> 当前状态：**Task 1–4 已完成；Task 5 corrected spec 已确认、独立实施计划已完成，等待执行方式选择**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -34,7 +34,7 @@
 | 2 | Pure normalization / transition / derivation rules | ✅ 完成（本地门禁绿，待独立复审） | RED：3 个 suite 全部 `Cannot find module`（既有 376 全过）；GREEN：domain 15 files / **402 tests PASS**（+26），lint/typecheck exit 0。**实现期发现真实缺陷**：`new URL('https:///claim')` 不抛错、反而被解析成 host `claim`，必须先拒绝空 authority，否则会被归一化成 `https://claim/`。两处变异检验通过：放开域名权威门禁 → 「无 granted 不得 verify」失败；`last_verified_at` 改用注册时间 → 两条派生用例失败。归一化按计划不剥离 `www.`。 |
 | 3 | Reference Ledger migration + protected commands + RLS + 安全联动 SQL | ✅ 完成（014 pgTAP 74/74、disposable 验证全绿） | 迁移 1,992 行 / 37 个对象。**disposable 验证（2026-08-30，用户授权）**：同步迁移+014（SHA 逐个核对）、reset exit 0（23 迁移）、full pgTAP **14 files / 1,424 tests PASS**（含 014 的 74 个新断言）、typegen 两次一致（156,630 字节）并替换 generated types；集成矩阵 **9 files / 66 tests PASS**（155.6s）；清理后回到 seed 基线（4 projects / 2 opps / 全部引用·安全表与 outbox = 0）、marker 完好；隧道关闭、凭据删除、54321/54322 全程未访问。**验证期修掉的 4 个真缺陷**：① `pg_catalog.position(x in y)` 限定名与 `IN` 语法不兼容（42601），改 `strpos`；② `pg_catalog.coalesce/least/nullif` 是语法结构不能带 schema 前缀；③ **plpgsql `RETURN QUERY` 不退出函数**——replay 分支返回后直落进版本检查抛 AR206，四个命令的 replay 全部不可用，补 `return;`；④ restore 用 `transaction_timestamp()` 使同事务 flag+release 的 `released_at > created_at` 恒假（AR299），改 `clock_timestamp()`。另：决策表新增 `aggregate_version` 列（同事务内时间戳恒定导致「最新决策」按随机 UUID 排序的不确定性）与 006 精确策略矩阵更新（4 条新策略）。 |
 | 4 | Contracts 补齐 + forward-only reviewer boundary migration/015 + bearer repository + repository integration | ✅ 完成 | 主提交 `93acfbf`；fresh gate 1,342 PASS / 71 gated skips，交接提交 `a338e7a`。 |
-| 5 | Phase 7A coupling under real races + forward-only shared-lock correction | 设计已批准，待书面复核 | 第25 migration + 016；Evidence source → domain authority → reference → row locks；indicator 按 reference UUID 排序；两个 race 顺序、restore/history、blocked Evidence、explicit integration registration。 |
+| 5 | Phase 7A coupling under real races + forward-only shared-lock correction | spec/plan ready，待执行方式选择 | 独立 272 行 plan；第25 migration + 016；source → authority → reference → row locks；两阶段 disposable 授权、real races、typegen no-drift、cleanup、fresh gate/review。 |
 | 6 | Strict public reference repositories and projections | 待执行 | — |
 | 7 | Authenticated reference BFF routes + browser client | 待执行 | — |
 | 8 | Reviewer reference workflow UI（`/review/references`） | 待执行 | — |
@@ -152,3 +152,5 @@
 | 2026-08-31 | Task 4 fresh final gate / local COMPLETE | 五 workspace lint/typecheck/build 0；Vitest **1,342 PASS / 71 gated skips**；placeholder scanner + 2 自测、diff check 通过。精确扫描无 service-role/base-table fallback；过期 158,522-byte typegen temp 已删除，integration env/typegen temp absent，16432/16433 无监听。本轮未连接远端/数据库，生产未访问。独立 review 因代理额度不可用，完成结论来自主任务逐项自审与 fresh gate。下一步原子提交 Task 4。 |
 | 2026-08-31 | Task 4 commit COMPLETE | 20 个 Task 4 精确文件以 `feat(database): add reference review repository` 提交为 **`93acfbf`**（4,693 insertions / 74 deletions）。生产未访问。下一步 Task 5：单独实现并证明 indicator → reference security-coupling races。 |
 | 2026-08-31 | Task 5 corrected locking design approved | 预检发现原“tests-only”计划无法满足已批准 spec 的 shared Phase 7A target-lock 验收；当前 SQL 只有 aggregate `FOR UPDATE`。项目所有者批准保持第23/24 migration 不变并新增第25 migration + 016。规格自审排除会被跨项目全局 indicator 造成反序死锁的 project-wide keys，最终使用同一 helper namespace 的 source → authority → reference → row-lock 顺序，trigger 按 reference UUID 排序；真实双会话覆盖两个竞态顺序、restore/history、blocked Evidence、cleanup，并注册进显式 integration command。设计已写入 spec，尚未写 RED/SQL、未访问远端/生产；下一步书面复核。 |
+| 2026-08-31 | Task 5 corrected implementation plan complete | 新增独立 272 行 plan，并把主计划 Task 5 改为五步入口。计划包含 5 条 integration、18 条 016、test-only RED 与 migration GREEN 两个授权停点、三函数最小替换、full pgTAP、typegen no-drift、真实竞态、cleanup、fresh gate/review/commit。placeholder/type/scope 自审通过；未写 RED/SQL、未访问远端/生产。下一步选择 Subagent-Driven（推荐）或 Inline。 |
+| 2026-08-31 | Task 5 plan final self-review | Node 22.22.2、diff check、直接占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全绿；第23/24 migration、015、generated types SHA 未漂移。pnpm wrapper 两次在脚本前因 PATH 及 registry/TTY 自检阻断且未改依赖，改为同一检查入口直跑通过。未写 RED/SQL、未连接数据库/远端/生产；等待执行方式选择。 |

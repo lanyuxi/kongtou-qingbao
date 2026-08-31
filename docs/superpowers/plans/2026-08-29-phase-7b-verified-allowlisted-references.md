@@ -334,32 +334,43 @@ git commit -m "feat(database): add reference review repository"
 
 ---
 
-### Task 5: Prove the Phase 7A security coupling under real races
+### Task 5: Correct and prove Phase 7A security coupling under real races
 
-> The coupling SQL and its pgTAP coverage ship with the Task 3 migration, so this task adds no migration edit. Editing an already-reset migration would break the forward-only rule.
+> **Approved detailed plan:** `docs/superpowers/plans/2026-08-31-phase-7b-task-5-reference-security-locking.md`
+>
+> Task 5 preflight proved that the former tests-only wording contradicted the approved shared-lock acceptance criterion. Migrations 23/24 remain immutable; the correction is migration 25 plus pgTAP 016 and a real-race integration suite.
 
 **Files:**
+- Create: `supabase/migrations/20260831000100_phase_7b_reference_security_locking.sql`
+- Create: `supabase/tests/016_phase_7b_reference_security_locking.test.sql`
 - Create: `packages/database/src/tests/reference-security-coupling.integration.test.ts`
-- Modify: `packages/database/src/tests/reference-review-repository.integration.test.ts`
+- Modify: `packages/database/package.json`
+- Modify: Task 5 plan/workbook/HANDOVER files.
 
 **Interfaces:**
-- Consumes: Phase 7A `security_indicators`, `security_incidents`, and `current_security_target_posture()` read-only.
-- Produces: disposable-stack proof that the coupling is synchronous, human-restorable, and race-safe.
+- Consumes: Phase 7A `security_target_lock_key_v1()` / source posture, Task 3 indicator coupling, and Task 4 decision RPC/repository contracts.
+- Produces: shared `source → domain_authority → reference → row lock` serialization, lock-after-wait security re-checks, and disposable proof for both winner orders, restore history, blocked Evidence, type-shape stability, and exact cleanup.
+- Prohibits: project-wide coupling locks, test-only fake production locks, edits to migrations 23/24, new public RPC/schema shape, generated-type drift, or any production access.
 
-- [ ] **Step 1: Write coupling integration RED tests**
+- [ ] **Step 1: Write integration + pgTAP RED and run local gates**
 
-Cover: flag-vs-verify serialization under two sessions; `restore` requiring Evidence and appending a decision instead of deleting the flag row; released flags retaining their release history; revoked domain authority un-verifying its URLs while a concurrent verify is in flight; and a blocked source's Evidence being rejected as verification input.
+Follow detailed-plan Steps 1–4. The integration suite is the load-bearing behavioral RED; 016 adds structural regression coverage.
 
-- [ ] **Step 2: Run the authorized disposable integration**
+- [ ] **Step 2: Run authorized disposable RED against migration 24**
 
-Require explicit user authorization and the same fail-closed preflight as Task 4. Do not reset again unless the previous task left fixture residue.
+Follow detailed-plan Steps 5–6. Sync 016 only, do not reset/sync migration, and clean every fixture/tunnel/temp artifact before implementation.
 
-- [ ] **Step 3: Update workbook/HANDOVER and commit**
+- [ ] **Step 3: Implement migration 25 and local GREEN**
 
-```bash
-git add packages/database/src/tests docs
-git commit -m "test(db): prove reference security coupling races"
-```
+Follow detailed-plan Steps 7–8. Replace exactly the indicator trigger and two decision RPC bodies; preserve signatures/contracts/owners/grants.
+
+- [ ] **Step 4: Run authorized disposable GREEN**
+
+Follow detailed-plan Steps 9–11: reset, focused/full pgTAP, byte-identical no-drift double typegen, real races in both orders, and independent zero-residue cleanup.
+
+- [ ] **Step 5: Run fresh final gate, review, update docs, and commit**
+
+Follow detailed-plan Steps 12–13. Commit with `test(db): prove reference security coupling races`, then record the hash in a docs-only follow-up commit.
 
 ---
 
