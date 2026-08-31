@@ -23,6 +23,14 @@ select ok(
   strpos(
     pg_catalog.pg_get_functiondef('public.flag_references_for_new_indicator()'::regprocedure),
     'security_target_lock_key_v1(''reference'', v_reference_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.flag_references_for_new_indicator()'::regprocedure),
+    'insert into public.reference_security_flags'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.flag_references_for_new_indicator()'::regprocedure),
+    'security_target_lock_key_v1(''reference'', v_reference_id)'
   ) < strpos(
     pg_catalog.pg_get_functiondef('public.flag_references_for_new_indicator()'::regprocedure),
     'insert into public.reference_security_flags'
@@ -55,6 +63,18 @@ select ok(
   strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''source'', v_evidence_source_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''domain_authority'', v_authority_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''reference'', p_reference_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''source'', v_evidence_source_id)'
   ) < strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''domain_authority'', v_authority_id)'
@@ -72,6 +92,14 @@ select ok(
   strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''reference'', p_reference_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'for update'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''reference'', p_reference_id)'
   ) < strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
     'for update'
@@ -81,6 +109,18 @@ select ok(
 
 select ok(
   strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''reference'', p_reference_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'reference_evidence_is_usable'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
+    'reference_current_state_v1'
+  ) > 0
+  and strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_reference(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''reference'', p_reference_id)'
   ) < strpos(
@@ -114,6 +154,14 @@ select ok(
   strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''source'', v_evidence_source_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''source'', v_evidence_source_id)'
   ) < strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
@@ -125,6 +173,14 @@ select ok(
   strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'for update'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
   ) < strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
     'for update'
@@ -134,6 +190,18 @@ select ok(
 
 select ok(
   strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'reference_evidence_is_usable'
+  ) > 0
+  and strpos(
+    pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
+    'domain_authority_current_state_v1'
+  ) > 0
+  and strpos(
     pg_catalog.pg_get_functiondef('public.submit_decide_domain_authority(uuid,jsonb,text)'::regprocedure),
     'security_target_lock_key_v1(''domain_authority'', p_authority_id)'
   ) < strpos(

@@ -240,6 +240,7 @@ describeIntegration('reference security coupling PostgREST integration', () => {
     indicatorIds.add(restoreIndicator.indicatorId);
     await expectReferenceProjection(database, target.referenceId, 'flagged', false);
     const before = await readReferenceMutationCounts(database, target.referenceId);
+    const historyBeforeRestore = await readReferenceDecisionHistory(database, target.referenceId);
 
     await expect(callDecideReferenceWithoutEvidence(
       authClients[1]!,
@@ -247,6 +248,7 @@ describeIntegration('reference security coupling PostgREST integration', () => {
       `restore-missing-evidence-${randomUUID()}`,
     )).rejects.toMatchObject({ code: 'AR209' });
     expect(await readReferenceMutationCounts(database, target.referenceId)).toEqual(before);
+    expect(await readReferenceDecisionHistory(database, target.referenceId)).toEqual(historyBeforeRestore);
 
     await expect(review.decideReference({
       accessToken: reviewerAccessToken,
@@ -267,6 +269,17 @@ describeIntegration('reference security coupling PostgREST integration', () => {
     });
     const after = await readReferenceMutationCounts(database, target.referenceId);
     expect(after).toEqual({ version: 3, decisions: before.decisions + 1, outbox: before.outbox + 1 });
+    const historyAfterRestore = await readReferenceDecisionHistory(database, target.referenceId);
+    expect(historyAfterRestore).toHaveLength(historyBeforeRestore.length + 1);
+    expect(historyAfterRestore.slice(0, historyBeforeRestore.length)).toEqual(historyBeforeRestore);
+    expect(historyAfterRestore.slice(historyBeforeRestore.length)).toEqual([
+      expect.objectContaining({
+        decision: 'restore',
+        resultingState: 'verified',
+        evidenceId: target.evidenceId,
+        aggregateVersion: 3,
+      }),
+    ]);
   });
 
   it('waits on the Evidence source key and rejects verification when source blocking wins', async () => {
@@ -723,6 +736,35 @@ async function readReferenceMutationCounts(
   return row;
 }
 
+async function readReferenceDecisionHistory(
+  sql: postgres.Sql,
+  referenceId: string,
+): Promise<readonly {
+  readonly id: string;
+  readonly decision: string;
+  readonly resultingState: string;
+  readonly evidenceId: string | null;
+  readonly aggregateVersion: number;
+}[]> {
+  return sql<readonly {
+    readonly id: string;
+    readonly decision: string;
+    readonly resultingState: string;
+    readonly evidenceId: string | null;
+    readonly aggregateVersion: number;
+  }[]>`
+    select
+      decision.id,
+      decision.decision,
+      decision.resulting_state as "resultingState",
+      decision.evidence_id as "evidenceId",
+      decision.aggregate_version::integer as "aggregateVersion"
+    from public.project_reference_decisions as decision
+    where decision.reference_id = ${referenceId}::uuid
+    order by decision.aggregate_version asc, decision.created_at asc, decision.id asc
+  `;
+}
+
 async function expectReferenceProjection(
   sql: postgres.Sql,
   referenceId: string,
@@ -893,6 +935,10 @@ async function assertNoFixtureResidue(
         where project_id = any(${projectIds}::uuid[]) or id = any(${[...ownedAuthorityIds]}::uuid[])) as authorities,
       (select count(*)::integer from public.reference_review_commands
         where aggregate_id = any(${aggregateIds}::uuid[]) or actor_user_id = any(${userIds}::uuid[])) as commands,
+      (select count(*)::integer from public.user_roles
+        where user_id = any(${userIds}::uuid[])) as user_roles,
+      (select count(*)::integer from public.profiles
+        where id = any(${userIds}::uuid[])) as profiles,
       (select count(*)::integer from public.reference_security_flags
         where reference_id = any(${[...ownedReferenceIds]}::uuid[])) as flags,
       (select count(*)::integer from public.project_reference_decisions
@@ -903,6 +949,13 @@ async function assertNoFixtureResidue(
         where id = any(${[...ownedIndicatorIds]}::uuid[])) as indicators,
       (select count(*)::integer from public.security_incidents
         where id = any(${[...ownedIncidentIds]}::uuid[])) as incidents,
+      (select count(*)::integer from public.security_incident_decisions
+        where incident_id = any(${[...ownedIncidentIds]}::uuid[])) as incident_decisions,
+      (select count(*)::integer from public.security_incident_indicator_links
+        where incident_id = any(${[...ownedIncidentIds]}::uuid[])
+          or indicator_id = any(${[...ownedIndicatorIds]}::uuid[])) as incident_indicator_links,
+      (select count(*)::integer from public.security_indicator_evidence_links
+        where indicator_id = any(${[...ownedIndicatorIds]}::uuid[])) as indicator_evidence_links,
       (select count(*)::integer from public.security_events
         where aggregate_id = any(${aggregateIds}::uuid[])) as security_events,
       (select count(*)::integer from public.outbox_events
