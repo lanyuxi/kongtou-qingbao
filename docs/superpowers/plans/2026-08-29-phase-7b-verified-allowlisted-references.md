@@ -358,6 +358,8 @@ Follow detailed-plan Steps 1–4. The integration suite is the load-bearing beha
 
 - [ ] **Step 2: Run authorized disposable RED against migration 24**
 
+> **2026-08-31 repaired rerun — BLOCKED:** structural RED and cleanup were exact, but the integration's restore timestamp uses a String assertion for a raw-driver Date, yielding 4 failed / 1 passed rather than the required 3 / 2. This step remains unchecked pending an authorized test-only repair and fresh disposable RED authorization.
+
 Follow detailed-plan Steps 5–6. Sync 016 only, do not reset/sync migration, and clean every fixture/tunnel/temp artifact before implementation.
 
 - [ ] **Step 3: Implement migration 25 and local GREEN**
