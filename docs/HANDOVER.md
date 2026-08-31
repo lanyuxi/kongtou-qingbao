@@ -1,12 +1,14 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 Phase B 已加入 mismatched-Evidence AR209 guard 并通过 local GREEN**；disposable SQL/behavioral GREEN 尚待明确授权。）
+> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 已通过独立 scoped re-review，原 I1 关闭**；disposable SQL/behavioral GREEN 尚待明确授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence RED 已以精确 4 failed/1 passed 证明缺 guard；Phase B 已在两个 decision RPC 加入最小 AR209 guard 并通过 local GREEN，详细 Steps 7–8 与 master Task 5 Step 3 已重新完成，disposable SQL/behavioral GREEN 尚待明确授权。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence RED 已以精确 4 failed/1 passed 证明缺 guard；Phase B 已在两个 decision RPC 加入最小 AR209 guard、通过 local GREEN 与独立 scoped re-review（I1 ADDRESSED，0C/0I/0M），详细 Steps 7–8 与 master Task 5 Step 3 已完成。下一边界是需明确授权的 disposable SQL/behavioral GREEN。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 **2026-08-31 Task 5 Fix Round 1 Phase B — local GREEN COMPLETE**：仅在 `submit_decide_domain_authority` 与 `submit_decide_reference` 的 strict Evidence→Raw Item→Source resolution 后、各自条件 source lock 前加入 exact `v_evidence_id is not null and v_evidence_source_id is null` → `reference_evidence_required` / `AR209` guard。migration25 现 **591 lines / SHA-256 `e0f1f5bf4bb00ca029f954cfe1084412d8ea3dd83e24d5a03a44e621c8d88f29`**；静态检查确认恰好两处 guard，均为 resolution < guard < source lock。integration 保持 SHA `1d6e7c97…f601b`；23/24、016、generated types、scripts 未改。Node 22.22.2 direct eslint/`tsc --noEmit` exit 0，focused Vitest 为 **1 passed / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。无 DB/remote/tunnel/reset/typegen/production；详细 Steps 7–8/master Step 3 已重新勾选，disposable SQL/behavioral GREEN 仍需单独授权。
+
+**2026-08-31 Task 5 Fix Round 1 scoped re-review CLEAN**：独立 reviewer 对 `b696b82..826fa2c` 判定原 I1 **ADDRESSED**，最终 **APPROVED / 0 Critical / 0 Important / 0 Minor**。复核确认 mismatch regression 使用真实、FK-valid 且 source id 不一致的 Evidence/raw item，仍精确五个 integration tests 并由既有 exact cleanup/residue 接管；两个 RPC 各恰有一处 guard，位置均为 strict resolution 后、source advisory lock 前，精确抛 `AR209`。replay、锁序、receipt、audit/outbox、owner、signature 未漂移，第23/24 migration、016、generated types 与 package scripts 未改。本地 skipped 明确不算数据库行为 GREEN；Task 1B 本地实现/审查已闭环，下一步仅在新授权后执行 Step 9–11 disposable GREEN。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
