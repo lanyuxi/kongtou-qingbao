@@ -67,7 +67,7 @@ shasum -a 256 \
 
 Expected: clean status; branch `codex/phase-7b-references`; migrations 23/24 and 015 match the recorded handover hashes; generated types are 158,662 bytes with SHA `e5dc3861…aedef`. Record the preflight in all three handover/workbook locations.
 
-- [ ] **Step 2: Write the real-race integration RED**
+- [x] **Step 2: Write the real-race integration RED**
 
 Create a self-contained integration file gated by the existing four environment variables. Use three `postgres` connections with `max: 1` (`owner`, `blocker`, `inserter`) plus fresh Supabase auth clients and the real `ReferenceReviewRepository`. Generate every fixture ID with `randomUUID()` and retain owned IDs for cleanup.
 
@@ -127,7 +127,7 @@ Expected outcomes:
 
 Cleanup must use `session_replication_role = replica` only inside its transaction, delete exact owned security indicator links/indicators/incidents/decisions/events/reference flags/reference decisions/commands/outbox/authorities/references/Evidence/raw/source/project/roles/profiles/auth users, then run a separate post-commit zero-residue query.
 
-- [ ] **Step 3: Register the new integration file and run local static/gated RED checks**
+- [x] **Step 3: Register the new integration file and run local static/gated RED checks**
 
 Append `src/tests/reference-security-coupling.integration.test.ts` to `packages/database/package.json#scripts.test:integration` without reformatting the script.
 
@@ -142,7 +142,7 @@ Run with Node 22.22.2 directly from `packages/database`:
 
 Expected without integration variables: lint/typecheck exit 0; the new integration file is environment-gated skipped, not executed. Update all three handover/workbook locations with the test names, file hash, and explicit statement that behavioral RED still requires disposable authorization.
 
-- [ ] **Step 4: Write pgTAP 016 RED before migration 25**
+- [x] **Step 4: Write pgTAP 016 RED before migration 25**
 
 Create `supabase/tests/016_phase_7b_reference_security_locking.test.sql`. Use `begin; select plan(18); … select * from finish(); rollback;`. Allocate the 18 assertions exactly as follows: 3 trigger lock/order checks; 6 reference source/authority/reference/order/re-check checks; 5 authority source/authority/order/re-check checks; and 4 aggregate security-definer/owner/signature/privilege checks.
 
