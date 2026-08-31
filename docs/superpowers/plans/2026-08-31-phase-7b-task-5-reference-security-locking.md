@@ -51,7 +51,7 @@
 - Produces: migration 25, pgTAP 016, and a registered disposable integration suite proving the shared-lock semantics without changing any TypeScript database shape.
 - Stable errors: missing/blocked Evidence → `AR209`; flag/authority state makes the transition illegal → `AR202`; stale aggregate → `AR206`.
 
-- [ ] **Step 1: Verify the isolated clean baseline and immutable bytes**
+- [x] **Step 1: Verify the isolated clean baseline and immutable bytes**
 
 Run from `.worktrees/phase-7b-references`:
 

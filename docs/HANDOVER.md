@@ -14,6 +14,8 @@
 
 **2026-08-31 Task 5 plan final self-review / commit**：声明 Node 22.22.2、`git diff --check`、仓库占位符脚本、272 行/13 steps/5 integration names 与关键约束结构检查全部 exit 0；第23/24 migration、015、generated types SHA 分别保持 `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`。两次通过 pnpm wrapper 启动检查分别在脚本前被缺失 Node PATH、registry/TTY 依赖自检阻断，未改依赖；随后直接执行同一 `scripts/check-placeholders.mjs` 通过。计划已以 `docs: plan phase 7b task 5 locking` 提交为 **`c28f6a2`**。尚未写 RED/SQL、未连接数据库或远端、生产未访问；下一步仅等待执行方式选择。
 
+**2026-08-31 Task 5 SDD Step 1 baseline COMPLETE**：项目所有者选择 Subagent-Driven；已确认当前目录是 linked worktree、分支 `codex/phase-7b-references`、起始 HEAD `3f688e3`，并建立本计划独立 gitignored ledger。第23/24 migration、015、generated types 分别保持 SHA `75e038d8…5966` / `570e6b89…aad8` / `a34cced6…5dd5b` / `e5dc3861…aedef`，types 为 158,662 bytes。声明 Node 22.22.2 下 database lint/typecheck exit 0，Vitest **14 passed / 10 gated files，287 PASS / 69 gated tests**。首次组合命令仅因从 database 目录使用仓库根相对哈希路径而在测试前中止；拆分正确 cwd 后全绿。执行裁定：单一 Task 依授权停点分为 1A local RED、1B migration GREEN、1C final verification/commit，串行代理、逐单元规格+质量复核；016 的函数定义检查仅作结构补充，真实 advisory wait integration 为行为主证据。未写 RED/SQL、未连接数据库/远端/生产；下一步派发 1A。
+
 #### 2026-08-30 Task 4 修订设计落盘
 
 **2026-08-31 Task 4 max-page cursor focused RED**：收尾自审发现 reviewer list 的 `p_limit` 上限为 100，而 repository 只以 `rows.length > limit` 判断下一页；请求 `limit=100` 时无法 overfetch 第 101 条，因而会把仍有后续数据的完整上限页错误标记为末页。新增 100 行上限页具名回归后，目标断言精确 `expected cursor / received null`。同次从 monorepo 根直接运行的 browser export 用例因 Node 无法从根解析 workspace package 产生环境性第二失败，不属于产品 RED；正式 focused gate 将从 `packages/database` 工作区运行。下一步只改 `pageOf` 的上限页判断，不动 migration/RPC contract。
