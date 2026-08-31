@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import postgres, { type TransactionSql } from 'postgres';
@@ -659,7 +660,8 @@ async function waitForBlockedAdvisoryLock(
   blockerPid: number,
   expectedWaiters: number,
 ): Promise<void> {
-  for (let attempt = 0; attempt < 200; attempt += 1) {
+  const deadline = performance.now() + 1_000;
+  do {
     const rows = await observer<readonly { waiting: number }[]>`
       select count(*)::integer as waiting
       from pg_catalog.pg_locks as waiting
@@ -677,8 +679,10 @@ async function waitForBlockedAdvisoryLock(
         )
     `;
     if ((rows[0]?.waiting ?? 0) === expectedWaiters) return;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) break;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(10, remaining)));
+  } while (performance.now() < deadline);
   throw new Error(`reference_security_advisory_wait_not_observed:${expectedWaiters}`);
 }
 
@@ -786,10 +790,7 @@ async function expectPublicReference(
 ): Promise<void> {
   const rows = await sql`
     select count(*)::integer as count from public.public_project_references as public_reference
-    join public.project_references as reference_row
-      on reference_row.project_id = public_reference.project_id
-      and reference_row.normalized_url = public_reference.normalized_url
-    where reference_row.id = ${referenceId}::uuid
+    where public_reference.reference_id = ${referenceId}::uuid
   `;
   expect(rows[0]?.count).toBe(visible ? 1 : 0);
 }
