@@ -967,7 +967,15 @@ async function assertNoFixtureResidue(
       (select count(*)::integer from auth.users where id = any(${userIds}::uuid[])) as users
   `;
   const residue = rows[0];
-  if (residue === undefined || Object.values(residue).some((count) => count !== 0)) {
+  if (residue === undefined) {
+    throw new Error('reference_security_fixture_residue:missing');
+  }
+  expect(residue.user_roles).toBe(0);
+  expect(residue.profiles).toBe(0);
+  expect(residue.incident_decisions).toBe(0);
+  expect(residue.incident_indicator_links).toBe(0);
+  expect(residue.indicator_evidence_links).toBe(0);
+  if (Object.values(residue).some((count) => count !== 0)) {
     throw new Error(`reference_security_fixture_residue:${JSON.stringify(residue)}`);
   }
 }
