@@ -4,7 +4,7 @@
 > 最近更新：2026-08-31（**Phase 7B Task 5 1A 本地 RED 工件已完成**。**下一步：仅请求 disposable behavioral RED 授权**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 已完成 1A 本地 integration/pgTAP RED 工件与门控，尚未运行 behavioral RED、未写 migration25/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 的 Step 6 disposable run 已清理但因 integration harness 缺陷 BLOCKED，未取得可接受 behavioral RED、未写 migration25/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
 
@@ -29,6 +29,16 @@
 **2026-08-31 Task 5 SDD 1A scoped review CLEAN**：首个 reviewer 在返回 verdict 前因额度失败，未产生 findings；替补 reviewer 对 `06416a9..a08518c` 判定 scope/spec 合规、质量 0 Critical / 3 Important / 1 Minor。Round 1 提交 `d74ab87` 关闭 016 token-existence 与 restore append-only 两项，复审发现 residue 仅 select 未 assert；Round 2 提交 `e92d115` 增加五项直接零断言，最终 scoped re-review 判定全部 Important **ADDRESSED**、无新 Critical/Important。1A 实现链为 `a08518c` / `d74ab87` / `e92d115`；integration / 016 最终 SHA 为 `87b0a4ff…e9657` / `0fa44939…bd20`。唯一 Minor（主计划措辞未显式重复“behavioral RED 未运行”）按 SDD ledger 延后给 final review。详细计划 Steps 1–4 已勾选；behavioral RED 仍未运行，migration25 不存在，未连接数据库/远端/生产。下一步只请求 Step 5 test-only disposable RED 授权。
 
 **2026-08-31 Task 5 Step 5 test-only disposable RED AUTHORIZED**：项目所有者已明确授权本轮仅执行：disposable 只读 fail-closed 预检、只同步最终 016、临时 IPv4 16432/16433 隧道与 0600 四变量环境、在当前 24-migration schema 上运行 focused 016 和唯一新 integration、exact fixture cleanup、关闭隧道并删除临时文件。明确禁止 reset、同步/应用 migration25、typegen、生产 `airdrop-intelligence-os` 与端口 54321/54322。详细计划 Step 5 已勾选；下一步从 exact identity/health/marker/hash/port/absence 预检开始，任一不一致立即停止。
+
+**2026-08-31 Task 5 Step 6 disposable RED preflight COMPLETE**：本地 SSH key mode `0600`、IPv4 `16432/16433` 均关闭，seed/23/24/014/015/016/integration SHA 与授权简报完全一致且 migration25 不存在。只读远端预检 exit 0：精确 workdir/project/CLI `2.112.0`，DB/Kong running+healthy 且只绑定 `64322/64321`，24 migrations / max `20260830000100`、paused marker=1；seed/23/24/014/015 SHA 全部一致，remote migration25 与 016 均 absent。尚未同步、reset、建立隧道或访问生产；下一步仅同步 016 并核 SHA。
+
+**2026-08-31 Task 5 Step 6 focused 016 RED COMPLETE**：仅同步 `016`，远端 SHA-256 `0fa44939475ac0a3ac43c8caabc791c82a51589656dfe727e52517d0c011bd20` 与本地完全一致。24-migration disposable schema 上 focused pgTAP 为 **Files=1 / Tests=18 / Failed=14 / exit 1**：Test 1–3 trigger reference-key/order/insert-before-flag，4–9 reference source/authority/reference key/order/row-lock/recheck，10–14 authority source/authority key/order/row-lock/recheck 均为预期缺 shared locks；Test 15–18 security-definer/owner/signature/privilege boundary PASS。无 SQL abort、TAP parse、No plan 或环境噪声，未 reset/同步 migration/typegen/访问生产；下一步建立临时 tunnel/env 后运行唯一 integration。
+
+**2026-08-31 Task 5 Step 6 tunnel/env/parity COMPLETE**：同一 SSH master 仅 IPv4 `127.0.0.1:16432→64322` 与 `127.0.0.1:16433→64321`，local env 为 `/private/tmp/phase7b-task5-reference-security-red.env`、mode `0600`、恰好四个授权变量名，未输出值。remote psql、tunnel PostgreSQL（本机无 `psql`，改用已安装 `postgres` driver 并关闭连接）与 anon PostgREST 对 active/rumored projects 的同一只读计数均为 **2**，endpoint parity PASS；未访问生产/54321/54322。下一步只运行新的单一 integration file。
+
+**2026-08-31 Task 5 Step 6 single integration result — BLOCKED before behavioral RED**：仅以 Node 22.22.2、`--no-file-parallelism` 运行 `reference-security-coupling.integration.test.ts`。sandbox 内首次连接 tunnel 被 EPERM、5 tests 未执行；授权的 tunnel 环境重跑为 **1 file / 5 tests / 4 failed / 1 passed / exit 1**。三个 race/source tests（`serializes flag-first…`、`serializes revoke-first…`、`waits on the Evidence source key…`）在 Vitest 5s 超时，restore/history test 报 `column public_reference.normalized_url does not exist`；`removes every Task 5 fixture and outbox row` PASS。该组不是可接受的 missing-lock behavioral RED，且测试字节需修复；按授权不改测试、不二次同步，现只做独立 residue/016/temp cleanup 并报告 BLOCKED。
+
+**2026-08-31 Task 5 Step 6 cleanup COMPLETE / BLOCKED stop**：integration 内 exact cleanup test PASS；随后 remote 独立查询 Task 5 project/source/raw/Evidence/user/role/profile/reference/authority/command/decision/flag/indicator/incident/link/event/outbox **20/20 categories 均为 zero**。本轮加入的 remote `016` 已删除并复核 absent；SSH master 已关闭，local `16432/16433` closed，`/private/tmp/phase7b-task5-reference-security-red.env` 与 control socket 均 absent。最终只读复核仍为 24 migrations / max `20260830000100`、paused marker=1，remote 016/migration25 absent。未 reset/typegen/同步 migration/访问生产，test/production 字节未改且没有第二次 sync。因 `normalized_url` test harness error 与 three 5s timeouts，详细 Step 6 和主计划 Task 5 Step 2 保持 unchecked；待获准的本地 test 修复与新的 remote RED authorization。
 
 #### 2026-08-30 Task 4 修订设计落盘
 

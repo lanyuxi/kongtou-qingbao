@@ -163,6 +163,8 @@ Stop and request authorization for only these actions: read-only fail-closed rem
 
 - [ ] **Step 6: Prove focused RED against migration 24**
 
+> **2026-08-31 execution record — BLOCKED:** exact disposable preflight, 016-only sync, focused structural RED, IPv4 tunnel/env/parity, and cleanup completed; the sole integration run exposed a `public_reference.normalized_url` harness query error plus three 5s timeouts, not an acceptable behavioral missing-lock RED. Remote 016 and all temporary state were removed; this checkbox remains unchecked pending an authorized local test-byte repair and a fresh RED authorization. See `.superpowers/sdd/2026-08-31-phase-7b-task-5-reference-security-locking/task-1-red-verification-report.md`.
+
 After authorization, verify exact remote workdir/project/CLI/healthy ports/paused marker, 24 applied migrations with max `20260830000100`, local/remote seed + migrations 23/24 + tests 014/015 hashes, absent remote migration25/016, and closed local 16432/16433.
 
 Sync only 016 and verify its SHA. Run focused 016: expected failure only on the three missing lock-order assertions. Establish tunnels/env, prove remote psql = tunnel DB = anon PostgREST parity, then run only the new integration file. Expected: lock-wait/race assertions fail because current production functions do not acquire the shared reference/authority/source keys; restore/history and already-existing fail-closed behavior may pass. Record exact counts and failure names. Always run exact cleanup and close/remove all temporary state before continuing.
