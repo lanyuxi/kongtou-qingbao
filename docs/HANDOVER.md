@@ -1,12 +1,16 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 Step 6 disposable structural + behavioral RED 已精确完成并清理**。migration25 尚未写入。）
+> 最近更新：2026-08-31（**Phase 7B Task 5 Steps 7–8 migration25 local GREEN/static alignment 已完成**；disposable GREEN 尚待明确授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 的 second-repaired disposable RED 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并完成清理，master Task 5 Step 2 已完成；未写 migration25/production SQL。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 的 second-repaired disposable RED 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并完成清理，Steps 7–8 已新增 migration25 并完成 local GREEN/static alignment，master Task 5 Step 3 已完成；disposable GREEN 尚待明确授权。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（Task 1–4 完成；Task 5 计划已批准）
+
+**2026-08-31 Task 5 Step 7 migration25 local implementation COMPLETE**：新增 `20260831000100_phase_7b_reference_security_locking.sql`（583 lines / SHA-256 `2e8013ccd041be9de2ed7910a707401ee96e051d132fa47b34bf90011242ce37`），仅以 `CREATE OR REPLACE` 替换 indicator trigger、reference decision RPC 与 domain-authority decision RPC。trigger 以 UUID text 排序并在 reference advisory wait 后重读版本；reference RPC 的 non-replay path 为 Evidence source → matching domain_authority → reference → aggregate `FOR UPDATE`，authority RPC 为 Evidence source → domain_authority → aggregate `FOR UPDATE`；Evidence 解析强制 Evidence→Raw Item→Source 的 source identity 一致。无 project-wide lock、新 schema/RPC/依赖或数据库/远端/生产访问。自审依据 relation correction 改为 `(project_id, normalized_domain)` 匹配 authority，而非不存在的 reference authority column。
+
+**2026-08-31 Task 5 Step 8 local GREEN/static alignment COMPLETE**：`git diff --check`、不可变 migration23/24、016、integration 与 158,662-byte generated types hash 均通过；Node 22.22.2 direct database eslint/`tsc --noEmit` 均 exit 0，focused Vitest 为 **1 passed file / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。静态检查确认恰有三项函数替换、三个 owner、锁类顺序 `reference; source→domain_authority; source→domain_authority→reference`、两条 Evidence source identity 一致 join、authority `(project_id, normalized_domain)` 匹配及无 schema-shape DDL。未运行 SQL compile 或行为 GREEN；下一步须获 disposable GREEN 授权。
 
 **2026-08-31 Task 5 corrected locking design**：预检确认原计划“仅集成测试、不改迁移”与已批准 spec/最终验收的 shared target lock 要求冲突：现有 reference/authority 函数只有各自 aggregate row `FOR UPDATE`，没有调用 Phase 7A `security_target_lock_key_v1()`；仅在测试夹具手动加锁会形成假证明。项目所有者已批准 corrected 方案：保持第23/24 migration 字节不变，新增第25个 `20260831000100_phase_7b_reference_security_locking.sql` + `016` pgTAP。规格自审进一步排除了 project-wide keys：一个全局域名 indicator 可跨项目命中，而 Phase 7A 事务可能预持有不同 project/source key，继续锁其他 project 会产生反序死锁。最终顺序收紧为同一 helper namespace 内 Evidence `source` → matching `domain_authority` → `reference` → aggregate row locks；indicator trigger 按 reference UUID 排序。migration25 只替换 trigger + 两个 decision RPC，不改注册命令/schema/RPC shape；双 typegen必须与 Task 4 逐字节一致。真实 integration 覆盖两个竞争顺序、restore/history、blocked-source Evidence 与零残留，并加入显式 `test:integration` 列表。当前仅写入设计与交接文档，未写测试/SQL、未连接 disposable/远端/生产；下一步等待书面规格复核。
 
