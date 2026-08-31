@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**Task 1–3 已完成；Task 4 contracts GREEN、结构 RED 有效；首轮完整矩阵 RED 暴露测试中止缺陷，正在本地修复**；生产未访问
+> 当前状态：**Task 1–4 已完成；Task 5 corrected locking design 已批准并写入 spec，等待书面复核后修订实施计划**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -13,6 +13,7 @@
 - 基线（2026-08-29 计划批准时）：主线 `pnpm verify` exit 0 = contracts 133 + domain 376 + database 257 + worker 236 + web 242 = **1,244 non-skipped / 68 gated skips**；22 migrations、13 个 pgTAP 文件
 - 已 reset 的 foundation：`20260829000100`（第 23 个）+ `014_phase_7b_verified_allowlisted_references.test.sql`（第 14 个），保持字节不变
 - Task 4 修正边界：新增 `20260830000100_phase_7b_reference_review_boundary.sql`（第 24 个）+ `015_phase_7b_reference_review_boundary.test.sql`（第 15 个）
+- Task 5 修正边界：保持第23/24 migration 不变；新增 `20260831000100_phase_7b_reference_security_locking.sql`（第25个）+ `016_phase_7b_reference_security_locking.test.sql`（第16个），只改函数/trigger 行为，不改 schema/RPC shape
 - disposable 栈：`/root/airdrop-governance-test`，project `airdrop-intelligence-governance-test`，DB 64322 / Kong 64321，本地隧道 16432 / 16433；pinned CLI `./cli/node_modules/.bin/supabase`（2.112.0）
 - 生产 `airdrop-intelligence-os` 与端口 54321/54322 **永不访问**；生产仍为 19 个已应用迁移
 
@@ -32,8 +33,8 @@
 | 1 | Strict reference contracts | ✅ 完成（本地门禁绿，待独立复审） | RED：4 个 suite 全部 `Cannot find module`（0 个新用例执行，既有 133 全过）；GREEN：contracts 16 files / **161 tests PASS**，lint/typecheck exit 0。变异检验：把 `publicProjectReferenceSchema` 放宽为 non-strict 后「公开投影携带内部字段」用例失败，随即还原。踩坑：测试导入路径误写为 `../`（会解析到 `src/enums.js` 而非同目录）；URL 控制字符判定用字面量正则会被 `no-control-regex` 拦下、且会往文件里写真实控制字节，已改为码点谓词。 |
 | 2 | Pure normalization / transition / derivation rules | ✅ 完成（本地门禁绿，待独立复审） | RED：3 个 suite 全部 `Cannot find module`（既有 376 全过）；GREEN：domain 15 files / **402 tests PASS**（+26），lint/typecheck exit 0。**实现期发现真实缺陷**：`new URL('https:///claim')` 不抛错、反而被解析成 host `claim`，必须先拒绝空 authority，否则会被归一化成 `https://claim/`。两处变异检验通过：放开域名权威门禁 → 「无 granted 不得 verify」失败；`last_verified_at` 改用注册时间 → 两条派生用例失败。归一化按计划不剥离 `www.`。 |
 | 3 | Reference Ledger migration + protected commands + RLS + 安全联动 SQL | ✅ 完成（014 pgTAP 74/74、disposable 验证全绿） | 迁移 1,992 行 / 37 个对象。**disposable 验证（2026-08-30，用户授权）**：同步迁移+014（SHA 逐个核对）、reset exit 0（23 迁移）、full pgTAP **14 files / 1,424 tests PASS**（含 014 的 74 个新断言）、typegen 两次一致（156,630 字节）并替换 generated types；集成矩阵 **9 files / 66 tests PASS**（155.6s）；清理后回到 seed 基线（4 projects / 2 opps / 全部引用·安全表与 outbox = 0）、marker 完好；隧道关闭、凭据删除、54321/54322 全程未访问。**验证期修掉的 4 个真缺陷**：① `pg_catalog.position(x in y)` 限定名与 `IN` 语法不兼容（42601），改 `strpos`；② `pg_catalog.coalesce/least/nullif` 是语法结构不能带 schema 前缀；③ **plpgsql `RETURN QUERY` 不退出函数**——replay 分支返回后直落进版本检查抛 AR206，四个命令的 replay 全部不可用，补 `return;`；④ restore 用 `transaction_timestamp()` 使同事务 flag+release 的 `released_at > created_at` 恒假（AR299），改 `clock_timestamp()`。另：决策表新增 `aggregate_version` 列（同事务内时间戳恒定导致「最新决策」按随机 UUID 排序的不确定性）与 006 精确策略矩阵更新（4 条新策略）。 |
-| 4 | Contracts 补齐 + forward-only reviewer boundary migration/015 + bearer repository + repository integration | 🚧 database/repository local GREEN；待 disposable integration 授权 | 第24 migration + 015 focused/full pgTAP + stable typegen 已 GREEN；repository unit/full 本地 GREEN，integration 3 条已准备并 gated。下一步只运行经授权的临时隧道 reference integration，无需 reset。 |
-| 5 | Phase 7A coupling under real races（仅集成测试，不再改迁移） | 待执行 | flag-vs-verify、revoke-vs-verify、restore/history、blocked Evidence；与 Task 4 repository integration 分离。 |
+| 4 | Contracts 补齐 + forward-only reviewer boundary migration/015 + bearer repository + repository integration | ✅ 完成 | 主提交 `93acfbf`；fresh gate 1,342 PASS / 71 gated skips，交接提交 `a338e7a`。 |
+| 5 | Phase 7A coupling under real races + forward-only shared-lock correction | 设计已批准，待书面复核 | 第25 migration + 016；Evidence source → domain authority → reference → row locks；indicator 按 reference UUID 排序；两个 race 顺序、restore/history、blocked Evidence、explicit integration registration。 |
 | 6 | Strict public reference repositories and projections | 待执行 | — |
 | 7 | Authenticated reference BFF routes + browser client | 待执行 | — |
 | 8 | Reviewer reference workflow UI（`/review/references`） | 待执行 | — |
@@ -150,3 +151,4 @@
 | 2026-08-31 | Task 4 max-page cursor focused GREEN | database 工作区先确认 28 PASS / 1 expected FAIL；最小实现复用 `reviewerListMaximumLimit=100`，完整上限页保守返回最后一项游标，避免第101条不可达，最多产生一个空末页。repository + entrypoints **2 files / 35 PASS / exit 0**；未改 migration/RPC/generated types。下一步 fresh 全仓门禁与最终 diff 自审。 |
 | 2026-08-31 | Task 4 fresh final gate / local COMPLETE | 五 workspace lint/typecheck/build 0；Vitest **1,342 PASS / 71 gated skips**；placeholder scanner + 2 自测、diff check 通过。精确扫描无 service-role/base-table fallback；过期 158,522-byte typegen temp 已删除，integration env/typegen temp absent，16432/16433 无监听。本轮未连接远端/数据库，生产未访问。独立 review 因代理额度不可用，完成结论来自主任务逐项自审与 fresh gate。下一步原子提交 Task 4。 |
 | 2026-08-31 | Task 4 commit COMPLETE | 20 个 Task 4 精确文件以 `feat(database): add reference review repository` 提交为 **`93acfbf`**（4,693 insertions / 74 deletions）。生产未访问。下一步 Task 5：单独实现并证明 indicator → reference security-coupling races。 |
+| 2026-08-31 | Task 5 corrected locking design approved | 预检发现原“tests-only”计划无法满足已批准 spec 的 shared Phase 7A target-lock 验收；当前 SQL 只有 aggregate `FOR UPDATE`。项目所有者批准保持第23/24 migration 不变并新增第25 migration + 016。规格自审排除会被跨项目全局 indicator 造成反序死锁的 project-wide keys，最终使用同一 helper namespace 的 source → authority → reference → row-lock 顺序，trigger 按 reference UUID 排序；真实双会话覆盖两个竞态顺序、restore/history、blocked Evidence、cleanup，并注册进显式 integration command。设计已写入 spec，尚未写 RED/SQL、未访问远端/生产；下一步书面复核。 |

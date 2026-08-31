@@ -1,12 +1,14 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 4 已提交**：`93acfbf feat(database): add reference review repository`。**下一步：按计划进入 Task 5 security coupling races**）
+> 最近更新：2026-08-31（**Phase 7B Task 5 corrected locking design 已批准并写入 spec**。**下一步：项目所有者复核书面规格后修订实施计划**）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–3 已完成；Task 4 的 contracts、forward migration、pgTAP/typegen、bearer repository、disposable integration、max-page regression 与 fresh final gate 均完成；Task 5–10 尚未实现。生产仍为 19 个已应用迁移，第 20–24 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 corrected design 已批准，明确以第25个 forward-only migration 补齐共享 Phase 7A target locks，尚未写 implementation RED/production SQL；Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
 
 ### Phase 7B verified allowlisted references（设计及 Task 4 修订已批准；Task 1–3 完成）
+
+**2026-08-31 Task 5 corrected locking design**：预检确认原计划“仅集成测试、不改迁移”与已批准 spec/最终验收的 shared target lock 要求冲突：现有 reference/authority 函数只有各自 aggregate row `FOR UPDATE`，没有调用 Phase 7A `security_target_lock_key_v1()`；仅在测试夹具手动加锁会形成假证明。项目所有者已批准 corrected 方案：保持第23/24 migration 字节不变，新增第25个 `20260831000100_phase_7b_reference_security_locking.sql` + `016` pgTAP。规格自审进一步排除了 project-wide keys：一个全局域名 indicator 可跨项目命中，而 Phase 7A 事务可能预持有不同 project/source key，继续锁其他 project 会产生反序死锁。最终顺序收紧为同一 helper namespace 内 Evidence `source` → matching `domain_authority` → `reference` → aggregate row locks；indicator trigger 按 reference UUID 排序。migration25 只替换 trigger + 两个 decision RPC，不改注册命令/schema/RPC shape；双 typegen必须与 Task 4 逐字节一致。真实 integration 覆盖两个竞争顺序、restore/history、blocked-source Evidence 与零残留，并加入显式 `test:integration` 列表。当前仅写入设计与交接文档，未写测试/SQL、未连接 disposable/远端/生产；下一步等待书面规格复核。
 
 #### 2026-08-30 Task 4 修订设计落盘
 
