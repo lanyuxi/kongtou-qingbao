@@ -1,10 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-08-31（**Phase 7B Task 5 Fix Round 1 已通过独立 scoped re-review，原 I1 关闭**；disposable SQL/behavioral GREEN 尚待明确授权。）
+> 最近更新：2026-08-31（**Phase 7B Task 5 migration25 disposable GREEN 已获明确授权**；下一步执行 fail-closed preflight。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Step 6 已取得精确 structural 18/14 与 behavioral 3 failed/2 passed 并清理。Fix Round 1 mismatched-Evidence RED 已以精确 4 failed/1 passed 证明缺 guard；Phase B 已在两个 decision RPC 加入最小 AR209 guard、通过 local GREEN 与独立 scoped re-review（I1 ADDRESSED，0C/0I/0M），详细 Steps 7–8 与 master Task 5 Step 3 已完成。下一边界是需明确授权的 disposable SQL/behavioral GREEN。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+> **当前一句话状态（2026-08-31 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Fix Round 1 已通过精确 RED、最小 AR209 guard、local GREEN 与独立 scoped re-review（I1 ADDRESSED，0C/0I/0M）。项目所有者现已明确授权 migration25 disposable GREEN；详细 Step 9 已完成，下一步从 exact local/remote preflight 开始，尚未同步/reset/运行 GREEN。Task 6–10 尚未实现。生产仍为 19 个已应用迁移，第 20–25 个均按 production unapplied 处理。
+
+**2026-08-31 Task 5 migration25 disposable GREEN AUTHORIZED**：在 controller 请求 exact phrase 后，项目所有者回复 `Task 5 migration25 disposable GREEN`。本次单次授权仅含 fail-closed preflight、只同步最终 migration25/016、一次 disposable reset、focused/full pgTAP、双 typegen 与 committed 158,662-byte types 逐字节无漂移证明、临时 IPv4 16432/16433 tunnels + 0600 四变量 endpoint parity、一次 sequential Task 4+5 integration、独立 residue 与 remote/local temp/tunnel exact cleanup。明确排除 production/54321/54322、source/test/dependency 编辑、第23/24 migration 修改、generated types 替换、额外 reset 或 integration rerun。详细 Step 9 已勾选；当前尚未连接远端或执行任何授权动作。
 
 **2026-08-31 Task 5 Fix Round 1 Phase B — local GREEN COMPLETE**：仅在 `submit_decide_domain_authority` 与 `submit_decide_reference` 的 strict Evidence→Raw Item→Source resolution 后、各自条件 source lock 前加入 exact `v_evidence_id is not null and v_evidence_source_id is null` → `reference_evidence_required` / `AR209` guard。migration25 现 **591 lines / SHA-256 `e0f1f5bf4bb00ca029f954cfe1084412d8ea3dd83e24d5a03a44e621c8d88f29`**；静态检查确认恰好两处 guard，均为 resolution < guard < source lock。integration 保持 SHA `1d6e7c97…f601b`；23/24、016、generated types、scripts 未改。Node 22.22.2 direct eslint/`tsc --noEmit` exit 0，focused Vitest 为 **1 passed / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。无 DB/remote/tunnel/reset/typegen/production；详细 Steps 7–8/master Step 3 已重新勾选，disposable SQL/behavioral GREEN 仍需单独授权。
 

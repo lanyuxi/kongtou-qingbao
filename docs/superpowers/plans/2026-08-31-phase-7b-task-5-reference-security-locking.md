@@ -236,7 +236,9 @@ shasum -a 256 supabase/migrations/20260829000100_phase_7b_verified_allowlisted_r
 
 Expected: immutable hashes unchanged; lint/typecheck/unit tests pass; integration remains gated without environment. Review migration25 diff against the copied source functions and account for every changed line. Update all three handover/workbook locations.
 
-- [ ] **Step 9: Obtain explicit disposable GREEN authorization**
+- [x] **Step 9: Obtain explicit disposable GREEN authorization**
+
+> **2026-08-31 AUTHORIZED:** after the controller requested the exact phrase, the project owner replied `Task 5 migration25 disposable GREEN`. The single-use scope is fail-closed preflight; sync only final migration25/016; one disposable reset; focused/full pgTAP; double typegen proven byte-identical to the committed 158,662-byte file; temporary IPv4 tunnels/0600 four-variable parity; one sequential Task 4+5 integration run; exact fixture/temp/tunnel cleanup. Production and 54321/54322 remain prohibited.
 
 Request authorization for: fresh fail-closed preflight; sync migration25 and final 016 only; disposable reset; focused 016; full pgTAP; double typegen/no-drift comparison; temporary tunnels/env/parity; focused Task4+Task5 reference integration; exact remote/local cleanup. Production and ports 54321/54322 remain prohibited.
 
