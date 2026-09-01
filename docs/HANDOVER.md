@@ -1,10 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 修复版 disposable GREEN 在 focused 016 的 trigger lock token 断言处 BLOCKED**；已完成清理与本地根因定位。）
+> 最近更新：2026-09-01（**Phase 7B Task 5 Fix Round 2 已完成本地 scalar trigger 修复与静态门禁**；SQL 编译和行为 GREEN 仍待 fresh disposable 授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 修复版 GREEN 已以 exact-file sync/reset 把 disposable 更新到 25 migrations，但 focused 016 为 18 tests / 2 failed，仅 #1/#3 trigger reference-lock token 断言失败，后续阶段未运行且 20/20 residue 已清理。根因是 migration25 使用 `v_matched.reference_id`，而已批准 exact implementation/016 要求 scalar `v_reference_id`；实际锁调用与先锁后 insert 顺序存在，但实现未匹配冻结规格。下一步本地最小 production-unapplied migration25 修复；远端复验需 fresh 授权。Task 6–10 尚未实现；生产仍为19个已应用迁移，第20–25个按 production unapplied 处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Fix Round 2 已把 migration25 trigger 的 record loop 最小改为 scalar `v_reference_id`，以匹配 focused 016 的 #1/#3 冻结 token 要求；本地 lint/typecheck 与 gated Vitest 通过。远端仍保留先前 SHA `e0f1f5bf…8f29` 的 25-migration disposable 状态，未执行任何本轮远端动作；SQL 编译、focused 016 与行为 GREEN 须在 fresh 授权后复验。Task 6–10 尚未实现；生产仍为19个已应用迁移，第20–25个按 production unapplied 处理。
+
+**2026-09-01 Task 5 Fix Round 2 trigger scalar local COMPLETE**：仅将 `flag_references_for_new_indicator()` 的 `v_matched record` 改为 `v_reference_id uuid`，ordered loop 改为只 select `reference_row.id`，并把六处 trigger-loop 引用替换为 scalar；UUID-text ordering、reference lock→post-wait version re-read→idempotent flag/outbox、两个 decision RPC 与两处 `AR209` guard 均未改。migration25 仍 **591 lines**，新 SHA-256 `07665b57872f0c399162a37f5597cc6c5cd4628c38e13431c6e43b4e245af040`；diff 为 **8 insertions / 8 deletions**，文档前仅该文件变更。静态检查确认 scalar declaration、exact helper token、lock-before-flag、UUID-text ordering、trigger section no `v_matched`、two AR209 guards；migration23/24、016、两份 integration 与 generated types hashes 未漂移。Node `v22.22.2` direct eslint/`tsc --noEmit` exit 0；focused Vitest 为 **1 passed / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。无 DB/network/remote/tunnel/reset/typegen/production；skipped integration 不构成 behavioral GREEN，remote re-sync/reset/focused 016 需 fresh authorization。
 
 **2026-09-01 Task 5 corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权修复版 Task 5 migration25 disposable GREEN`。这是替代已消耗 blocker run 的 fresh single-use 授权：保留 preflight、一次 reset、focused/full pgTAP、双 typegen no-drift、一次 sequential Task4+5 integration 与 exact cleanup；同步改为 migration25、016 各一条独立命令，必须直接指向完整 `supabase/migrations/...sql` 与 `supabase/tests/...sql` 文件名，前一文件 SHA/行数通过后才能复制后一文件，禁止 combined/common-directory SCP。production/54321/54322 与原禁止项不变；当前尚未开始修复版远端动作。
 

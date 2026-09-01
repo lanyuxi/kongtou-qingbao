@@ -5,7 +5,7 @@ security definer
 set search_path = pg_catalog, public, extensions
 as $function$
 declare
-  v_matched record;
+  v_reference_id uuid;
   v_reference_version bigint;
   v_occurred_at_text text;
 begin
@@ -14,27 +14,27 @@ begin
     'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
   );
 
-  for v_matched in
-    select reference_row.id as reference_id
+  for v_reference_id in
+    select reference_row.id
     from public.match_references_for_indicator(new.indicator_type, new.value_text) as matched
     join public.project_references as reference_row
       on reference_row.id = matched.reference_id
     order by reference_row.id::text asc
   loop
     perform pg_catalog.pg_advisory_xact_lock(
-      public.security_target_lock_key_v1('reference', v_matched.reference_id)
+      public.security_target_lock_key_v1('reference', v_reference_id)
     );
 
     select reference_row.version into v_reference_version
     from public.project_references as reference_row
-    where reference_row.id = v_matched.reference_id;
+    where reference_row.id = v_reference_id;
 
     if not found then
       continue;
     end if;
 
     insert into public.reference_security_flags (reference_id, indicator_id)
-    values (v_matched.reference_id, new.id)
+    values (v_reference_id, new.id)
     on conflict (reference_id, indicator_id) do nothing;
 
     -- Only the flag that this indicator actually created is published.
@@ -43,12 +43,12 @@ begin
         aggregate_type, aggregate_id, aggregate_version,
         event_type, payload, occurred_at, created_at
       ) values (
-        'reference', v_matched.reference_id, v_reference_version,
+        'reference', v_reference_id, v_reference_version,
         'reference.security_flagged.v1',
         pg_catalog.jsonb_build_object(
           'version', 1,
           'eventType', 'reference.security_flagged.v1',
-          'aggregateId', v_matched.reference_id,
+          'aggregateId', v_reference_id,
           'aggregateVersion', v_reference_version,
           'indicatorId', new.id,
           'occurredAt', v_occurred_at_text
