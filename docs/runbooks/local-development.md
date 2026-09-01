@@ -368,8 +368,11 @@ command — the protected functions re-check `auth.uid()` on every call.
 Work top-down, one object at a time:
 
 1. **Grant the domain authority first.** `verify`, `reverify`, and `restore` all
-   read the authority covering the URL's host; without a `granted` authority the
-   command fails with `domain_authority_not_found` (`AR203`).
+   read the authority covering the URL's host. If **no authority row** covers
+   that host the command fails with `domain_authority_not_found` (`AR203`); if a
+   row exists but is not currently `granted` — it is `candidate` or `revoked` —
+   the command fails with `reference_not_decidable` (`AR202`) instead, so the two
+   codes tell you whether to create the authority or to re-grant an existing one.
 2. **Register the URL entry** for the specific page you intend to link to.
    Registration only creates a `candidate`; it never renders publicly.
 3. **Decide** with Evidence that traces to a Raw Item and a Source whose source
@@ -408,8 +411,8 @@ The API returns stable domain codes; never branch on human-readable text.
 | Code | Meaning | Typical operator action |
 | --- | --- | --- |
 | `reference_not_found` (`AR201`) | Reference ID does not exist or is not visible to this session | Reload the list |
-| `reference_not_decidable` (`AR202`) | The current state does not permit this decision (for example verifying an already verified reference) | Reload and re-read the state, then choose the permitted decision |
-| `domain_authority_not_found` (`AR203`) | Either the authority ID does not exist, or no `granted` domain authority covers the URL's host | Grant the authority first, or reload |
+| `reference_not_decidable` (`AR202`) | The current state does not permit this decision — either the state/decision pair is invalid (for example verifying an already verified reference), or a covering domain authority exists but is not `granted` | Reload and re-read the state; re-grant the authority when that is the cause |
+| `domain_authority_not_found` (`AR203`) | No authority row covers the URL's host, or the specified authority ID does not exist | Create the authority, or reload |
 | `reference_reviewer_required` (`AR204`) | No active `reviewer` / `senior_reviewer` / `admin` grant on the bearer session | Provision or restore the grant |
 | `reference_version_conflict` (`AR206`) | `expectedVersion` is stale | Reload and re-confirm; never auto-adopt the new version |
 | `reference_idempotency_conflict` (`AR207`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |

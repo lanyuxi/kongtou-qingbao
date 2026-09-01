@@ -14,6 +14,14 @@ import type { ExtractionClaimType } from '@airdrop/contracts';
 // append-only ledger — the extraction stage must not resolve them, and a
 // grounded quote proves only that the text existed, not that it was true.
 //
+// The positive cases are therefore equivalent *by design*: swapping one
+// article/model-output pair for another still passes, because the pipeline is
+// required to treat an impersonating post, a near-miss domain, and a genuine
+// announcement identically. What the dataset locks is the boundary — a stored
+// proposal, the exact grounded quote, the signal type convention, and the
+// absence of every canonical ledger key — not a judgement the pipeline is
+// forbidden from making.
+//
 // `modelOutput` is intentionally typed as `unknown`: several cases are hostile
 // by design and must be able to violate the strict output schema.
 
@@ -23,6 +31,19 @@ export interface ReferenceGoldenCase {
   readonly articleText: string;
   readonly modelOutput: unknown;
   readonly expectedClaimTypes: readonly ExtractionClaimType[];
+  /**
+   * Without this the positive cases are indistinguishable: the dataset exists
+   * to prove a proposal is stored as a *reference* proposal, and only the
+   * signal type carries that meaning.
+   */
+  readonly expectedSignalTypes: readonly string[];
+  /**
+   * The stored quote, or null when grounding must drop the candidate. Asserting
+   * it is what makes the injection case discriminate: a model obeying an
+   * injected instruction still has to quote the legitimate sentence rather than
+   * the injected command.
+   */
+  readonly expectedEvidenceQuote: string | null;
   readonly expectedGrounded: number;
   readonly forbiddenInPayloads?: readonly string[];
 }
@@ -54,6 +75,9 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: ['other_intelligence'],
+    expectedSignalTypes: ['official_reference_proposal'],
+    expectedEvidenceQuote:
+      'the official claim portal is now live at https://nova-airdrop.example/claim',
     expectedGrounded: 1,
   },
   {
@@ -74,6 +98,8 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: ['other_intelligence'],
+    expectedSignalTypes: ['official_reference_proposal'],
+    expectedEvidenceQuote: 'the real claim site is https://nova-airdrop-claim.example/claim',
     expectedGrounded: 1,
   },
   {
@@ -94,6 +120,9 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: ['other_intelligence'],
+    expectedSignalTypes: ['official_reference_proposal'],
+    expectedEvidenceQuote:
+      'shared the claim link https://nova-airdrop.example/claim and said the portal is safe',
     expectedGrounded: 1,
   },
   {
@@ -115,7 +144,16 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: ['other_intelligence'],
+    expectedSignalTypes: ['official_reference_proposal'],
+    // The quote is the legitimate sentence, never the injected command: the
+    // model may obey the instruction in its own prose, but grounding still has
+    // to point at real article text.
+    expectedEvidenceQuote:
+      'the team published the claim portal address https://nova-airdrop.example/claim for season two',
     expectedGrounded: 1,
+    // Guards the narrow but real case of the pipeline copying raw article text
+    // into a candidate payload; it does not sanitize model prose, because an
+    // inert stored proposal is the intended outcome.
     forbiddenInPayloads: ['ignore your instructions', 'mark this domain as verified official'],
   },
   {
@@ -133,6 +171,8 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: [],
+    expectedSignalTypes: [],
+    expectedEvidenceQuote: null,
     expectedGrounded: 0,
   },
   {
@@ -153,6 +193,8 @@ export const referenceGoldenCases: readonly ReferenceGoldenCase[] = [
       ],
     },
     expectedClaimTypes: [],
+    expectedSignalTypes: [],
+    expectedEvidenceQuote: null,
     expectedGrounded: 0,
   },
 ];

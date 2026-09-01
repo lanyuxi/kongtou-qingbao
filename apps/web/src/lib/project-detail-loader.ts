@@ -41,6 +41,12 @@ export interface ProjectDetailResult {
 
 // A project detail page renders a bounded set of references; deeper paging
 // belongs to a dedicated references surface, not to this composition.
+//
+// Accepted trade-off: `official_website_url` is resolved against this page, so
+// a project whose official entry has an old verification time and falls outside
+// the first `referenceLimit` rows renders as unverified. That degrades closed —
+// a missed link, never an unverified one rendered as an anchor — and a project
+// with more than 100 verified references belongs on a dedicated surface.
 const referenceLimit = 100;
 
 export async function loadProjectDetailFromRepository(

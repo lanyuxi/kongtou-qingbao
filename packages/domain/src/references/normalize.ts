@@ -80,16 +80,23 @@ export function normalizeReferenceUrl(value: string): string | null {
   }
 
   const rest = value.slice('https://'.length);
-  // An empty authority must be rejected explicitly, and the authority must not
-  // carry percent-encoding: `https://ex%41mple.com` would otherwise decode to a
-  // different host than the raw string suggests.
-  if (rest.length === 0 || /^[/?#]/u.test(rest) || rest.includes('%')) {
+  // An empty authority must be rejected explicitly: a bare `https:///claim`
+  // would otherwise be repointed at host `claim`.
+  if (rest.length === 0 || /^[/?#]/u.test(rest)) {
     return null;
   }
 
   const end = authorityEndIndex(rest);
   const authority = end === -1 ? rest : rest.slice(0, end);
   const tail = end === -1 ? '' : rest.slice(end);
+
+  // Only the authority may not carry percent-encoding: `https://ex%41mple.com`
+  // would decode to a host other than the one the raw string suggests, while a
+  // percent in the path or query has no such effect. The sql layer scopes its
+  // check to the authority the same way, so both layers accept the same URLs.
+  if (authority.includes('%')) {
+    return null;
+  }
 
   // More than one colon means an IPv6 literal, which this allowlist does not
   // accept (the domain rules only admit ASCII hostname labels).

@@ -10,9 +10,11 @@ import { formatTimestamp } from './opportunity-elements.js';
 /**
  * `projects.official_website_url` is a Catalog clue, not a verified fact. It
  * becomes a link only when a verified reference normalizes to exactly the same
- * form, and the comparison uses the same pure function the ledger applied at
- * registration time, so a value cannot verify under one form and be rendered
- * under another.
+ * form. The application normalization is kept in step with the sql function the
+ * ledger applied at registration, so a value cannot verify under one form and
+ * be rendered under another; the cross-layer parity cases in
+ * `packages/domain/src/references/normalize.test.ts` are what hold that true,
+ * so any change to either implementation must extend them together.
  */
 export function resolveOfficialWebsite(
   references: readonly PublicProjectReference[],

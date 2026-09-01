@@ -14,7 +14,14 @@
 
 **2026-09-01 Task 10 Step5 敏感字段 review CLEAN**：按计划在 `apps/web` + `packages/contracts/src/references` + `packages/database/src/references` 范围内扫描 `service_role`/`DATABASE_URL`/`reviewer_user_id`/`internal_note`/`evidence_locator`/`candidate_payload`，**零命中**；并以范围外的既有集成测试命中 `service_role` 反向验证扫描模式有效，排除假阴性（该命中属 server-only 测试边界，非缺陷）。`pnpm verify` exit 0、`git diff --check` exit 0、占位符检查 exit 0。
 
-**2026-09-01 Task 10 剩余项（需显式授权）**：Step3 的 disposable reset / full pgTAP / integration 矩阵与 Step6 的独立复审**尚未执行**——两者都需要用户明确授权，与 Task 4/5 的惯例一致，不得在无授权情况下连接远端 64322/64321 或建 16432/16433 隧道。计划文件清单里还列了两处 Modify（`packages/contracts/src/references/projections.test.ts` 与 `packages/database/src/tests/reference-review-repository.integration.test.ts`），它们属于该授权矩阵的一部分，同样待授权后处理。plied处理。
+**2026-09-01 Task 10 Step6 独立复审 CHANGES REQUESTED → 已全部闭环**：复审区间 `17fd364..dd3675c`，结论 **0 Critical / 2 Important / 4 Minor**；四项核心安全属性（未验证 URL 不可能成锚点、blocked 不渲染引用、域名芯片非链接、敌意 label 惰性）**全部核实成立且有测试锁定**。
+
+- **I-1（本次最有价值的发现）TS/SQL 归一化 `%` 分叉**：`normalize.ts` 原用 `rest.includes('%')`（覆盖 authority+path+query 全部），SQL 则用 `strpos('%') between 1 and least(...) - 1` **只查 authority 段**。设计规格要求拒绝的是「**% 编码 host**」而非 path，因此 **TS 是过度拒绝的缺陷**——后果是 `https://example.com/a%20b` 这类 URL 可被台账接受并完成 verify，却在页头被渲染成「未验证」。RED 实证（`expected null to be 'https://example.com/a%20b'`）后改为只校验 authority，domain **411 全绿**。**接手者注意：跨层归一化一致性不能靠「看代码觉得一样」，必须有用例逐条对拍；本次分叉在引入 `@airdrop/domain` 依赖后才被生产代码路径激活。**
+- **I-2 Golden Dataset 区分力**：原实现从未断言 `signalType`，4 个正例在断言层面完全等价（复审者实测改掉 `signalType` 仍全绿）。已新增 `expectedSignalTypes` 与 `expectedEvidenceQuote` 逐用例断言，并用两项变异证明有效（改 `signalType` → 4 个正例全失败；改期望引文 → 对应正例失败）。**同时写明「正例等价是设计使然」**：抽取层不得判定官方性，冒充/近似域名/真公告必须被同等对待，数据集锁的是边界而非判断。
+- **M-2 修正 runbook 错误码**：`v_authority_state is null`（无权威行覆盖该 host）→ `AR203`；**权威行存在但非 `granted`（candidate/revoked）→ `AR202`**，原文档误写为 AR203。运维据此可区分「要新建权威」还是「要重新 grant」。
+- **M-1/M-3/M-4**：`forbiddenInPayloads` 补注释说明其防护边界（防管道把原文抄进载荷，而模型散文本就应按惰性候选存储）；删除 HANDOVER 第 17 行的编辑残留；loader 注释记录官网解析受 100 条分页上限约束的取舍（**fail-closed 降级：漏一个链接，绝不会把未验证链接渲染成锚点**）。
+
+**2026-09-01 Task 10 剩余项（需显式授权）**：Step3 的 disposable reset / full pgTAP / integration 矩阵与 Step6 的独立复审**尚未执行**——两者都需要用户明确授权，与 Task 4/5 的惯例一致，不得在无授权情况下连接远端 64322/64321 或建 16432/16433 隧道。计划文件清单里还列了两处 Modify（`packages/contracts/src/references/projections.test.ts` 与 `packages/database/src/tests/reference-review-repository.integration.test.ts`），它们属于该授权矩阵的一部分，同样待授权后处理。
 
 **2026-09-01 Task 9 public link resolution + unverified-link marking COMPLETE**：公开项目详情页的对外链接从此只来自已验证白名单引用。新增 `apps/web/src/components/reference-elements.tsx`（126 行）四个导出：①`resolveOfficialWebsite(references, officialWebsiteUrl)`——`official_website_url` 与引用列表的匹配必须经 `@airdrop/domain` 的 `normalizeReferenceUrl`（与登记时同一纯函数），因此一个值不可能「以形式 A 通过验证、以形式 B 渲染」；归一化失败（如 `javascript:`）的 URL 永不匹配；`www.` 与裸域名按产品决策 3 仍是独立权威，不会静默互认。②`OfficialWebsiteLink`——blocked 时惰性文本「已停用」；未验证时惰性文本「未验证」+ 原始线索代码样式（可见但不可点）；匹配已验证引用时渲染锚点（`rel="noreferrer noopener"`、`target="_blank"`）。③`VerifiedReferenceLinks`——锚点列表 + `<time dateTime={lastVerifiedAt}>`（核验时间机器可读，可见文案走共享 `formatTimestamp`）；blocked 或空列表渲染为空。④`GrantedDomainChips`——已授权域名仅作「所有权证据」芯片渲染，永不为链接。
 

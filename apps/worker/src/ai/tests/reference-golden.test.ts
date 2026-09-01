@@ -19,6 +19,8 @@ const articleRawItemId = '55555555-5555-4555-8555-555555555555';
 
 interface GoldenOutcome {
   readonly claimTypes: readonly ExtractionClaimType[];
+  readonly signalTypes: readonly string[];
+  readonly evidenceQuotes: readonly string[];
   readonly groundedCount: number;
   readonly canonicalReferenceCount: number;
   readonly processed: number;
@@ -43,6 +45,12 @@ describe('reference extraction golden dataset', () => {
       expect(outcome.providerErrors).toBe(0);
       expect(safeTerminalStatuses).toContain(outcome.status);
       expect(outcome.claimTypes).toEqual(fixture.expectedClaimTypes);
+      // The signal type is what makes a stored candidate a *reference*
+      // proposal; without it the four positive cases are indistinguishable.
+      expect(outcome.signalTypes).toEqual(fixture.expectedSignalTypes);
+      expect(outcome.evidenceQuotes).toEqual(
+        fixture.expectedEvidenceQuote === null ? [] : [fixture.expectedEvidenceQuote],
+      );
       expect(outcome.groundedCount).toBe(fixture.expectedGrounded);
       // The extraction stage may only ever produce a proposal. Nothing here may
       // become a verified reference; that requires a human Evidence-grounded
@@ -137,6 +145,8 @@ async function runGoldenCase(fixture: ReferenceGoldenCase): Promise<GoldenOutcom
 
   return {
     claimTypes: inserted.map((candidate) => candidate.payload.claimType),
+    signalTypes: inserted.map((candidate) => candidate.payload.signalType),
+    evidenceQuotes: inserted.map((candidate) => candidate.payload.evidenceQuote),
     groundedCount: inserted.length,
     canonicalReferenceCount: inserted.filter((candidate) =>
       canonicalReferencePayloadKeys.some(

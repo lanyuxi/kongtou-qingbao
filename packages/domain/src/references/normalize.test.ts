@@ -67,6 +67,18 @@ describe('normalizeReferenceUrl', () => {
     expect(normalizeReferenceUrl('https://exa_mple.com/x')).toBeNull();
   });
 
+  it('accepts percent-encoding outside the authority so both layers agree', () => {
+    // Only a percent-encoded *host* is dangerous, because it decodes to a host
+    // other than the one the raw string suggests. The sql layer scopes its
+    // check to the authority, so a percent-encoded path or query must survive
+    // here too: rejecting it would make a reference that the ledger accepts
+    // unverifiable from the application side.
+    expect(normalizeReferenceUrl('https://example.com/a%20b')).toBe('https://example.com/a%20b');
+    expect(normalizeReferenceUrl('https://example.com/claim?utm=a%20b')).toBe(
+      'https://example.com/claim?utm=a%20b',
+    );
+  });
+
   it('normalizes a non-default port with leading zeros like the sql layer', () => {
     expect(normalizeReferenceUrl('https://example.com:0080/x')).toBe('https://example.com:80/x');
     expect(normalizeReferenceUrl('https://example.com:0/x')).toBe('https://example.com:0/x');
