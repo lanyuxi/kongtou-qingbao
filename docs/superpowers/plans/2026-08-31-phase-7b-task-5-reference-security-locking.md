@@ -240,6 +240,8 @@ Expected: immutable hashes unchanged; lint/typecheck/unit tests pass; integratio
 
 > **2026-08-31 AUTHORIZED:** after the controller requested the exact phrase, the project owner replied `Task 5 migration25 disposable GREEN`. The single-use scope is fail-closed preflight; sync only final migration25/016; one disposable reset; focused/full pgTAP; double typegen proven byte-identical to the committed 158,662-byte file; temporary IPv4 tunnels/0600 four-variable parity; one sequential Task 4+5 integration run; exact fixture/temp/tunnel cleanup. Production and 54321/54322 remain prohibited.
 
+> **2026-09-01 CORRECTED AUTHORIZATION:** after the first run stopped before reset because a combined SCP targeted the common `supabase/` directory, the owner explicitly authorized `授权修复版 Task 5 migration25 disposable GREEN`. The corrected run retains the same scope but requires two independent copies to the full exact migration/test destination filenames; combined/common-directory SCP is prohibited.
+
 Request authorization for: fresh fail-closed preflight; sync migration25 and final 016 only; disposable reset; focused 016; full pgTAP; double typegen/no-drift comparison; temporary tunnels/env/parity; focused Task4+Task5 reference integration; exact remote/local cleanup. Production and ports 54321/54322 remain prohibited.
 
 - [ ] **Step 10: Run disposable migration/pgTAP/typegen GREEN**

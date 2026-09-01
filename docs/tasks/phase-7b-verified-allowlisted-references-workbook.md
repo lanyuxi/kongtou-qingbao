@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**Task 1–4 已完成；Task 5 migration25 disposable GREEN 因单次同步路径错误 BLOCKED，误放文件已清理，等待 fresh corrected GREEN 授权**；生产未访问
+> 当前状态：**Task 1–4 已完成；Task 5 修复版 migration25 disposable GREEN 已明确授权，等待 fresh fail-closed preflight**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -204,3 +204,4 @@
 | 2026-08-31 | Task 5 migration25 disposable GREEN remote preflight COMPLETE | Disposable-only read-only preflight exit 0: exact workdir/project/CLI2.112.0, healthy only 64322/64321, 24/max20260830000100, marker=1, seed/23/24/014/015 exact, remote migration25/016 and Task1C typegen temp absent. No sync/reset/test/tunnel/production. |
 | 2026-09-01 | Task 5 migration25 disposable GREEN sync BLOCKED | The single combined SCP targeted common remote `supabase/`, so SCP preserved basenames and placed migration25/016 in the root rather than exact `migrations/`/`tests/` destinations. Correct destinations stayed absent; fail-closed stop occurred before reset/pgTAP/typegen/tunnel/integration. Corrected run must use two explicit source-to-file destinations and no combined directory target. |
 | 2026-09-01 | Task 5 migration25 disposable GREEN mismatch cleanup COMPLETE | Independent diagnosis showed both mistaken files present, correct targets absent, DB/Kong healthy, 24/max migration24. Each mistaken file passed its authorized SHA before exactly those two paths were removed; final four paths absent, marker=1, local 16432/16433 and Task1C temps clear. No reset/test/typegen/tunnel/integration/source change/production. Steps10–11/masterStep4 unchecked; fresh corrected GREEN authorization required. |
+| 2026-09-01 | Task 5 corrected migration25 disposable GREEN AUTHORIZED | Owner explicitly authorized `授权修复版 Task 5 migration25 disposable GREEN`. Fresh single-use run retains preflight, one reset, focused/full pgTAP, double no-drift typegen, one sequential Task4+5 integration, and exact cleanup. Copy is corrected to two independent commands with full exact destination filenames, migration25 first and 016 second after SHA/line verification; combined/common-directory SCP is prohibited. Production/54321/54322 and all original exclusions remain. |

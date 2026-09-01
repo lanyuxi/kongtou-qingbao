@@ -1,10 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 migration25 disposable GREEN 在单次同步路径错误处 BLOCKED，误放文件已精确清理**；需 fresh corrected GREEN 授权。）
+> 最近更新：2026-09-01（**Phase 7B Task 5 修复版 migration25 disposable GREEN 已明确授权**；下一步 fresh fail-closed preflight。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Fix Round 1 本地实现/审查已完成。首次 migration25 disposable GREEN 的 local/remote preflight 通过，但 combined SCP 把两个文件误放到远端 `supabase/` 根目录；执行在 reset 前 fail-closed 停止，误放文件经 SHA 核对后精确删除，最终仍为 24 migrations/max migration24、marker=1。详细 Steps 10–11/master Step 4 未完成，需 fresh corrected GREEN 授权。Task 6–10 尚未实现；生产仍为 19 个已应用迁移，第20–25个按 production unapplied 处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Fix Round 1 本地实现/审查已完成。首次 GREEN 的误放文件已清理，数据库保持 24 migrations/max migration24、marker=1；项目所有者已明确授权修复版 migration25 disposable GREEN。修复版只允许两条独立的 exact-file SCP，禁止 common-directory combined SCP；下一步 fresh local/remote preflight。Task 6–10 尚未实现；生产仍为 19 个已应用迁移，第20–25个按 production unapplied 处理。
+
+**2026-09-01 Task 5 corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权修复版 Task 5 migration25 disposable GREEN`。这是替代已消耗 blocker run 的 fresh single-use 授权：保留 preflight、一次 reset、focused/full pgTAP、双 typegen no-drift、一次 sequential Task4+5 integration 与 exact cleanup；同步改为 migration25、016 各一条独立命令，必须直接指向完整 `supabase/migrations/...sql` 与 `supabase/tests/...sql` 文件名，前一文件 SHA/行数通过后才能复制后一文件，禁止 combined/common-directory SCP。production/54321/54322 与原禁止项不变；当前尚未开始修复版远端动作。
 
 **2026-08-31 Task 5 migration25 disposable GREEN AUTHORIZED**：在 controller 请求 exact phrase 后，项目所有者回复 `Task 5 migration25 disposable GREEN`。本次单次授权仅含 fail-closed preflight、只同步最终 migration25/016、一次 disposable reset、focused/full pgTAP、双 typegen 与 committed 158,662-byte types 逐字节无漂移证明、临时 IPv4 16432/16433 tunnels + 0600 四变量 endpoint parity、一次 sequential Task 4+5 integration、独立 residue 与 remote/local temp/tunnel exact cleanup。明确排除 production/54321/54322、source/test/dependency 编辑、第23/24 migration 修改、generated types 替换、额外 reset 或 integration rerun。详细 Step 9 已勾选；当前尚未连接远端或执行任何授权动作。
 
