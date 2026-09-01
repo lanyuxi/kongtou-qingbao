@@ -1,10 +1,12 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 Fix Round 2 scalar trigger 修复已通过独立 scoped review**；SQL 编译和行为 GREEN 仍待 fresh disposable 授权。）
+> 最近更新：2026-09-01（**Phase 7B Task 5 二次修复版 migration25 disposable GREEN 已明确授权**；下一步 fresh fail-closed preflight。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task 1–4 已完成；Task 5 Fix Round 2 已把 migration25 trigger 的 record loop 最小改为 scalar `v_reference_id` 并通过独立 scoped review（SPEC COMPLIANT / APPROVED / 0C/0I/0M）。远端仍保留先前 SHA `e0f1f5bf…8f29` 的25-migration disposable状态；本轮新 SHA `07665b57…af040` 尚未同步，SQL编译、focused016与行为GREEN须在fresh授权后复验。Task6–10尚未实现；生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–4已完成；Task5 Fix Round2 scalar trigger修复已独立审查通过。项目所有者现已授权二次修复版GREEN：远端基线须为25 migrations、旧migration25 SHA与exact016；只覆盖新版migration25，不复制016，再执行一次reset与剩余GREEN序列。当前尚未开始本轮远端动作。Task6–10尚未实现；生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+
+**2026-09-01 Task 5 second-corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权二次修复版 Task 5 migration25 disposable GREEN`。本次fresh single-use授权以远端25 migrations/旧migration25 SHA `e0f1f5bf…8f29`/exact016为基线；仅允许一条exact source→full migration filename SCP覆盖为新SHA `07665b57…af040`，禁止复制016。之后仅一次disposable reset、focused/full pgTAP、双typegen与committed 158,662-byte types no-drift、IPv4 tunnel/env parity、一次sequential Task4+5 integration和exact cleanup。production/54321/54322、combined SCP、source/test编辑、额外reset/rerun仍禁止；尚未开始远端动作。
 
 **2026-09-01 Task 5 Fix Round 2 trigger scalar local COMPLETE**：仅将 `flag_references_for_new_indicator()` 的 `v_matched record` 改为 `v_reference_id uuid`，ordered loop 改为只 select `reference_row.id`，并把六处 trigger-loop 引用替换为 scalar；UUID-text ordering、reference lock→post-wait version re-read→idempotent flag/outbox、两个 decision RPC 与两处 `AR209` guard 均未改。migration25 仍 **591 lines**，新 SHA-256 `07665b57872f0c399162a37f5597cc6c5cd4628c38e13431c6e43b4e245af040`；diff 为 **8 insertions / 8 deletions**，文档前仅该文件变更。静态检查确认 scalar declaration、exact helper token、lock-before-flag、UUID-text ordering、trigger section no `v_matched`、two AR209 guards；migration23/24、016、两份 integration 与 generated types hashes 未漂移。Node `v22.22.2` direct eslint/`tsc --noEmit` exit 0；focused Vitest 为 **1 passed / 1 environment-gated skipped file; 29 passed / 5 skipped tests / exit 0**。无 DB/network/remote/tunnel/reset/typegen/production；skipped integration 不构成 behavioral GREEN，remote re-sync/reset/focused 016 需 fresh authorization。
 

@@ -242,6 +242,8 @@ Expected: immutable hashes unchanged; lint/typecheck/unit tests pass; integratio
 
 > **2026-09-01 CORRECTED AUTHORIZATION:** after the first run stopped before reset because a combined SCP targeted the common `supabase/` directory, the owner explicitly authorized `授权修复版 Task 5 migration25 disposable GREEN`. The corrected run retains the same scope but requires two independent copies to the full exact migration/test destination filenames; combined/common-directory SCP is prohibited.
 
+> **2026-09-01 SECOND-CORRECTED AUTHORIZATION:** after focused 016 exposed the trigger scalar-token alignment defect and Fix Round 2 passed scoped review, the owner explicitly authorized `授权二次修复版 Task 5 migration25 disposable GREEN`. Remote baseline is 25 migrations with the old migration25 SHA and exact unchanged 016; this run copies only the new migration25 to its full exact filename, performs one reset, then resumes the same focused/full/typegen/integration/cleanup sequence. Copying 016 remains prohibited.
+
 Request authorization for: fresh fail-closed preflight; sync migration25 and final 016 only; disposable reset; focused 016; full pgTAP; double typegen/no-drift comparison; temporary tunnels/env/parity; focused Task4+Task5 reference integration; exact remote/local cleanup. Production and ports 54321/54322 remain prohibited.
 
 - [ ] **Step 10: Run disposable migration/pgTAP/typegen GREEN**
