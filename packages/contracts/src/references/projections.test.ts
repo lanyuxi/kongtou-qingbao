@@ -3,9 +3,13 @@ import { describe, expect, it } from 'vitest';
 import {
   domainAuthorityReviewListCursorSchema,
   domainAuthorityReviewListQuerySchema,
+  publicProjectDomainAuthorityListQuerySchema,
+  publicProjectDomainAuthorityListSchema,
   publicProjectDomainAuthoritySchema,
   publicProjectReferenceSchema,
   publicProjectReferenceCursorSchema,
+  publicProjectReferenceListQuerySchema,
+  publicProjectReferencePageSchema,
   referenceReviewListCursorSchema,
   referenceReviewListQuerySchema,
   reviewerDomainAuthorityDetailSchema,
@@ -104,6 +108,106 @@ describe('reference projections', () => {
       'domain',
       'grantedAt',
     ]);
+  });
+
+  it('requires a project scope and bounds the public reference list query', () => {
+    const cursor = encodeCursor({
+      lastVerifiedAt: '2026-08-29T02:00:00.000Z',
+      referenceId,
+    });
+
+    expect(publicProjectReferenceListQuerySchema.parse({ projectId, cursor })).toEqual({
+      projectId,
+      cursor,
+      limit: 25,
+    });
+    expect(publicProjectReferenceListQuerySchema.parse({ projectId })).toEqual({
+      projectId,
+      cursor: null,
+      limit: 25,
+    });
+
+    for (const invalid of [
+      {},
+      { projectId, limit: 0 },
+      { projectId, limit: 101 },
+      { projectId, cursor: 'not-base64url+' },
+      { projectId, extra: true },
+    ]) {
+      expect(
+        publicProjectReferenceListQuerySchema.safeParse(invalid).success,
+        JSON.stringify(invalid),
+      ).toBe(false);
+    }
+  });
+
+  it('rejects a public reference page that leaks internal fields or a foreign cursor', () => {
+    const item = {
+      projectId,
+      referenceId,
+      kind: 'official_site' as const,
+      label: '官方领取页',
+      url: 'https://example.com/claim',
+      lastVerifiedAt: '2026-08-29T00:00:00.000Z',
+    };
+    const cursor = encodeCursor({
+      lastVerifiedAt: '2026-08-29T00:00:00.000Z',
+      referenceId,
+    });
+
+    expect(publicProjectReferencePageSchema.parse({ items: [item], nextCursor: cursor })).toEqual({
+      items: [item],
+      nextCursor: cursor,
+    });
+    expect(publicProjectReferencePageSchema.parse({ items: [], nextCursor: null })).toEqual({
+      items: [],
+      nextCursor: null,
+    });
+
+    for (const invalid of [
+      { items: [{ ...item, normalizedDomain: 'example.com' }], nextCursor: null },
+      { items: [{ ...item, evidenceId }], nextCursor: null },
+      { items: [item], nextCursor: 'not-base64url+' },
+      { items: [item], nextCursor: cursor, extra: true },
+      { items: [item] },
+    ]) {
+      expect(publicProjectReferencePageSchema.safeParse(invalid).success).toBe(false);
+    }
+  });
+
+  it('requires a project scope and bounds the public domain authority list query', () => {
+    expect(publicProjectDomainAuthorityListQuerySchema.parse({ projectId })).toEqual({
+      projectId,
+      limit: 25,
+    });
+    expect(publicProjectDomainAuthorityListQuerySchema.parse({ projectId, limit: 100 })).toEqual({
+      projectId,
+      limit: 100,
+    });
+
+    for (const invalid of [{}, { projectId, limit: 0 }, { projectId, limit: 101 }, { projectId, extra: true }]) {
+      expect(
+        publicProjectDomainAuthorityListQuerySchema.safeParse(invalid).success,
+        JSON.stringify(invalid),
+      ).toBe(false);
+    }
+    expect(
+      publicProjectDomainAuthorityListSchema.parse({
+        items: [
+          {
+            projectId,
+            authorityId,
+            domain: 'example.com',
+            grantedAt: '2026-08-29T00:00:00.000Z',
+          },
+        ],
+      }).items,
+    ).toHaveLength(1);
+    expect(
+      publicProjectDomainAuthorityListSchema.safeParse({
+        items: [{ projectId, authorityId, domain: 'example.com', grantedAt: '2026-08-29T00:00:00.000Z', note: 'x' }],
+      }).success,
+    ).toBe(false);
   });
 
   it('accepts a reviewer list item with derived state and last verified time', () => {

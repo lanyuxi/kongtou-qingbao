@@ -399,19 +399,19 @@ Follow detailed-plan Steps 12–13. Commit with `test(db): prove reference secur
 - Consumes: `public_project_references`, `public_project_domain_authorities`, and Phase 7A public posture.
 - Produces: anon-safe verified reference reads with an opaque cursor and no base-table fallback.
 
-- [ ] **Step 1: Write public projection RED tests**
+- [x] **Step 1: Write public projection RED tests**
 
 Cover: verified-only rows, flagged/withdrawn/candidate exclusion, blocked-project suppression, granted-domain-only rows, exact selected columns, malformed-row failure, no fallback base-table reads, cursor order, empty pages, and absence of Evidence ids, locators, notes, actor identity, and normalization diagnostics.
 
-- [ ] **Step 2: Run database RED**
+- [x] **Step 2: Run database RED**
 
 ```bash
 pnpm --filter @airdrop/database test
 ```
 
-- [ ] **Step 3: Implement the repository**
+- [x] **Step 3: Implement the repository**
 
-- [ ] **Step 4: Run database GREEN**
+- [x] **Step 4: Run database GREEN**
 
 ```bash
 pnpm --filter @airdrop/database test
@@ -419,7 +419,7 @@ pnpm --filter @airdrop/database lint
 pnpm --filter @airdrop/database typecheck
 ```
 
-- [ ] **Step 5: Update workbook/HANDOVER and commit**
+- [x] **Step 5: Update workbook/HANDOVER and commit**
 
 ```bash
 git add packages/database/src/repositories packages/database/src/tests packages/database/src/index.ts docs

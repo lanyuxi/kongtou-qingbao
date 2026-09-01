@@ -1,10 +1,16 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 COMPLETE / final review clean**；下一步 Task 6 public reference repositories。）
+> 最近更新：2026-09-01（**Phase 7B Task 6 实现完成，本地门禁全绿**；下一步 Task 7 authenticated reference BFF routes + browser client。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–5已完成；Task5 final review 为 SPEC COMPLIANT / APPROVED / 0C0I0M / READY YES，disposable 与 fresh local gates 全部通过，详细 Steps1–13、master Task5 Steps1–5 complete。下一步 Task6 public reference repositories/projections；Task6–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–6已完成；Task6 新增 `ReferencePublicRepository`（211 行 / 15 测试）与 4 个公共查询·分页 contract schema（contracts +3 测试），8 项变异检验全部 killed，`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 242 = **1,360 non-skipped / 76 gated skips**）。**本轮未连接数据库、未建隧道、未访问远端或生产。** 下一步 Task7 authenticated reference BFF routes + browser client；Task7–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+
+**2026-09-01 Task 6 public reference repositories 本地实现 COMPLETE**：新增 `packages/database/src/repositories/reference-public-repository.ts`（211 行 / SHA-256 `fd43c8f4…bf36`），只经浏览器安全根导出（`packages/database/src/index.ts`），无 server-only、无 service role、无 base-table fallback。两个方法：`listVerifiedReferences` 读 `public_project_references`，游标为 `(last_verified_at desc, reference_id desc)` 的不透明 base64url，续页 filter 与 Phase 7A blocked 列表同款 `or(lt, and(eq, lt))` 形状；`listGrantedDomainAuthorities` 读 `public_project_domain_authorities`，按 `(granted_at desc, authority_id desc)` 有界列表（`range(0, limit-1)`，不分页、无游标——规范 §12 只为引用定义了游标）。两者都 parse-before-map：先严格键集校验（多一个内部列即 TypeError），再校验 `project_id` 落在请求作用域内（跨项目行即 TypeError），最后用 contract schema 校验取值；错误边界只抛带稳定 code 的 `ReferencePublicProjectionQueryError`，PostgREST message/details/hint 不外泄。contracts 侧新增 `publicProjectReferenceListQuerySchema` / `publicProjectReferencePageSchema` / `publicProjectDomainAuthorityListQuerySchema` / `publicProjectDomainAuthorityListSchema` 四个 strict schema 与六个类型导出（公共列表查询属 API 契约，按 `AGENTS.md` 必须落在 `packages/contracts`）。
+
+**2026-09-01 Task 6 RED / GREEN / 变异检验**：RED 为 `Cannot find module '../repositories/reference-public-repository.js'`（0 个新用例执行，既有 287 全过）。实现后 focused **15/15 PASS**。三处初始失败全为测试侧缺陷并已修正：① fake client 无法模拟 PostgREST `or` 语义，行级续页属数据库保证，已改为只断言 orders/orFilters/游标编码与页大小，不伪造行内容；② 取值级畸形（如 `last_verified_at: null`）抛 ZodError 而非键集校验的 TypeError，已把「内部字段」与「不安全取值」拆成两组断言。变异检验 **8/8 killed**：base-table 回退（7 失败）、selection 加宽 `normalized_domain`、去掉项目作用域校验、反转游标顺序、跳过 authority 严格键集、把 PostgREST `message` 当 code 外泄、去掉 `project_id` 过滤、去掉 `slice(0, limit)`——每项均立即复现失败并还原。fresh 全仓 `pnpm verify` exit 0，lint/typecheck/build/placeholders 全绿。
+
+**2026-09-01 Task 6 边界与未完成项（接手者必读）**：Task 6 **只有本地单测证据，没有数据库行为证据**——flagged/withdrawn/candidate 排除、blocked 项目抑制、granted-only 过滤、游标真实续页均由 migration 23/24 的视图与 `reference_is_publicly_renderable_v1()` 保证，仓库层能做且已做的是「永不读基表、永不回退、永不外泄」。若要行为级证明，须按 Task 4/5 惯例**单独申请 disposable 授权**（reset → 造 verified/candidate/flagged/withdrawn/blocked 五种 fixture → 隧道 → anon 客户端分页 → exact cleanup）。Task 7 的 `/api/v1/references` 与 Task 9 的项目详情链接解析将直接消费本仓库，届时再决定是否补 disposable 证明。
 
 **2026-09-01 Task 5 second-corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权二次修复版 Task 5 migration25 disposable GREEN`。本次fresh single-use授权以远端25 migrations/旧migration25 SHA `e0f1f5bf…8f29`/exact016为基线；仅允许一条exact source→full migration filename SCP覆盖为新SHA `07665b57…af040`，禁止复制016。之后仅一次disposable reset、focused/full pgTAP、双typegen与committed 158,662-byte types no-drift、IPv4 tunnel/env parity、一次sequential Task4+5 integration和exact cleanup。production/54321/54322、combined SCP、source/test编辑、额外reset/rerun仍禁止；尚未开始远端动作。
 
@@ -301,9 +307,10 @@ Task 4 fresh 最终本地门禁：五 workspace lint/typecheck 全部 exit 0；�
 | 1 | Strict reference contracts（`packages/contracts/src/references/` 四模块） | ✅ 完成 | `f63f793`；contracts 16 files / 161 tests（+28），变异检验通过（strict 放宽 → 泄漏用例失败） |
 | 2 | 纯归一化 / 状态机 / 派生规则（`packages/domain/src/references/` 三模块） | ✅ 完成（含复检修复） | `3cb69bf` + `0b3d721`；domain 410 tests（+26 后复检再 +8）；TS 侧**不用 `new URL`**、与 SQL 同一纯字符串解析算法 |
 | 3 | Reference Ledger 迁移 + 受保护命令 + RLS + 安全联动 SQL + 014 pgTAP + types | ✅ 完成（disposable 验证全绿） | `87cc070` + `0b3d721` + `5772ad5`；迁移 1,992 行 / 37 对象（第 23 个）；full pgTAP 14 files / 1,424 PASS（014 = 74 断言）；集成矩阵 66 PASS；typegen 两次一致；清理回 seed 基线 |
-| 4 | Bearer-scoped reference review repository + 双会话竞态集成 | ⬜ 待执行 | 涉及 disposable 栈，**需用户逐次显式授权** |
-| 5 | 7A 联动集成测试（双会话竞态证明） | ⬜ 待执行 | 同上；SQL 已随 Task 3 交付，Task 5 只做集成测试 |
-| 6–10 | 公共投影仓储 / BFF / reviewer UI / 公开链接解析 / Golden+收口 | ⬜ 待执行 | 详见实施计划 |
+| 4 | Bearer-scoped reference review repository + 双会话竞态集成 | ✅ 完成 | `93acfbf`；第24 migration 1,241 行 + 015（59 断言）；disposable reset/full pgTAP（15 files / 1,483）/双 typegen 无漂移/integration 全绿；final gate 1,342 PASS |
+| 5 | 7A 联动集成测试（双会话竞态证明） | ✅ 完成 | 第25 migration `20260831000100`（591 行）+ 016（18 断言）；两阶段 disposable 授权后全绿；final review `0C/0I/0M`。**注意：SQL 未随 Task 3 交付**——原计划措辞已被 corrected locking design 取代 |
+| 6 | Strict public reference repositories and projections | ✅ 完成（本地门禁全绿；**无数据库行为证据**） | `reference-public-repository.ts` 211 行 / 15 测试 / 8 项变异检验 killed；全仓 verify 1,360 non-skipped / 76 gated skips。行为级证明需单独 disposable 授权 |
+| 7–10 | BFF / reviewer UI / 公开链接解析 / Golden+收口 | ⬜ 待执行 | 详见实施计划 |
 
 **已落地的关键设计事实（接手者必读）**：
 - 数据模型实际为 **6 张表**（规范写 5 张）：额外加了 `reference_review_commands` 独立回执表（`security_review_commands` 的列与 aggregate 校验是安全专用，硬塞会扭曲语义）；决策历史表各含 `aggregate_version bigint` 列，状态推导按 `aggregate_version desc` 排序（同事务内 `transaction_timestamp()` 恒定，按时间排会退化为随机 UUID 序）。

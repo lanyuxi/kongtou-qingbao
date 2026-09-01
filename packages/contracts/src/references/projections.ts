@@ -117,6 +117,28 @@ export const publicProjectDomainAuthoritySchema = z.strictObject({
   grantedAt: timestampSchema,
 });
 
+// Public list boundaries stay explicit so a public endpoint can never widen
+// into an unbounded scan or leak a driver-side default.
+export const publicProjectReferenceListQuerySchema = z.strictObject({
+  projectId: uuidSchema,
+  cursor: publicProjectReferenceCursorSchema.nullable().default(null),
+  limit: z.number().int().min(1).max(100).default(25),
+});
+
+export const publicProjectReferencePageSchema = z.strictObject({
+  items: z.array(publicProjectReferenceSchema),
+  nextCursor: publicProjectReferenceCursorSchema.nullable(),
+});
+
+export const publicProjectDomainAuthorityListQuerySchema = z.strictObject({
+  projectId: uuidSchema,
+  limit: z.number().int().min(1).max(100).default(25),
+});
+
+export const publicProjectDomainAuthorityListSchema = z.strictObject({
+  items: z.array(publicProjectDomainAuthoritySchema),
+});
+
 export const reviewerReferenceListItemSchema = z.strictObject({
   referenceId: uuidSchema,
   projectId: uuidSchema,
@@ -191,6 +213,16 @@ export const reviewerReferenceDetailSchema = z.strictObject({
 export type PublicProjectReference = z.infer<typeof publicProjectReferenceSchema>;
 export type PublicProjectDomainAuthority = z.infer<typeof publicProjectDomainAuthoritySchema>;
 export type PublicProjectReferenceCursor = z.infer<typeof publicProjectReferenceCursorSchema>;
+export type PublicProjectReferenceListQuery = z.infer<
+  typeof publicProjectReferenceListQuerySchema
+>;
+export type PublicProjectReferencePage = z.infer<typeof publicProjectReferencePageSchema>;
+export type PublicProjectDomainAuthorityListQuery = z.infer<
+  typeof publicProjectDomainAuthorityListQuerySchema
+>;
+export type PublicProjectDomainAuthorityList = z.infer<
+  typeof publicProjectDomainAuthorityListSchema
+>;
 export type ReferenceReviewListCursor = z.infer<typeof referenceReviewListCursorSchema>;
 export type DomainAuthorityReviewListCursor = z.infer<
   typeof domainAuthorityReviewListCursorSchema
