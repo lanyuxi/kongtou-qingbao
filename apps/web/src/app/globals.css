@@ -1129,3 +1129,79 @@ td.num-col {
   color: var(--warn);
   font-size: 12.5px;
 }
+
+.reference-inert {
+  color: var(--ink-500);
+  font-size: 12.5px;
+}
+
+.reference-inert-value {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: #f0f2f4;
+  color: var(--ink-700);
+  overflow-wrap: anywhere;
+}
+
+.reference-link {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
+.reference-link-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.reference-link-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+}
+
+.reference-verified-at {
+  color: var(--ink-400);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.reference-domain-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reference-domain {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-700);
+}
+
+.reference-domain-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--good-bg);
+  color: var(--good);
+  overflow-wrap: anywhere;
+}
+
+.reference-domain-label {
+  color: var(--ink-400);
+  font-size: 12px;
+}

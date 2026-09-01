@@ -1,10 +1,20 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 8 实现完成，本地门禁全绿**；下一步 Task 9 public link resolution + unverified-link marking。）
+> 最近更新：2026-09-01（**Phase 7B Task 9 实现完成，本地门禁全绿**；下一步 Task 10 Golden Dataset / E2E / runbook / full verification。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–8已完成；Task8 新增四组件（authority-list 146 / authority-detail 328 / reference-list 271 / reference-detail 329 行）、三个页面、shell 导航与 runtime `referenceApi`，web +25 测试，变异检验 19/19 killed，`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 342 = **1,460 non-skipped / 76 gated skips**）。**本轮未连接数据库、未建隧道、未访问远端或生产。** 下一步 Task9 public link resolution + unverified-link marking；Task9–10未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–9已完成；Task9 新增 `reference-elements.tsx`（126 行：`resolveOfficialWebsite` / `OfficialWebsiteLink` / `VerifiedReferenceLinks` / `GrantedDomainChips`）与 13 个新测试，项目详情页改为「官方网站仅在匹配已验证引用时才是链接」，`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 353 = **1,471 non-skipped / 76 gated skips**）。**本轮未连接数据库、未建隧道、未访问远端或生产。** 下一步 Task10 Golden Dataset / E2E / runbook / full verification；Task10未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+
+**2026-09-01 Task 9 public link resolution + unverified-link marking COMPLETE**：公开项目详情页的对外链接从此只来自已验证白名单引用。新增 `apps/web/src/components/reference-elements.tsx`（126 行）四个导出：①`resolveOfficialWebsite(references, officialWebsiteUrl)`——`official_website_url` 与引用列表的匹配必须经 `@airdrop/domain` 的 `normalizeReferenceUrl`（与登记时同一纯函数），因此一个值不可能「以形式 A 通过验证、以形式 B 渲染」；归一化失败（如 `javascript:`）的 URL 永不匹配；`www.` 与裸域名按产品决策 3 仍是独立权威，不会静默互认。②`OfficialWebsiteLink`——blocked 时惰性文本「已停用」；未验证时惰性文本「未验证」+ 原始线索代码样式（可见但不可点）；匹配已验证引用时渲染锚点（`rel="noreferrer noopener"`、`target="_blank"`）。③`VerifiedReferenceLinks`——锚点列表 + `<time dateTime={lastVerifiedAt}>`（核验时间机器可读，可见文案走共享 `formatTimestamp`）；blocked 或空列表渲染为空。④`GrantedDomainChips`——已授权域名仅作「所有权证据」芯片渲染，永不为链接。
+
+**2026-09-01 Task 9 loader / 页面接线**：`project-detail-loader.ts` 的 `loadProjectDetailFromRepository` 增加第三参 `referenceRepository: ReferencePublicRepository`，六个读取（信号/因子/引用/安全/引用列表/权威列表）一次 `Promise.all` 发起后组合，引用快照限 100 条且不受更慢的评分读取影响（有独立测试：评分读取挂起时引用快照不被二次读取改写）。`projects/[slug]/page.tsx` 改为从 `reference-elements.js` 导入 `OfficialWebsiteLink` 并传 `references`，安全横幅后新增「已验证引用」板块（空或 blocked 时整块不渲染），底部过时说明改为「外部引用链接仅来自已验证的白名单引用，官方网站未通过验证时只作为线索展示、不可点击」。
+
+**2026-09-01 Task 9 修正的继承缺陷（接手者必读）**：①**测试 fixture 契约失真**——`RecordingReferencePublicRepository` 原直接 resolve 数组，而真实 `ReferencePublicRepository` 返回 `{version, items, nextCursor}` / `{version, items}` 分页对象，按原样实现运行时 `page.items` 会是 `undefined`，已改为按契约构造页对象；②**`dateTime` 大小写**——React 服务端渲染保留驼峰属性名，测试断言由 `datetime=` 改为 `dateTime=`；③**旧组件移除**——`security-elements.tsx` 的被取代 `OfficialWebsiteLink` 与其 3 个渲染测试删除，其中「公开组件源码不得含内部字段」的卫生测试独立成块并纳入 `reference-elements.tsx` 扫描范围。
+
+**2026-09-01 Task 9 计划外改动（已记录待确认）**：①`apps/web/package.json` 新增 `@airdrop/domain: workspace:*` 依赖——`resolveOfficialWebsite` 必须复用 domain 包的归一化函数（重新实现会产生分叉类，违反 Task 2 教训），`pnpm-lock.yaml` 仅新增一条内部链接、无外部依赖；②`globals.css` 新增 `.reference-*` 样式块——全局 `a { color: inherit; text-decoration: none }` 规则会把新锚点剥成无色纯文本，链接外观必须显式声明。
+
+**2026-09-01 Task 9 变异检验 8/8 killed**：`reference-elements.tsx` 6 项（归一化匹配改为原始串比较、blocked 守卫删除、未验证时渲染锚点、`VerifiedReferenceLinks` blocked 守卫删除、`rel` 属性删除、域名芯片改为链接）+ `project-detail-loader.ts` 2 项（两处 `page.items` 改为空数组）。全部逐变异注入→窄域测试失败→还原，文件无残留。RED→GREEN 基线：focused 356 → 全 web **353 PASS**（移除 3 个旧测试、净增 13 个新测试 + 1 个快照独立测试 + 1 个源码卫生重组），`pnpm verify` exit 0 = **1,471 non-skipped / 76 gated skips**。本轮未连库、未建隧道、未访问远端或生产。下一步 Task 10。
 
 **2026-09-01 Task 8 reviewer workflow COMPLETE**：四组件 + 三页面。`authority-list.tsx`（146 行）：域名权威列表、状态过滤、游标、`authorityDetailHref`。`authority-detail.tsx`（328 行）：权威详情与不可变历史、决策表单（grant/revoke/regrant），并承载共享的 `ReferenceSubmissionState` 与 `SubmissionMessage`。`reference-list.tsx`（271 行）：引用列表、状态过滤、游标、`referenceDetailHref`，以及候选引用登记表单。`reference-detail.tsx`（329 行）：引用详情（含域名权威上下文、最近核验时间、活跃安全指标）与决策表单（verify/reverify/restore/withdraw）。
 

@@ -1,7 +1,7 @@
 # Phase 7B Verified Allowlisted References — Development Workbook
 
 > 日期：2026-08-29
-> 当前状态：**Task1–4已完成；Task5二次修复版migration25 disposable GREEN已明确授权，等待fresh preflight**；生产未访问
+> 当前状态：**Task1–9已完成；下一步 Task10 Golden Dataset / E2E / runbook / full verification**；生产未访问
 > 权威设计：`docs/superpowers/specs/2026-08-29-phase-7b-verified-allowlisted-references-design.md`
 > 实施计划：`docs/superpowers/plans/2026-08-29-phase-7b-verified-allowlisted-references.md`
 > 前置：Phase 7A 已于 2026-08-29 以 merge `00b4497` 并入主线 `codex/phase-0-1-foundation`
@@ -38,7 +38,7 @@
 | 6 | Strict public reference repositories and projections | ✅ 完成（本地门禁全绿） | `reference-public-repository.ts` 211 行 / 15 测试；contracts +3 测试（公共列表查询与分页 schema）；8 项变异检验全部 killed；`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 242 = **1,360 non-skipped / 76 gated skips**）。**未访问数据库/远端/生产**。 |
 | 7 | Authenticated reference BFF routes + browser client | ✅ 完成（本地门禁全绿） | 三模块：`reference-cursor.ts` 34 行 / `reference-review-handlers.ts` 454 行 / `reference-review-api-client.ts` 247 行；五个 BFF 路由；web +75 测试（7+44+24）；16 项变异检验全部 killed；打包隔离已扩到新客户端；`pnpm verify` exit 0 = **1,435 non-skipped / 76 gated skips**。**未访问数据库/远端/生产**。 |
 | 8 | Reviewer reference workflow UI（`/review/references`） | ✅ 完成（本地门禁全绿） | 四组件（authority-list 146 / authority-detail 328 / reference-list 271 / reference-detail 329 行）+ 三页面 + shell 导航 + runtime `referenceApi`；web +25 测试；变异检验 19/19 killed（含 3 项首轮存活后补测）；`pnpm verify` exit 0 = **1,460 non-skipped / 76 gated skips**。**未访问数据库/远端/生产**。 |
-| 9 | Public link resolution + unverified-link marking | 待执行 | — |
+| 9 | Public link resolution + unverified-link marking | ✅ 完成（本地门禁全绿） | `reference-elements.tsx` 126 行（`resolveOfficialWebsite` / `OfficialWebsiteLink` / `VerifiedReferenceLinks` / `GrantedDomainChips`）+ 13 新测试；`project-detail-loader` 增加第三参并行读引用/权威快照；`projects/[slug]` 页接线；旧 `security-elements` 的 `OfficialWebsiteLink` 与其 3 个测试移除（源码卫生测试保留并纳入新组件）。新增计划外改动：`apps/web` 增加 `@airdrop/domain` 工作区依赖 + `globals.css` 新增 `.reference-*` 样式。8 项变异检验全部 killed；`pnpm verify` exit 0 = contracts 170 + domain 410 + database 302 + worker 236 + web 353 = **1,471 non-skipped / 76 gated skips**。**未访问数据库/远端/生产**。 |
 | 10 | Golden Dataset / E2E / runbook / full verification | 待执行 | — |
 
 ## 4. 执行约定
@@ -245,3 +245,4 @@
 | 2026-09-01 | Task 5 STEP 12 FRESH LOCAL GATE COMPLETE | Five workspace lint/typecheck/build exit0. Vitest contracts167 + domain410 + database287 + worker236 + web242 = **1,342 pass / 76 gated skips**, all exit0. Four TS builds pass; Web initial wrong root Next entry never launched build, workspace-local Next16.3.0 rerun pass, no code/dependency edit. Placeholder/sensitive/diff, migration23/24/25+016+Task4/Task5+types hashes, 158,662-byte types, env/temp/ports and exact docs-only status all pass. No DB/network/remote/production. Detailed Step12 complete; next final review/commit. |
 | 2026-09-01 | Task 5 FINAL REVIEW CLEAN / COMPLETE | Independent final review over Task5 baseline→HEAD plus current evidence: **SPEC COMPLIANT / APPROVED / 0C / 0I / 0M / READY YES**. Three-function migration/lock order/post-wait/AR209, 18 pgTAP checks, exact five integration cases, immediate rejection handler, package entry, type no-drift and all RED/GREEN/cleanup/local evidence approved. Detailed Step13/masterStep5 complete; Task5 DONE, next Task6. |
 | 2026-09-01 | Task 5 COMPLETION COMMIT | `ed02b2f docs: complete task 5 reference security coupling` commits final review/evidence, detailed Steps10–13 and master Steps4–5 completion, workbook and HANDOVER. This row is the planned docs-only hash follow-up; Task6 next. |
+| 2026-09-01 | Task 9 实现 | 接手时 worktree 已有本任务前序改动（`reference-elements.tsx`/测试、loader 三参签名、`opportunity-queries.ts` 注入、`@airdrop/domain` 依赖），本轮补齐：①修正 `RecordingReferencePublicRepository` fixture 契约——真实仓储返回 `{version, items, nextCursor}` 分页对象，原 fixture 直接 resolve 数组，loader 的 `page.items` 会在运行时得到 `undefined`；②`dateTime` 断言大小写修正（React 服务端渲染保留驼峰属性名）；③`projects/[slug]/page.tsx` 接线新组件并新增「已验证引用」板块、修正过时底部说明；④移除 `security-elements` 旧 `OfficialWebsiteLink` 与其 3 个被取代测试，源码卫生测试独立成块并纳入 `reference-elements.tsx` 扫描；⑤`globals.css` 新增 `.reference-*` 样式（全局 `a` 规则会剥离链接外观）。变异检验 **8/8 killed**（原始 URL 匹配、blocked 守卫 ×2、未验证守卫、rel 属性、域名变链接、loader 两处 `page.items`→空列表）。`pnpm verify` exit 0：contracts 170 + domain 410 + database 302 + worker 236 + web 353 = **1,471 non-skipped / 76 gated skips**。**计划外改动已记录**：`apps/web` 新增 `@airdrop/domain` workspace 依赖（lockfile 仅新增内部链接）与 `globals.css` 样式。本轮未连库、未建隧道、未访问远端或生产。 |

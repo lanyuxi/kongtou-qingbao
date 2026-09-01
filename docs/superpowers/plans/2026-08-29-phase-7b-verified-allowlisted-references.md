@@ -540,21 +540,21 @@ git commit -m "feat(web): build reference reviewer workflow"
 - Consumes: `ReferencePublicRepository` and Phase 7A public posture.
 - Produces: link resolution that renders an anchor only for verified references and marks everything else unverified and inert.
 
-- [ ] **Step 1: Write public rendering RED tests**
+- [x] **Step 1: Write public rendering RED tests**
 
 Cover: clear-project regression equivalence, verified reference rendered as an anchor with `last_verified_at` and `rel="noreferrer noopener"`; granted domain rendered as a chip and never as a link; unverified official URL rendered as inert text with an explicit marker and no anchor; blocked project rendering no reference links; and hostile reference labels rendered inert.
 
-- [ ] **Step 2: Run Web RED**
+- [x] **Step 2: Run Web RED**
 
 ```bash
 pnpm --filter @airdrop/web test -- reference-elements project-detail-loader
 ```
 
-- [ ] **Step 3: Implement link resolution**
+- [x] **Step 3: Implement link resolution**
 
 Load project identity, the current immutable score, and the public reference state separately, then compose them without allowing a later score read to change the reference snapshot. Render `projects.official_website_url` as an anchor only when a verified reference matches its normalized form.
 
-- [ ] **Step 4: Run Web GREEN**
+- [x] **Step 4: Run Web GREEN**
 
 ```bash
 pnpm --filter @airdrop/web test
@@ -563,12 +563,14 @@ pnpm --filter @airdrop/web typecheck
 pnpm --filter @airdrop/web build
 ```
 
-- [ ] **Step 5: Update workbook/HANDOVER and commit**
+- [x] **Step 5: Update workbook/HANDOVER and commit**
 
 ```bash
 git add apps/web/src/components apps/web/src/app/projects apps/web/src/lib apps/web/src/tests docs
 git commit -m "feat(web): resolve official links from verified references"
 ```
+
+> **2026-09-01 Task 9 COMPLETE:** RED was inherited from earlier session artifacts; this round fixed the loader test fixture to match the real page-object contract (`{version, items, nextCursor}`), corrected the `dateTime` attribute casing assertion, wired `projects/[slug]/page.tsx`, removed the superseded `security-elements` `OfficialWebsiteLink`, and added `.reference-*` styles plus the unplanned `@airdrop/domain` workspace dependency (lockfile gains only an internal link). Mutation testing 8/8 killed. Fresh `pnpm verify` exit 0 at **1,471 non-skipped / 76 gated skips** (contracts 170 + domain 410 + database 302 + worker 236 + web 353). No database, tunnel, remote, or production access.
 
 ---
 

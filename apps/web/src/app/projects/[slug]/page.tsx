@@ -9,10 +9,15 @@ import {
   lifecycleLabel,
 } from '../../../components/opportunity-elements.js';
 import {
+  GrantedDomainChips,
+  OfficialWebsiteLink,
+  VerifiedReferenceLinks,
+} from '../../../components/reference-elements.js';
+import {
   ScoreEvidenceCitations,
   ScoreFactorGroups,
 } from '../../../components/project-score-evidence.js';
-import { OfficialWebsiteLink, ProjectSecurityBanner } from '../../../components/security-elements.js';
+import { ProjectSecurityBanner } from '../../../components/security-elements.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';
@@ -28,9 +33,12 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const { project, signals, factors, citations, security } = detail;
+  const { project, signals, factors, citations, security, references, authorities } = detail;
   const score = project.latestScore;
   const historical = security.posture === 'blocked';
+  // Both children already self-render as null when blocked or empty; this guard
+  // only keeps an empty card from showing its heading with no content.
+  const hasReferences = references.length > 0 || authorities.length > 0;
 
   return (
     <main>
@@ -55,13 +63,25 @@ export default async function ProjectDetailPage({
           {project.officialWebsiteUrl === null ? null : (
             <>
               {' · '}
-              <OfficialWebsiteLink url={project.officialWebsiteUrl} posture={security.posture} />
+              <OfficialWebsiteLink
+                url={project.officialWebsiteUrl}
+                references={references}
+                posture={security.posture}
+              />
             </>
           )}
         </p>
       </div>
 
       <ProjectSecurityBanner state={security} />
+
+      {hasReferences && !historical ? (
+        <section className="card detail-section">
+          <h2 className="detail-section-title">已验证引用</h2>
+          <VerifiedReferenceLinks references={references} posture={security.posture} />
+          <GrantedDomainChips authorities={authorities} posture={security.posture} />
+        </section>
+      ) : null}
 
       {score === null ? (
         <section className="card">
@@ -146,7 +166,7 @@ export default async function ProjectDetailPage({
       <p className="fixture-note">
         演示项目的评分仍为手工样例数据（模型版本 <code>seed-fixture-v1</code>
         ）；真实来源项目由确定性评分管线计算（模型版本 <code>score-model-v1</code>
-        ）。引用首版仅展示经审核的纯文本与安全来源元数据，暂不提供外部引用链接。
+        ）。外部引用链接仅来自已验证的白名单引用，官方网站未通过验证时只作为线索展示、不可点击。
       </p>
     </main>
   );

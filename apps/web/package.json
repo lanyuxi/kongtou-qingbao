@@ -13,6 +13,7 @@
   "dependencies": {
     "@airdrop/contracts": "workspace:*",
     "@airdrop/database": "workspace:*",
+    "@airdrop/domain": "workspace:*",
     "@supabase/supabase-js": "^2.112.2",
     "next": "^16.0.0",
     "react": "^19.2.0",
