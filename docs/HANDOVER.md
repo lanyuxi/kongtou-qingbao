@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 bounded harness fix 审查 CLEAN**；等待 fresh disposable rerun 授权。）
+> 最近更新：2026-09-01（**Phase 7B Task 5 unhandled-rejection disposable GREEN rerun 已授权**；下一步 fresh fail-closed preflight。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–4已完成；Task5 unhandled rejection 的 bounded test-only 修复 `faeb9f9` 已通过本地门禁与独立 scoped review（0C/0I/0M），产品 SQL/锁序/超时/断言未改；下一步需 fresh 授权，仅重做只读 preflight、tunnel/env/parity、一次 Task4+5 integration 与 cleanup，不重跑 reset/pgTAP/typegen。Task6–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–4已完成；Task5 test-only harness fix `faeb9f9` 已本地全绿/审查 clean，owner 已授权窄范围 disposable rerun：仅 fresh 只读 preflight、tunnel/env/parity、一次 Task4+5 integration 与 cleanup；reset/sync/pgTAP/typegen/production 明确排除。Task6–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
 
 **2026-09-01 Task 5 second-corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权二次修复版 Task 5 migration25 disposable GREEN`。本次fresh single-use授权以远端25 migrations/旧migration25 SHA `e0f1f5bf…8f29`/exact016为基线；仅允许一条exact source→full migration filename SCP覆盖为新SHA `07665b57…af040`，禁止复制016。之后仅一次disposable reset、focused/full pgTAP、双typegen与committed 158,662-byte types no-drift、IPv4 tunnel/env parity、一次sequential Task4+5 integration和exact cleanup。production/54321/54322、combined SCP、source/test编辑、额外reset/rerun仍禁止；尚未开始远端动作。
 
@@ -1383,3 +1383,7 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-09-01 Task 5 bounded harness fix ATOMIC COMMIT COMPLETE**：`faeb9f9 test(db): handle expected source block rejection` 已提交，仅含 Task5 integration 的 3+/6- harness fix、worktree HANDOVER 与 Phase7B workbook；主 checkout HANDOVER mirror 保持仅本地、不入 worktree commit。下一步对 blocker→fix 增量做 scoped spec/quality review；未经 review 与 fresh disposable 授权不运行远端复验。
 
 **2026-09-01 Task 5 bounded harness fix SCOPED REVIEW CLEAN**：独立 reviewer 返回 **SPEC COMPLIANT / APPROVED / 0 Critical / 0 Important / 0 Minor**。确认 `.catch` 在 `input.verify()` 返回时同步挂载，消除 rejection-without-handler 窗口；caught error 仍作为 outcome 被既有 `reference_evidence_required` assertion 校验，不会静默放过错误；source advisory lock、waiter、source-block write/release/commit、rollback/finally 与1000ms deadline均未改。`48b38d8..faeb9f9` 的 migration25/016/Task4/types Git blobs一致，本地 5 skips 被诚实限定为非行为证据。fresh disposable rerun 仍必需；精确简报为 `task-1c-unhandled-rejection-rerun-brief.md`。
+
+**2026-09-01 Task 5 bounded harness fix REVIEW BOOKKEEPING COMMIT COMPLETE**：`989d43e docs: record task 5 harness fix review` 已提交审查结论与 fresh rerun 等待状态；当前下一步仅等待 owner 明确授权 `授权 Task 5 unhandled-rejection disposable GREEN rerun`。授权前禁止 remote preflight/tunnel/env/integration；本次未来 rerun 明确不含 reset/sync/pgTAP/typegen。
+
+**2026-09-01 Task 5 unhandled-rejection disposable GREEN rerun AUTHORIZED**：owner 明确回复 `授权 Task 5 unhandled-rejection disposable GREEN rerun`。本次 fresh single-use scope 仅含 local/remote fail-closed preflight、IPv4 16432/16433 tunnels、0600 exact-four-variable env 与三端 parity、一次 Node22 sequential Task4+Task5 integration、20-category residue/final remote state/temp+tunnel cleanup。明确排除 reset、任何 sync/copy/migration operation、pgTAP、typegen、source/test/dependency edit、第二次 integration、production/54321/54322。任一不符即清理后停止。
