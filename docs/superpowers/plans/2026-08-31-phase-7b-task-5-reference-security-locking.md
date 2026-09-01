@@ -282,7 +282,7 @@ Using Node 22.22.2 direct entry points, run five workspace lint/typecheck/tests/
 
 - [x] **Step 13: Review, update the master plan, and commit**
 
-> **2026-09-01 COMPLETE:** independent final review over `3f688e3..f93db0a` plus current Step10–12 evidence returned **SPEC COMPLIANT / APPROVED / 0C / 0I / 0M / READY TO COMPLETE TASK 5: YES**. All product/test/evidence boundaries passed. Final completion documentation is being committed, followed by a docs-only hash record.
+> **2026-09-01 COMPLETE:** independent final review over `3f688e3..f93db0a` plus current Step10–12 evidence returned **SPEC COMPLIANT / APPROVED / 0C / 0I / 0M / READY TO COMPLETE TASK 5: YES**. All product/test/evidence boundaries passed. Completion evidence commit: `ed02b2f docs: complete task 5 reference security coupling`; its hash is recorded in this docs-only follow-up.
 
 Mark the master Phase 7B Task 5 steps complete, update workbook/HANDOVER with exact RED/GREEN counts, migration/test hashes, typegen no-drift proof, cleanup, review findings, production non-access, and local-vs-production state.
 
