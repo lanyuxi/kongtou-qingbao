@@ -3,6 +3,9 @@ import type {
   PublicProjectReference,
   SecurityPosture,
 } from '@airdrop/contracts';
+import { readdirSync, readFileSync } from 'node:fs';
+import { relative, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -211,3 +214,39 @@ describe('GrantedDomainChips', () => {
     ).toBe('');
   });
 });
+
+describe('domain package client boundary', () => {
+  it('keeps @airdrop/domain out of client components so node builtins stay server-side', () => {
+    // These components import normalizeReferenceUrl from @airdrop/domain, whose
+    // package root also re-exports intelligence/evidence-grounding, and that
+    // module imports node:crypto. That is fine while reference resolution runs
+    // in server components, but a single client import would drag a Node
+    // builtin into the browser bundle and break the build. The boundary is
+    // invisible at the import site, so it is asserted here instead.
+    expect(clientModulesImportingDomain()).toEqual([]);
+  });
+});
+
+function clientModulesImportingDomain(): readonly string[] {
+  const sourceRoot = join(fileURLToPath(new URL('../..', import.meta.url)), 'src');
+  const offenders: string[] = [];
+
+  const walk = (directory: string): void => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (!/\.(ts|tsx)$/u.test(entry.name) || entry.name.includes('.test.')) continue;
+      const source = readFileSync(path, 'utf8');
+      if (!/^\s*['"]use client['"]/u.test(source)) continue;
+      if (source.includes("from '@airdrop/domain")) {
+        offenders.push(relative(sourceRoot, path));
+      }
+    }
+  };
+  walk(sourceRoot);
+
+  return offenders;
+}
