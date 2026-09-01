@@ -79,6 +79,18 @@ describe('normalizeReferenceUrl', () => {
     );
   });
 
+  it('counts colons across the whole remainder so both layers agree', () => {
+    // The sql layer counts colons in the entire remainder, not only in the
+    // authority, so more than one colon anywhere is treated as an IPv6 literal
+    // and rejected. Accepting a second colon in the path or query here would
+    // let the application resolve a URL the ledger can never have stored.
+    expect(normalizeReferenceUrl('https://example.com/time?t=12:30:45')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com:8443/a:b')).toBeNull();
+    expect(normalizeReferenceUrl('https://example.com:8443/claim')).toBe(
+      'https://example.com:8443/claim',
+    );
+  });
+
   it('normalizes a non-default port with leading zeros like the sql layer', () => {
     expect(normalizeReferenceUrl('https://example.com:0080/x')).toBe('https://example.com:80/x');
     expect(normalizeReferenceUrl('https://example.com:0/x')).toBe('https://example.com:0/x');

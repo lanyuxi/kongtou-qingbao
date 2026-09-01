@@ -99,8 +99,11 @@ export function normalizeReferenceUrl(value: string): string | null {
   }
 
   // More than one colon means an IPv6 literal, which this allowlist does not
-  // accept (the domain rules only admit ASCII hostname labels).
-  if ((authority.match(/:/gu) ?? []).length > 1) {
+  // accept (the domain rules only admit ASCII hostname labels). The sql layer
+  // counts the whole remainder rather than only the authority, so a second
+  // colon in the path or query is rejected here too; otherwise this layer would
+  // resolve URLs the ledger can never have stored.
+  if ((rest.match(/:/gu) ?? []).length > 1) {
     return null;
   }
 
