@@ -22,6 +22,7 @@ const publicAnonMarker = 'public-review-anon-bundle-marker';
 const sessionRuntimeMarker = 'sign_in_failed';
 const apiRuntimeMarker = 'review_version_conflict';
 const securityApiRuntimeMarker = 'security_version_conflict';
+const referenceApiRuntimeMarker = 'reference_version_conflict';
 const forbiddenServiceMarker = 'forbidden-service-role-bundle-marker';
 const forbiddenDatabaseMarker = 'postgresql://forbidden-database-bundle-marker';
 const forbiddenPromotionMarker = 'forbidden-promotion-env-bundle-marker';
@@ -69,13 +70,21 @@ describe('review browser client production bundle', () => {
         sessionRuntime: bundle?.includes(sessionRuntimeMarker),
         apiRuntime: bundle?.includes(apiRuntimeMarker),
         securityApiRuntime: bundle?.includes(securityApiRuntimeMarker),
-      }).toEqual({ sessionRuntime: true, apiRuntime: true, securityApiRuntime: true });
+        referenceApiRuntime: bundle?.includes(referenceApiRuntimeMarker),
+      }).toEqual({
+        sessionRuntime: true,
+        apiRuntime: true,
+        securityApiRuntime: true,
+        referenceApiRuntime: true,
+      });
       expect(bundle?.includes(forbiddenServiceMarker)).toBe(false);
       expect(bundle?.includes(forbiddenDatabaseMarker)).toBe(false);
       expect(bundle?.includes(forbiddenPromotionMarker)).toBe(false);
       expect(bundle?.includes(forbiddenWorkerMarker)).toBe(false);
       expect(bundle).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY|AIRDROP_DATABASE_URL|AIRDROP_PROMOTION_SERVICE_URL|AIRDROP_WORKER_QUEUE_SECRET/);
-      expect(bundle).not.toMatch(/createSecurityReviewRepository|createSecurityPublicRepository|postgres|internalNote|evidenceLocator|rawPayload/);
+      expect(bundle).not.toMatch(
+        /createSecurityReviewRepository|createSecurityPublicRepository|createReferenceReviewRepository|postgres|internalNote|evidenceLocator|rawPayload/,
+      );
     } finally {
       rmSync(parent, { recursive: true, force: true });
     }
@@ -107,6 +116,7 @@ function createFixture(fixtureRoot: string): void {
     'env.ts',
     'review-api-client.ts',
     'security-review-api-client.ts',
+    'reference-review-api-client.ts',
     'review-session.ts',
     'supabase-browser.ts',
   ]) {
@@ -189,6 +199,7 @@ export default function Page() {
 import { useEffect } from 'react';
 import { createReviewApiClient } from '../lib/review-api-client';
 import { createSecurityReviewApiClient } from '../lib/security-review-api-client';
+import { createReferenceReviewApiClient } from '../lib/reference-review-api-client';
 import { createReviewSessionController } from '../lib/review-session';
 import {
   createReviewBrowserAuthPort,
@@ -225,6 +236,19 @@ export function ReviewClientBundleSmoke() {
       }, { status: 409 }),
       ids: { generate: () => 'fixture-security-idempotency-key' },
     });
+    const referenceApi = createReferenceReviewApiClient({
+      session,
+      fetch: async () => Response.json({
+        ok: false,
+        error: {
+          code: 'reference_version_conflict',
+          message: 'Fixture conflict.',
+          requestId: 'a1000000-0000-4000-8000-000000000001',
+          details: null,
+        },
+      }, { status: 409 }),
+      ids: { generate: () => 'fixture-reference-idempotency-key' },
+    });
 
     void session.signIn('reviewer@example.test', 'fixture-password').then((result) => {
       document.body.dataset.sessionResult = result.ok ? 'ok' : result.code;
@@ -242,6 +266,15 @@ export function ReviewClientBundleSmoke() {
       expectedCandidateVersion: 1,
       decision: 'reject',
       reasonCode: 'claim_not_supported',
+      note: null,
+    });
+    void referenceApi.decideReference('a2000000-0000-4000-8000-000000000001', {
+      version: 1,
+      referenceId: 'a2000000-0000-4000-8000-000000000001',
+      expectedVersion: 1,
+      decision: 'verify',
+      reasonCode: 'evidence_verified',
+      evidenceId: 'a3000000-0000-4000-8000-000000000001',
       note: null,
     });
   }, []);

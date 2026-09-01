@@ -447,21 +447,21 @@ git commit -m "feat(database): expose safe public reference projections"
 - Consumes: the Task 4 and Task 6 repositories.
 - Produces: thin authenticated handlers, a strict browser client, and a public verified-reference endpoint.
 
-- [ ] **Step 1: Write handler and client RED tests**
+- [x] **Step 1: Write handler and client RED tests**
 
 Cover: missing/malformed auth, auth verifier failure, unknown/repeated query keys, malformed cursor/body/idempotency key/UUID, every stable `AR2xx` mapping, exact success envelope, fresh token and key per mutation, and typed `409` without retry. Cover the public endpoint cursor behavior and the untrusted-cursor boundary validation.
 
-- [ ] **Step 2: Run Web RED**
+- [x] **Step 2: Run Web RED**
 
 ```bash
 pnpm --filter @airdrop/web test -- reference
 ```
 
-- [ ] **Step 3: Implement the handlers, client, and cursor helper**
+- [x] **Step 3: Implement the handlers, client, and cursor helper**
 
 Route Handlers perform no long-running work. Validate untrusted cursors at the page boundary with `safeParse` and fall back to the first page rather than surfacing a server error.
 
-- [ ] **Step 4: Run Web GREEN and verify bundle isolation**
+- [x] **Step 4: Run Web GREEN and verify bundle isolation**
 
 ```bash
 pnpm --filter @airdrop/web test
@@ -470,7 +470,7 @@ pnpm --filter @airdrop/web typecheck
 pnpm --filter @airdrop/web build
 ```
 
-- [ ] **Step 5: Update workbook/HANDOVER and commit**
+- [x] **Step 5: Update workbook/HANDOVER and commit**
 
 ```bash
 git add apps/web/src/lib apps/web/src/app apps/web/src/tests docs
