@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 5 bounded harness fix 本地门禁已通过**；下一步原子提交与 scoped review。）
+> 最近更新：2026-09-01（**Phase 7B Task 5 bounded harness fix 审查 CLEAN**；等待 fresh disposable rerun 授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–4已完成；Task5 unhandled rejection 的 bounded test-only 修复已实现且本地 lint/typecheck/focused gate 全绿，仅在 verification Promise 创建时立即处理预期拒绝，产品 SQL/锁序/超时/断言未改；下一步原子提交与 scoped review，之后才申请新的 disposable 复验授权。Task6–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–4已完成；Task5 unhandled rejection 的 bounded test-only 修复 `faeb9f9` 已通过本地门禁与独立 scoped review（0C/0I/0M），产品 SQL/锁序/超时/断言未改；下一步需 fresh 授权，仅重做只读 preflight、tunnel/env/parity、一次 Task4+5 integration 与 cleanup，不重跑 reset/pgTAP/typegen。Task6–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
 
 **2026-09-01 Task 5 second-corrected migration25 disposable GREEN AUTHORIZED**：项目所有者明确回复 `授权二次修复版 Task 5 migration25 disposable GREEN`。本次fresh single-use授权以远端25 migrations/旧migration25 SHA `e0f1f5bf…8f29`/exact016为基线；仅允许一条exact source→full migration filename SCP覆盖为新SHA `07665b57…af040`，禁止复制016。之后仅一次disposable reset、focused/full pgTAP、双typegen与committed 158,662-byte types no-drift、IPv4 tunnel/env parity、一次sequential Task4+5 integration和exact cleanup。production/54321/54322、combined SCP、source/test编辑、额外reset/rerun仍禁止；尚未开始远端动作。
 
@@ -1379,3 +1379,7 @@ git branch -d codex/phase-6a-canonical-governance
 **2026-09-01 Task 5 unhandled rejection bounded harness fix LOCAL IMPLEMENTED**：owner 已确认短设计。仅修改 `reference-security-coupling.integration.test.ts` 的 `blockSourceBeforeVerification()`：`input.verify()` 创建时立即 `.catch(error => error)`，随后在 blocker commit 后直接 await 已处理 outcome；finally 的 rollback/allSettled 路径、advisory wait、source-block write/commit、1s deadline 与最终 error assertion 均保持。source diff **3 insertions / 6 deletions**，新 Task5 integration SHA `826da2f3bd6dfef3bd29f39ac9e89c42d10f2c26929ba070404b23f04266f825`；migration25、016、Task4 integration、types hashes exact unchanged，`git diff --check` pass。尚未运行 local gates/DB/remote；下一步 lint/typecheck/focused gated test 与 scoped review。
 
 **2026-09-01 Task 5 bounded harness fix LOCAL GATES COMPLETE**：Node `v22.22.2` direct ESLint 对唯一修改测试 exit0，database `tsc --noEmit` exit0；focused Vitest（`reference-review-repository.test.ts` + environment-gated Task5 integration，`--no-file-parallelism`）为 **1 passed / 1 skipped file，29 passed / 5 skipped tests，exit0**。无 integration env、DB/network/remote/tunnel/reset/typegen/production；5 skips 仅是环境门控，不构成 behavioral GREEN。下一步原子提交并 scoped review。
+
+**2026-09-01 Task 5 bounded harness fix ATOMIC COMMIT COMPLETE**：`faeb9f9 test(db): handle expected source block rejection` 已提交，仅含 Task5 integration 的 3+/6- harness fix、worktree HANDOVER 与 Phase7B workbook；主 checkout HANDOVER mirror 保持仅本地、不入 worktree commit。下一步对 blocker→fix 增量做 scoped spec/quality review；未经 review 与 fresh disposable 授权不运行远端复验。
+
+**2026-09-01 Task 5 bounded harness fix SCOPED REVIEW CLEAN**：独立 reviewer 返回 **SPEC COMPLIANT / APPROVED / 0 Critical / 0 Important / 0 Minor**。确认 `.catch` 在 `input.verify()` 返回时同步挂载，消除 rejection-without-handler 窗口；caught error 仍作为 outcome 被既有 `reference_evidence_required` assertion 校验，不会静默放过错误；source advisory lock、waiter、source-block write/release/commit、rollback/finally 与1000ms deadline均未改。`48b38d8..faeb9f9` 的 migration25/016/Task4/types Git blobs一致，本地 5 skips 被诚实限定为非行为证据。fresh disposable rerun 仍必需；精确简报为 `task-1c-unhandled-rejection-rerun-brief.md`。
