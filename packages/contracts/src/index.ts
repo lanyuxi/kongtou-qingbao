@@ -239,3 +239,81 @@ export type {
 } from './security/projections.js';
 export { securityOutboxEventV1Schema } from './security/events.js';
 export type { SecurityOutboxEventV1 } from './security/events.js';
+export {
+  domainAuthorityDecisionSchema,
+  domainAuthorityStateSchema,
+  referenceDecisionSchema,
+  referenceErrorCodeSchema,
+  referenceKindSchema,
+  referenceOutboxEventTypeSchema,
+  referenceReasonCodeSchema,
+  referenceStateSchema,
+} from './references/enums.js';
+export type {
+  DomainAuthorityDecision,
+  DomainAuthorityState,
+  ReferenceDecision,
+  ReferenceErrorCode,
+  ReferenceKind,
+  ReferenceOutboxEventType,
+  ReferenceReasonCode,
+  ReferenceState,
+} from './references/enums.js';
+export {
+  decideDomainAuthorityCommandV1Schema,
+  decideReferenceCommandV1Schema,
+  domainAuthorityCommandReceiptV1Schema,
+  referenceDomainSchema,
+  referenceCommandReceiptV1Schema,
+  referenceUrlSchema,
+  registerDomainAuthorityCommandV1Schema,
+  registerReferenceCommandV1Schema,
+} from './references/commands.js';
+export type {
+  DecideDomainAuthorityCommandV1,
+  DecideReferenceCommandV1,
+  DomainAuthorityCommandReceiptV1,
+  ReferenceCommandReceiptV1,
+  ReferenceDomain,
+  ReferenceUrl,
+  RegisterDomainAuthorityCommandV1,
+  RegisterReferenceCommandV1,
+} from './references/commands.js';
+export {
+  domainAuthorityReviewListCursorSchema,
+  domainAuthorityReviewListQuerySchema,
+  publicProjectDomainAuthorityListQuerySchema,
+  publicProjectDomainAuthorityListSchema,
+  publicProjectDomainAuthoritySchema,
+  publicProjectReferenceCursorSchema,
+  publicProjectReferenceListQuerySchema,
+  publicProjectReferencePageSchema,
+  publicProjectReferenceSchema,
+  referenceReviewListCursorSchema,
+  referenceReviewListQuerySchema,
+  reviewerDomainAuthorityDetailSchema,
+  reviewerDomainAuthorityListItemSchema,
+  reviewerReferenceDetailSchema,
+  reviewerReferenceListItemSchema,
+} from './references/projections.js';
+export type {
+  DomainAuthorityReviewListCursor,
+  DomainAuthorityReviewListQuery,
+  PublicProjectDomainAuthority,
+  PublicProjectDomainAuthorityList,
+  PublicProjectDomainAuthorityListQuery,
+  PublicProjectReference,
+  PublicProjectReferenceCursor,
+  PublicProjectReferenceListQuery,
+  PublicProjectReferencePage,
+  ReferenceReviewListCursor,
+  ReferenceReviewListQuery,
+  ReviewerDomainAuthorityDecision,
+  ReviewerDomainAuthorityDetail,
+  ReviewerDomainAuthorityListItem,
+  ReviewerReferenceDecision,
+  ReviewerReferenceDetail,
+  ReviewerReferenceListItem,
+} from './references/projections.js';
+export { referenceOutboxEventV1Schema } from './references/events.js';
+export type { ReferenceOutboxEventV1 } from './references/events.js';

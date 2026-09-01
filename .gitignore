@@ -12,3 +12,4 @@ supabase/.temp/
 
 # WorkBuddy session data
 .workbuddy/
+.DS_Store

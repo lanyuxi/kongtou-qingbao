@@ -1,8 +1,12 @@
 # Phase 7B Verified Allowlisted References — Design
 
 **Date:** 2026-08-29
-**Status:** Approved
+**Status:** Approved; Task 4 boundary amendment approved 2026-08-30; Task 5 locking amendment approved 2026-08-31
 **Scope:** Local modular-monolith implementation of the canonical reference ledger, verification workflow, security coupling to Phase 7A, reviewer UI, and public link resolution
+
+> **2026-08-30 implementation amendment:** Task 3 disposable verification exposed four interface defects that the original Task 4 file list could not safely hide: authenticated reviewers had no protected list/detail/history read RPCs; command contracts accepted internal notes while SQL rejected every non-null note; public rendering did not re-check that the matching domain authority remained `granted`; and `project_references` enforced global URL uniqueness instead of the approved `(project_id, normalized_url)` scope. The approved correction is a new forward-only migration and a new pgTAP file. The already-reset `20260829000100` migration remains immutable. Browser/service-role or direct-base-table fallbacks are forbidden. A self-review also removed the stale Section 16 exception for `security_reviewer`: it contradicted the approved role decision and the Task 3 command boundary, so Phase 7B commands remain limited to active `reviewer`, `senior_reviewer`, and `admin` grants.
+
+> **2026-08-31 concurrency amendment:** Task 5 preflight found that the approved concurrency sentence required shared Phase 7A target locks, while the Task 3/4 SQL only used aggregate-row `FOR UPDATE` locks and the original Task 5 plan prohibited migration work. A test-only race suite would therefore prove terminal projection behavior but could not prove deterministic serialization. The approved correction keeps migrations 23 and 24 immutable and adds forward-only migration `20260831000100_phase_7b_reference_security_locking.sql` plus pgTAP `016_phase_7b_reference_security_locking.test.sql`. The security-indicator coupling path and reference/domain-authority decision commands must share the `security_target_lock_key_v1()` namespace, acquire the aggregate-specific keys in the order defined below, and re-check Evidence, flag, and authority state only after locking. Task 5 also adds its real-race integration file to the explicit database integration command. No production access or rollout is included.
 
 ## 1. Goal
 
@@ -100,19 +104,20 @@ reference_error_code    = reference_reviewer_required | reference_not_found |
 - `register_reference` — `{ projectId, kind, url, label, evidenceId, note }`
 - `decide_reference` — `{ referenceId, expectedVersion, decision, reasonCode, evidenceId, note }`
 
-**Projections:** internal reviewer read models (authority detail/history, reference detail/history, per-project state) and public read models (verified references only, granted domains only). Out-of-band types: `reference.registered.v1`, `reference.decided.v1`, `domain_authority.decided.v1`, `reference.security_flagged.v1`.
+**Projections:** internal reviewer read models (authority list/detail/history, reference list/detail/history, per-project state) and public read models (verified references only, granted domains only). Reviewer list queries and their opaque cursors are strict contracts; list order is `(updated_at desc, id desc)`. Internal decision history may expose the bounded inert `note` but not Evidence locators or raw source content. Each of the four mutation RPC result shapes is parsed by a strict command-receipt schema before mapping. Out-of-band types: `reference.registered.v1`, `reference.decided.v1`, `domain_authority.decided.v1`, `reference.security_flagged.v1`.
 
 ## 7. Database Model
 
-Five append-only tables plus three views, in one forward-only migration.
+The Task 3 foundation contains five ledger tables, one append-only command-receipt table, and three views. The 2026-08-30 correction is delivered as a second forward-only migration; it alters the existing shape without rewriting the already-reset Task 3 migration.
 
 | Table | Purpose | Key columns |
 | --- | --- | --- |
 | `project_domain_authorities` | Canonical current row per `(project_id, normalized_domain)` | `id`, `project_id`, `normalized_domain`, `version` |
-| `project_domain_authority_decisions` | Append-only authority history | `authority_id`, `decision`, `resulting_state`, `reason_code`, `evidence_id`, `actor_user_id`, `idempotency_key`, `created_at` |
+| `project_domain_authority_decisions` | Append-only authority history | `authority_id`, `decision`, `resulting_state`, `reason_code`, `evidence_id`, `note`, `actor_user_id`, `idempotency_key`, `created_at` |
 | `project_references` | Canonical current row per `(project_id, normalized_url)` | `id`, `project_id`, `kind`, `normalized_url`, `normalized_domain`, `label`, `version` |
-| `project_reference_decisions` | Append-only reference history | `reference_id`, `decision`, `resulting_state`, `reason_code`, `evidence_id`, `actor_user_id`, `idempotency_key`, `created_at` |
+| `project_reference_decisions` | Append-only reference history | `reference_id`, `decision`, `resulting_state`, `reason_code`, `evidence_id`, `note`, `actor_user_id`, `idempotency_key`, `created_at` |
 | `reference_security_flags` | Phase 7A coupling, append-only with release | `reference_id`, `indicator_id`, `created_at`, `released_at`, `released_by`, `release_evidence_id` |
+| `reference_review_commands` | Append-only idempotency receipt | command/actor/aggregate identity, input hash, resulting version/state, timestamps |
 
 Derived state rules:
 
@@ -123,10 +128,10 @@ Derived state rules:
 Views:
 
 - `project_reference_current_state` (internal) — reference + derived state + `last_verified_at` + active flag indicator id.
-- `public_project_references` — (`security_invoker`, `security_barrier`) rows in `verified` state with no active flag: `project_id`, `kind`, `label`, `normalized_url`, `last_verified_at`.
+- `public_project_references` — (`security_invoker`, `security_barrier`) rows in `verified` state with no active flag **and a matching authority whose current state is `granted`**: `project_id`, `kind`, `label`, `normalized_url`, `last_verified_at`.
 - `public_project_domain_authorities` — rows in `granted` state: `project_id`, `normalized_domain`, `granted_at`.
 
-Protected functions follow the Phase 6A/7A pattern exactly: `security definer` where required, owned by the service role, `revoke all … from public, anon, authenticated, service_role` then narrow grants, caller identity taken only from `auth.uid()`, and database-owned timestamps.
+Protected functions follow the Phase 6A/7A pattern exactly: `security definer` where required, owned by the service role, `revoke all … from public, anon, authenticated, service_role` then narrow grants, caller identity taken only from `auth.uid()`, and database-owned timestamps. Dedicated reviewer list/detail RPCs re-check the active reviewer role on every call and return exact allowlisted columns; authenticated callers never receive direct access to the internal view or ledger base tables.
 
 ## 8. Candidate Ingress and Verification Flow
 
@@ -150,7 +155,12 @@ When a Phase 7A indicator is accepted, the ledger matches its normalized value a
 - Each successful mutation commits decision rows, the security event, the command receipt, and the versioned outbox event in one transaction.
 - Same key + same request replays exactly; same key + different body returns `reference_idempotency_conflict`.
 - A stale `expected_version` returns `reference_version_conflict`; the UI reloads and re-confirms rather than adopting the newer version.
-- Reference and authority commands take the same deterministic advisory lock ordering used by Phase 7A so a flag race and a verify race serialize deterministically.
+- Security indicator coupling and reference/domain-authority **decision** commands use `security_target_lock_key_v1()` rather than a parallel lock namespace. They use target labels `source`, `domain_authority`, and `reference`; the helper accepts text and yields one deterministic bigint namespace.
+- Lock order is deterministic: Evidence `source` first when a decision depends on Evidence, matching `domain_authority` second, `reference` third, and aggregate-row locks last. Within one lock class, UUIDs are acquired in ascending text order. Aggregate-specific keys avoid a cross-project deadlock that project-wide keys would permit when a single globally matched indicator touches references in multiple projects while its Phase 7A command already holds a different project/source key.
+- The indicator trigger locks every currently matched `reference` key in sorted order before inserting any flag. A reference decision resolves its Evidence source and matching authority without treating either as trusted state, then acquires source → authority → reference keys before checking Evidence usability, current flag state, authority state, or aggregate version. An authority decision follows source → authority when Evidence is present; revoke locks the authority key before re-checking state/version.
+- Migration 25 replaces exactly `flag_references_for_new_indicator()`, `submit_decide_reference(...)`, and `submit_decide_domain_authority(...)`. It adds no new public RPC, does not alter registration commands, and preserves every existing owner/revoke/grant and receipt/outbox contract.
+- Replay lookup may return an already-committed receipt before target locks because it creates no new canonical state. Every non-replay path performs all mutable-state and security checks after the shared locks are held.
+- If verify wins the reference key, a later matching flag still forces final state to `flagged`; if the flag wins, verify observes `flagged` and fails closed. If verify wins the authority key before revoke, revoke subsequently suppresses public rendering; if revoke wins, verify re-checks the authority and fails closed. A source block that wins its source key makes the Evidence unusable before verification can commit.
 - No external call occurs while a transaction is open.
 
 ## 11. Synchronous Enforcement
@@ -168,7 +178,7 @@ When a Phase 7A indicator is accepted, the ledger matches its normalized value a
 
 ## 13. Repositories and HTTP Boundaries
 
-- `packages/database/src/references/` — `ReferenceReviewRepository` (per-call bearer, strict parse-before-map, stable `AR2xx` error mapping) and `ReferencePublicRepository` (anon, public views only, no base-table fallback), plus the browser-denied entrypoint that keeps the reviewer repository out of client bundles.
+- `packages/database/src/references/` — `ReferenceReviewRepository` (per-call bearer, protected reviewer read/write RPCs only, strict parse-before-map, stable `AR2xx` error mapping) and `ReferencePublicRepository` (anon, public views only, no base-table fallback), plus the browser-denied entrypoint that keeps the reviewer repository out of client bundles.
 - `apps/web/src/app/api/v1/review/references/*` — thin authenticated handlers; `/api/v1/references` — public verified references per project.
 - `apps/web/src/lib/reference-review-api-client.ts` and `reference-public-loader.ts` — strict browser client with a fresh bearer per call and a fresh idempotency key per mutation; typed `409` without retry.
 - Route Handlers perform no long-running work.
@@ -194,7 +204,7 @@ When a Phase 7A indicator is accepted, the ledger matches its normalized value a
 
 - RLS is enabled on every new table. Anonymous and ordinary authenticated principals read only the public views; canonical tables deny direct DML to all browser principals.
 - Protected commands re-check `auth.uid()` against an active `reviewer`, `senior_reviewer`, or `admin` grant on every call, so revocation takes effect immediately.
-- `security_reviewer` retains its Phase 7A powers and additionally may `restore` a reference it can justify, but cannot grant authority on Evidence alone without the reviewer role.
+- `security_reviewer` retains its Phase 7A powers but gains no Phase 7B command privilege. `restore`, like every other Phase 7B canonical command, requires an active `reviewer`, `senior_reviewer`, or `admin` grant.
 - Browser bundles are verified to exclude the reviewer repository, service-role key, database URL, and internal projection fields.
 
 ## 17. Error and Security Behavior
@@ -208,14 +218,15 @@ When a Phase 7A indicator is accepted, the ledger matches its normalized value a
 
 - **Contracts:** strict schema, enum/state/reason compatibility, cursor bounds, URL and domain normalization matrices, hostile and near-miss values, safe outbox keys.
 - **Domain:** normalization determinism, state transition matrix for every decision × current state, `last_verified_at` derivation, flag-over-verified precedence, domain-first verify gating.
-- **Database (pgTAP):** RLS for every principal, protected-command-only canonical writes, `auth.uid()` attribution, append-only enforcement, transactional rollback with outbox, idempotency and version conflicts, and two-session races.
-- **Integration:** flag race against a concurrent verify, restore after a security flag, revoked domain authority un-verifying its URLs, blocked project suppressing references, and fixture cleanup to the disposable seed baseline.
+- **Database (pgTAP):** RLS for every principal, protected-command-only canonical writes, bearer-scoped reviewer reads, exact read-column allowlists, internal-note persistence/public-note exclusion, project-scoped URL uniqueness, domain-authority rendering gate, `auth.uid()` attribution, append-only enforcement, transactional rollback with outbox, idempotency/version conflicts, exact advisory-lock function ownership/grants, and fail-closed decision re-checks.
+- **Integration:** both lock orderings for flag-vs-verify and authority-revoke-vs-verify; restore without Evidence rejection; Evidence-grounded restore appending a decision while retaining the released flag row and release metadata; blocked-source Evidence rejection including the source-block race; public suppression; and exact fixture cleanup to the disposable seed baseline. Tests must observe real `pg_stat_activity` advisory waits on the reference/authority/source keys rather than adding the production-side lock only in test code and calling that serialization.
 - **Golden Dataset:** add reference-proposal cases (explicit official announcement, social-account impersonation, near-miss domain, injected instruction, invented Evidence locator) reusing the Phase 7A runner.
 - **UI:** unverified markers, blocked suppression, inert notes, confirmation binding, and bundle isolation.
 
 ## 19. Delivery Boundaries
 
-- One forward-only migration, plus one pgTAP file, plus the contracts/domain/database/worker/web slices and the runbook chapter.
+- Three forward-only migrations in total (`20260829000100` foundation, the Task 4 correction, and `20260831000100` Task 5 locking correction) with pgTAP files `014`–`016`, plus the contracts/domain/database/worker/web slices and the runbook chapter. Migrations 23 and 24 remain byte-immutable; Task 5 never rewrites them.
+- The Task 5 migration changes function bodies and trigger behavior only. It adds no table/column/enum/RPC signature, so generated database types must remain byte-identical; disposable double typegen proves that negative shape guarantee.
 - Local and disposable verification only. No production access, migration application, deployment, or rollout.
 - Local completion and production availability must continue to be reported separately.
 
@@ -231,5 +242,5 @@ Phase 7B is complete when all of the following hold together:
 6. Canonical writes are impossible without an active reviewer/senior_reviewer/admin session and are attributed to `auth.uid()`.
 7. `clear`-equivalent regression holds: projects with no references render exactly as they do today except that unverified URLs are inert rather than linked.
 8. Public projections expose no Evidence locator, note, actor identity, candidate row, or internal normalization diagnostic.
-9. Idempotency, version conflicts, two-session races, and transactional rollback with outbox are all covered by real tests.
+9. Idempotency, version conflicts, shared-target advisory serialization in both race orders, and transactional rollback with outbox are all covered by real tests.
 10. The full database gate and the full repository gate pass under Node 22.22.2 / pnpm 11.16.0, and the runbook documents the workflow.

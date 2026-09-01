@@ -11,7 +11,6 @@ import { describe, expect, it } from 'vitest';
 import { OpportunityRow, SecurityPostureBadge } from '../components/opportunity-elements.js';
 import {
   BlockedProjectTable,
-  OfficialWebsiteLink,
   ProjectSecurityBanner,
   SafeSecurityIndicatorText,
   blockedProjectsPageHref,
@@ -256,42 +255,13 @@ describe('blockedCursorFromQuery', () => {
   });
 });
 
-describe('OfficialWebsiteLink', () => {
-  it('renders the official website link as an anchor while posture is clear', () => {
-    const html = renderToStaticMarkup(
-      createElement(OfficialWebsiteLink, {
-        url: 'https://demo.example.test',
-        posture: 'clear',
-      }),
-    );
-
-    expect(html).toContain('href="https://demo.example.test"');
-    expect(html).toContain('rel="noreferrer noopener"');
-  });
-
-  it('disables the official website link while the project is blocked', () => {
-    const html = renderToStaticMarkup(
-      createElement(OfficialWebsiteLink, {
-        url: 'https://demo.example.test',
-        posture: 'blocked',
-      }),
-    );
-
-    expect(html).not.toContain('<a');
-    expect(html).not.toContain('demo.example.test');
-    expect(html).toContain('已停用');
-  });
-
-  it('renders nothing when the project has no registered website', () => {
-    expect(
-      renderToStaticMarkup(createElement(OfficialWebsiteLink, { url: null, posture: 'clear' })),
-    ).toBe('');
-  });
-
+describe('public component source hygiene', () => {
   it('does not reference internal security or outbound-link fields in the public component source', () => {
-    const sources = ['security-elements.tsx', 'opportunity-elements.tsx'].map((file) =>
-      readFileSync(new URL(`../components/${file}`, import.meta.url), 'utf8'),
-    );
+    const sources = [
+      'security-elements.tsx',
+      'opportunity-elements.tsx',
+      'reference-elements.tsx',
+    ].map((file) => readFileSync(new URL(`../components/${file}`, import.meta.url), 'utf8'));
 
     for (const forbidden of [
       'dangerouslySetInnerHTML',

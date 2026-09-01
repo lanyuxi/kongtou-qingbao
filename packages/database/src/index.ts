@@ -1,5 +1,23 @@
 export { createBrowserSupabaseClient, type BrowserSupabaseClientOptions } from './client.js';
 export type { Database, Json } from './generated/database.types.js';
+export type {
+  DomainAuthorityReviewListResult,
+  ReferenceReviewListResult,
+  ReferenceReviewRepository,
+  ReferenceReviewRepositoryErrorCode,
+  ReferenceReviewRepositoryOptions,
+  ReferenceReviewRpc,
+  ReferenceReviewRpcCall,
+} from './references/reference-review-repository.js';
+export {
+  createReferencePublicRepository,
+  ReferencePublicProjectionQueryError,
+  type PublicDomainAuthorityList,
+  type PublicDomainAuthorityListQuery,
+  type PublicReferenceListQuery,
+  type PublicReferencePage,
+  type ReferencePublicRepository,
+} from './repositories/reference-public-repository.js';
 export {
   createSecurityPublicRepository,
   SecurityPublicProjectionQueryError,

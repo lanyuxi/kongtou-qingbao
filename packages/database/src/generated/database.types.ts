@@ -1033,6 +1033,312 @@ export type Database = {
         }
         Relationships: []
       }
+      project_domain_authorities: {
+        Row: {
+          created_at: string
+          id: string
+          normalized_domain: string
+          project_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          normalized_domain: string
+          project_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          normalized_domain?: string
+          project_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
+      project_domain_authority_decisions: {
+        Row: {
+          actor_user_id: string
+          aggregate_version: number
+          authority_id: string
+          created_at: string
+          decision: string
+          evidence_id: string | null
+          id: string
+          idempotency_key: string
+          note: string | null
+          reason_code: string
+          resulting_state: string
+        }
+        Insert: {
+          actor_user_id: string
+          aggregate_version: number
+          authority_id: string
+          created_at?: string
+          decision: string
+          evidence_id?: string | null
+          id?: string
+          idempotency_key: string
+          note?: string | null
+          reason_code: string
+          resulting_state: string
+        }
+        Update: {
+          actor_user_id?: string
+          aggregate_version?: number
+          authority_id?: string
+          created_at?: string
+          decision?: string
+          evidence_id?: string | null
+          id?: string
+          idempotency_key?: string
+          note?: string | null
+          reason_code?: string
+          resulting_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_domain_authority_decisions_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_domain_authority_decisions_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "project_domain_authorities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_domain_authority_decisions_authority_id_fkey"
+            columns: ["authority_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_domain_authorities"
+            referencedColumns: ["authority_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authority_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_domain_authority_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+        ]
+      }
+      project_reference_decisions: {
+        Row: {
+          actor_user_id: string
+          aggregate_version: number
+          created_at: string
+          decision: string
+          evidence_id: string | null
+          id: string
+          idempotency_key: string
+          note: string | null
+          reason_code: string
+          reference_id: string
+          resulting_state: string
+        }
+        Insert: {
+          actor_user_id: string
+          aggregate_version: number
+          created_at?: string
+          decision: string
+          evidence_id?: string | null
+          id?: string
+          idempotency_key: string
+          note?: string | null
+          reason_code: string
+          reference_id: string
+          resulting_state: string
+        }
+        Update: {
+          actor_user_id?: string
+          aggregate_version?: number
+          created_at?: string
+          decision?: string
+          evidence_id?: string | null
+          id?: string
+          idempotency_key?: string
+          note?: string | null
+          reason_code?: string
+          reference_id?: string
+          resulting_state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_reference_decisions_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_reference_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_reference_decisions_evidence_id_fkey"
+            columns: ["evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "project_reference_decisions_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_reference_current_state"
+            referencedColumns: ["reference_id"]
+          },
+          {
+            foreignKeyName: "project_reference_decisions_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_references"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_reference_decisions_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_references"
+            referencedColumns: ["reference_id"]
+          },
+        ]
+      }
+      project_references: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          label: string
+          normalized_domain: string
+          normalized_url: string
+          project_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          label: string
+          normalized_domain: string
+          normalized_url: string
+          project_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string
+          normalized_domain?: string
+          normalized_url?: string
+          project_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       project_scores: {
         Row: {
           calculated_at: string
@@ -1520,6 +1826,146 @@ export type Database = {
             columns: ["source_id"]
             isOneToOne: false
             referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reference_review_commands: {
+        Row: {
+          actor_user_id: string
+          aggregate_id: string
+          aggregate_type: string
+          created_at: string
+          decision_id: string | null
+          expected_version: number | null
+          id: string
+          idempotency_key: string
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_version: number | null
+        }
+        Insert: {
+          actor_user_id: string
+          aggregate_id: string
+          aggregate_type: string
+          created_at?: string
+          decision_id?: string | null
+          expected_version?: number | null
+          id?: string
+          idempotency_key: string
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_version?: number | null
+        }
+        Update: {
+          actor_user_id?: string
+          aggregate_id?: string
+          aggregate_type?: string
+          created_at?: string
+          decision_id?: string | null
+          expected_version?: number | null
+          id?: string
+          idempotency_key?: string
+          input_hash?: string
+          operation?: string
+          result_payload?: Json
+          resulting_version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_review_commands_actor_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reference_security_flags: {
+        Row: {
+          created_at: string
+          id: string
+          indicator_id: string
+          reference_id: string
+          release_evidence_id: string | null
+          released_at: string | null
+          released_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          indicator_id: string
+          reference_id: string
+          release_evidence_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          indicator_id?: string
+          reference_id?: string
+          release_evidence_id?: string | null
+          released_at?: string | null
+          released_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reference_security_flags_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "public_safe_security_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_indicator_id_fkey"
+            columns: ["indicator_id"]
+            isOneToOne: false
+            referencedRelation: "security_indicators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_reference_current_state"
+            referencedColumns: ["reference_id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_references"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_references"
+            referencedColumns: ["reference_id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_release_evidence_id_fkey"
+            columns: ["release_evidence_id"]
+            isOneToOne: false
+            referencedRelation: "evidence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_release_evidence_id_fkey"
+            columns: ["release_evidence_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_score_evidence_citations"
+            referencedColumns: ["evidence_id"]
+          },
+          {
+            foreignKeyName: "reference_security_flags_released_by_fkey"
+            columns: ["released_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3171,6 +3617,91 @@ export type Database = {
         }
         Relationships: []
       }
+      project_reference_current_state: {
+        Row: {
+          active_indicator_id: string | null
+          created_at: string | null
+          current_state: string | null
+          kind: string | null
+          label: string | null
+          last_verified_at: string | null
+          normalized_domain: string | null
+          normalized_url: string | null
+          project_id: string | null
+          reference_id: string | null
+          version: number | null
+        }
+        Insert: {
+          active_indicator_id?: never
+          created_at?: string | null
+          current_state?: never
+          kind?: string | null
+          label?: string | null
+          last_verified_at?: never
+          normalized_domain?: string | null
+          normalized_url?: string | null
+          project_id?: string | null
+          reference_id?: string | null
+          version?: number | null
+        }
+        Update: {
+          active_indicator_id?: never
+          created_at?: string | null
+          current_state?: never
+          kind?: string | null
+          label?: string | null
+          last_verified_at?: never
+          normalized_domain?: string | null
+          normalized_url?: string | null
+          project_id?: string | null
+          reference_id?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       public_blocked_projects: {
         Row: {
           category: string | null
@@ -3189,6 +3720,140 @@ export type Database = {
           version: number | null
         }
         Relationships: []
+      }
+      public_project_domain_authorities: {
+        Row: {
+          authority_id: string | null
+          domain: string | null
+          granted_at: string | null
+          project_id: string | null
+        }
+        Insert: {
+          authority_id?: string | null
+          domain?: string | null
+          granted_at?: never
+          project_id?: string | null
+        }
+        Update: {
+          authority_id?: string | null
+          domain?: string | null
+          granted_at?: never
+          project_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_domain_authorities_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
+      public_project_references: {
+        Row: {
+          kind: string | null
+          label: string | null
+          last_verified_at: string | null
+          project_id: string | null
+          reference_id: string | null
+          url: string | null
+        }
+        Insert: {
+          kind?: string | null
+          label?: string | null
+          last_verified_at?: never
+          project_id?: string | null
+          reference_id?: string | null
+          url?: string | null
+        }
+        Update: {
+          kind?: string | null
+          label?: string | null
+          last_verified_at?: never
+          project_id?: string | null
+          reference_id?: string | null
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
       }
       public_project_security_state: {
         Row: {
@@ -3235,6 +3900,10 @@ export type Database = {
       }
     }
     Functions: {
+      actor_has_active_reference_role: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       actor_has_active_security_role: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -3368,6 +4037,18 @@ export type Database = {
           dead_lettered_job_id: string
         }[]
       }
+      domain_authority_current_state_v1: {
+        Args: { p_authority_id: string }
+        Returns: string
+      }
+      domain_authority_granted_at_v1: {
+        Args: { p_authority_id: string }
+        Returns: string
+      }
+      domain_authority_state_for_reference: {
+        Args: { p_reference_id: string }
+        Returns: string
+      }
       evidence_quote_sha256_v1: {
         Args: { input_text: string }
         Returns: string
@@ -3463,12 +4144,43 @@ export type Database = {
           schedule_version: number
         }[]
       }
+      get_domain_authority_review_detail: {
+        Args: { p_authority_id: string }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          decisions: Json
+          domain: string
+          projectId: string
+          state: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       get_failed_ai_run: {
         Args: { p_ai_run_id: string }
         Returns: {
           decisions: Json
           input: Json
           run: Json
+          version: number
+        }[]
+      }
+      get_reference_review_detail: {
+        Args: { p_reference_id: string }
+        Returns: {
+          activeIndicatorId: string
+          decisions: Json
+          domainAuthority: Json
+          kind: string
+          label: string
+          lastVerifiedAt: string
+          projectId: string
+          referenceId: string
+          referenceVersion: number
+          state: string
+          updatedAt: string
+          url: string
           version: number
         }[]
       }
@@ -3507,6 +4219,24 @@ export type Database = {
         Args: { project_id: string; source_id: string }
         Returns: boolean
       }
+      list_domain_authority_review_items: {
+        Args: {
+          p_cursor_id: string
+          p_cursor_updated_at: string
+          p_limit: number
+          p_project_id: string
+          p_state: string
+        }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          domain: string
+          projectId: string
+          state: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       list_failed_ai_runs: {
         Args: {
           p_cursor_created_at: string
@@ -3539,6 +4269,28 @@ export type Database = {
         Returns: {
           candidate_id: string
           candidate_version: number
+        }[]
+      }
+      list_reference_review_items: {
+        Args: {
+          p_cursor_id: string
+          p_cursor_updated_at: string
+          p_limit: number
+          p_project_id: string
+          p_state: string
+        }
+        Returns: {
+          activeIndicatorId: string
+          kind: string
+          label: string
+          lastVerifiedAt: string
+          projectId: string
+          referenceId: string
+          referenceVersion: number
+          state: string
+          updatedAt: string
+          url: string
+          version: number
         }[]
       }
       list_security_candidates: {
@@ -3593,10 +4345,21 @@ export type Database = {
           source_id: string
         }[]
       }
+      match_references_for_indicator: {
+        Args: { p_indicator_type: string; p_value: string }
+        Returns: {
+          reference_id: string
+        }[]
+      }
       normalize_evidence_text_v1: {
         Args: { input_text: string }
         Returns: string
       }
+      normalize_reference_domain_v1: {
+        Args: { p_value: string }
+        Returns: string
+      }
+      normalize_reference_url_v1: { Args: { p_value: string }; Returns: string }
       normalize_security_indicator_value_v1: {
         Args: { p_value: string }
         Returns: string
@@ -3645,6 +4408,26 @@ export type Database = {
           replayed: boolean
           signal_id: string
         }[]
+      }
+      reference_current_state_v1: {
+        Args: { p_reference_id: string }
+        Returns: string
+      }
+      reference_evidence_is_usable: {
+        Args: { p_evidence_id: string }
+        Returns: boolean
+      }
+      reference_is_publicly_renderable_v1: {
+        Args: { p_reference_id: string }
+        Returns: boolean
+      }
+      reference_last_verified_at_v1: {
+        Args: { p_reference_id: string }
+        Returns: string
+      }
+      reference_url_host_v1: {
+        Args: { p_normalized_url: string }
+        Returns: string
       }
       renew_collection_job_lease: {
         Args: {
@@ -3767,12 +4550,64 @@ export type Database = {
         Args: { p_signal_id: string }
         Returns: boolean
       }
+      submit_decide_domain_authority: {
+        Args: {
+          p_authority_id: string
+          p_command_payload: Json
+          p_idempotency_key: string
+        }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          commandId: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
+      submit_decide_reference: {
+        Args: {
+          p_command_payload: Json
+          p_idempotency_key: string
+          p_reference_id: string
+        }
+        Returns: {
+          commandId: string
+          referenceId: string
+          referenceVersion: number
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
       submit_manual_security_candidate: {
         Args: { p_command_payload: Json; p_idempotency_key: string }
         Returns: {
           candidateId: string
           candidateVersion: number
           commandId: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
+      submit_register_domain_authority: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          authorityId: string
+          authorityVersion: number
+          commandId: string
+          replayed: boolean
+          state: string
+          version: number
+        }[]
+      }
+      submit_register_reference: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          commandId: string
+          referenceId: string
+          referenceVersion: number
           replayed: boolean
           state: string
           version: number

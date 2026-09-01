@@ -1,10 +1,15 @@
-import type { PublicProjectSecurityState } from '@airdrop/contracts';
+import type {
+  PublicProjectDomainAuthority,
+  PublicProjectReference,
+  PublicProjectSecurityState,
+} from '@airdrop/contracts';
 import type {
   ProjectDetail,
   ProjectEvidenceCitation,
   ProjectRepository,
   ProjectScoreFactor,
   ProjectSignal,
+  ReferencePublicRepository,
   SecurityPublicRepository,
 } from '@airdrop/database';
 
@@ -21,11 +26,33 @@ export interface ProjectDetailResult {
    * active incident summaries rendered beside it.
    */
   readonly security: PublicProjectSecurityState;
+  /**
+   * Verified references only. The public projection already excludes candidate,
+   * flagged, and withdrawn rows, and every reference under a blocked project, so
+   * renderers must treat this as the single source for outbound links.
+   */
+  readonly references: readonly PublicProjectReference[];
+  /**
+   * Granted domain authorities. These prove ownership, not destination safety,
+   * and must never be rendered as links.
+   */
+  readonly authorities: readonly PublicProjectDomainAuthority[];
 }
+
+// A project detail page renders a bounded set of references; deeper paging
+// belongs to a dedicated references surface, not to this composition.
+//
+// Accepted trade-off: `official_website_url` is resolved against this page, so
+// a project whose official entry has an old verification time and falls outside
+// the first `referenceLimit` rows renders as unverified. That degrades closed —
+// a missed link, never an unverified one rendered as an anchor — and a project
+// with more than 100 verified references belongs on a dedicated surface.
+const referenceLimit = 100;
 
 export async function loadProjectDetailFromRepository(
   repository: ProjectRepository,
   securityRepository: SecurityPublicRepository,
+  referenceRepository: ReferencePublicRepository,
   slug: string,
 ): Promise<ProjectDetailResult | null> {
   const project = await repository.getProjectBySlug(slug);
@@ -34,13 +61,22 @@ export async function loadProjectDetailFromRepository(
   }
 
   const scoreId = project.latestScore?.id;
-  const [signals, factors, citations, security] = await Promise.all([
+  // All reads start together and compose once, so a slower score read can never
+  // rewrite the reference snapshot taken for this render.
+  const [signals, factors, citations, security, references, authorities] = await Promise.all([
     repository.listProjectSignals(project.projectId, 20),
     scoreId === undefined ? [] : repository.listCurrentScoreFactors(project.projectId, scoreId),
     scoreId === undefined
       ? []
       : repository.listCurrentScoreEvidenceCitations(project.projectId, scoreId),
     securityRepository.getProjectSecurity(project.projectId),
+    referenceRepository
+      .listVerifiedReferences({ projectId: project.projectId, cursor: null, limit: referenceLimit })
+      .then((page) => page.items),
+    referenceRepository
+      .listGrantedDomainAuthorities({ projectId: project.projectId, limit: referenceLimit })
+      .then((page) => page.items),
   ]);
-  return { project, signals, factors, citations, security };
+
+  return { project, signals, factors, citations, security, references, authorities };
 }

@@ -4,7 +4,6 @@ import {
   type PublicProjectSecurityState,
   type SecurityIncidentCategory,
   type SecurityIndicatorType,
-  type SecurityPosture,
   type SecuritySeverity,
 } from '@airdrop/contracts';
 import Link from 'next/link';
@@ -139,33 +138,6 @@ export function blockedProjectsPageHref(cursor: string | null): string {
   return cursor === null
     ? '/opportunities?tab=blocked'
     : `/opportunities?tab=blocked&after=${encodeURIComponent(cursor)}`;
-}
-
-export function OfficialWebsiteLink({
-  url,
-  posture,
-}: {
-  readonly url: string | null;
-  readonly posture: SecurityPosture;
-}) {
-  if (url === null) {
-    return null;
-  }
-  if (posture === 'blocked') {
-    return (
-      <span style={{ color: 'var(--ink-500)' }}>官方网站（安全封锁期间外部跳转已停用）</span>
-    );
-  }
-  return (
-    <a
-      href={url}
-      rel="noreferrer noopener"
-      style={{ color: 'var(--accent-ink)' }}
-      target="_blank"
-    >
-      官方网站 ↗
-    </a>
-  );
 }
 
 function SecurityIncidentSummary({

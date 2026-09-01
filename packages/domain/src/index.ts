@@ -149,3 +149,29 @@ export {
   normalizeSecurityIndicatorValueV1,
 } from './security/indicator.js';
 export type { SecurityIndicatorLexicalInput } from './security/indicator.js';
+export {
+  isReferenceDomainLexicallyValid,
+  isReferenceUrlLexicallyValid,
+  normalizeReferenceDomain,
+  normalizeReferenceUrl,
+  referenceUrlHost,
+} from './references/normalize.js';
+export {
+  canDecideDomainAuthority,
+  canDecideReference,
+  deriveDomainAuthorityState,
+  deriveEffectiveReferenceState,
+  deriveLastVerifiedAt,
+  deriveReferenceState,
+  resultingDomainAuthorityState,
+  resultingReferenceState,
+} from './references/rules.js';
+export type {
+  DomainAuthorityDecisionRecord,
+  ReferenceDecisionRecord,
+} from './references/rules.js';
+export { matchIndicatorToReference } from './references/flag-match.js';
+export type {
+  ReferenceMatchCandidate,
+  ReferenceMatchIndicator,
+} from './references/flag-match.js';
