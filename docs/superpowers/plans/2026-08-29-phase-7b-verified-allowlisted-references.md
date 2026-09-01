@@ -374,11 +374,15 @@ Follow detailed-plan Steps 5–6. Sync 016 only, do not reset/sync migration, an
 
 Follow detailed-plan Steps 7–8. Replace exactly the indicator trigger and two decision RPC bodies; preserve signatures/contracts/owners/grants.
 
-- [ ] **Step 4: Run authorized disposable GREEN**
+- [x] **Step 4: Run authorized disposable GREEN**
+
+> **2026-09-01 COMPLETE:** one disposable reset applied final migration25; focused 016 passed 18/18; full pgTAP passed 16 files / 1,501 tests; double typegen was byte-identical to committed 158,662-byte types. After a reviewed test-only immediate rejection-handler repair, the fresh no-reset/no-sync rerun passed three-endpoint parity and the one sequential Task4+Task5 integration at 2 files / 8 tests / exit0 with no unhandled warning. Independent cleanup was 20/20 residue categories zero, final 25/max migration25 + marker1 exact, and all tunnels/temps closed. Production was not accessed.
 
 Follow detailed-plan Steps 9–11: reset, focused/full pgTAP, byte-identical no-drift double typegen, real races in both orders, and independent zero-residue cleanup.
 
-- [ ] **Step 5: Run fresh final gate, review, update docs, and commit**
+- [x] **Step 5: Run fresh final gate, review, update docs, and commit**
+
+> **2026-09-01 COMPLETE:** fresh five-workspace Node22 gates passed with **1,342 tests / 76 gated skips**, all lint/typecheck/build and static/hash/temp checks green. Final reviewer returned **SPEC COMPLIANT / APPROVED / 0C / 0I / 0M / READY YES**. Task 5 is complete; Task 6 is next.
 
 Follow detailed-plan Steps 12–13. Commit with `test(db): prove reference security coupling races`, then record the hash in a docs-only follow-up commit.
 

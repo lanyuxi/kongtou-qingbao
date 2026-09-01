@@ -246,7 +246,9 @@ Expected: immutable hashes unchanged; lint/typecheck/unit tests pass; integratio
 
 Request authorization for: fresh fail-closed preflight; sync migration25 and final 016 only; disposable reset; focused 016; full pgTAP; double typegen/no-drift comparison; temporary tunnels/env/parity; focused Task4+Task5 reference integration; exact remote/local cleanup. Production and ports 54321/54322 remain prohibited.
 
-- [ ] **Step 10: Run disposable migration/pgTAP/typegen GREEN**
+- [x] **Step 10: Run disposable migration/pgTAP/typegen GREEN**
+
+> **2026-09-01 COMPLETE:** the second-corrected authorized run applied exactly one migration25 overwrite and one disposable reset, then passed focused 016 (**1 file / 18 tests**), full pgTAP (**16 files / 1,501 tests**), and two byte-identical typegen outputs equal to committed types (**158,662 bytes / `e5dc3861…aedef`**). No generated file was replaced. The later test-only rerun performed no reset/sync/pgTAP/typegen and did not alter this evidence.
 
 After authorization and exact preflight, sync only migration25/016 and verify byte hashes. Reset the disposable stack. Fail closed in this order:
 
@@ -258,7 +260,9 @@ After authorization and exact preflight, sync only migration25/016 and verify by
 
 Any failure stops later actions and enters systematic debugging. Do not replace generated types because shape drift is forbidden.
 
-- [ ] **Step 11: Run focused real-race GREEN and exact cleanup**
+- [x] **Step 11: Run focused real-race GREEN and exact cleanup**
+
+> **2026-09-01 COMPLETE:** after the reviewed immediate-rejection-handler repair, a fresh authorized no-reset/no-sync rerun passed endpoint parity (**2/2/2**) and the one sequential Task4+Task5 integration (**2 files / 8 tests / exit 0**) with no unhandled rejection or warning. Independent residue was **20/20 categories, sum 0**; final 25/max migration25, marker1, exact migration25/016, forbidden-temp absence, closed tunnels, and deleted env/socket all passed. Production was not accessed.
 
 Create the same two IPv4-only tunnels and 0600 four-variable environment used by Task 4; prove endpoint parity without printing credentials. Run sequentially:
 
@@ -270,11 +274,15 @@ Create the same two IPv4-only tunnels and 0600 four-variable environment used by
 
 Expected: every Task 4 repository case and every Task 5 race/history/Evidence case passes. Then independently query zero residue for all owned reference/authority/security/command/outbox/project/source/raw/evidence/user IDs, verify marker/migration count, terminate tunnels, and delete local env/typegen plus remote typegen temp. Update all three handover/workbook locations after integration and after cleanup.
 
-- [ ] **Step 12: Run fresh local task gate**
+- [x] **Step 12: Run fresh local task gate**
+
+> **2026-09-01 COMPLETE:** Node22 direct five-workspace lint/typecheck/build all exited 0. Vitest passed **1,342 tests / 76 environment-gated skips**. Placeholder, sensitive-field, diff, migration23/24/25, 016, both integration, generated types SHA/158,662-byte size, environment/temp, and closed-port checks passed. The corrected workspace-local Next16.3.0 build passed without source/dependency edits; no DB/network/remote/production access occurred.
 
 Using Node 22.22.2 direct entry points, run five workspace lint/typecheck/tests/build, placeholder checks, sensitive-field scan, `git diff --check`, closed-port/temp checks, and verify migrations 23/24 hashes plus generated types SHA again. Record exact counts. No success claim may reuse Task 4 output.
 
-- [ ] **Step 13: Review, update the master plan, and commit**
+- [x] **Step 13: Review, update the master plan, and commit**
+
+> **2026-09-01 COMPLETE:** independent final review over `3f688e3..f93db0a` plus current Step10–12 evidence returned **SPEC COMPLIANT / APPROVED / 0C / 0I / 0M / READY TO COMPLETE TASK 5: YES**. All product/test/evidence boundaries passed. Final completion documentation is being committed, followed by a docs-only hash record.
 
 Mark the master Phase 7B Task 5 steps complete, update workbook/HANDOVER with exact RED/GREEN counts, migration/test hashes, typegen no-drift proof, cleanup, review findings, production non-access, and local-vs-production state.
 
