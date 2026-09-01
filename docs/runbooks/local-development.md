@@ -343,6 +343,119 @@ no role or account creation, no data backfill, and no deployment. Production
 rollout remains gated behind reviewer supply, a healthy production Auth service,
 a rehearsed pre-migration backup, and explicit authorization.
 
+## Verified allowlisted references (Phase 7B)
+
+The reference ledger is an append-only, two-layer record of what the product is
+allowed to link to. A **domain authority** proves that a domain belongs to the
+project; a **reference** is one specific URL entry underneath it. A granted
+domain never verifies any URL beneath it — both objects carry their own
+decisions and their own history. AI and collector output can only ever create a
+candidate; canonical verification requires a human decision grounded in
+Evidence.
+
+### Reviewer provisioning
+
+Canonical reference writes are only possible from the current bearer session of
+a user holding an active `reviewer`, `senior_reviewer`, or `admin` grant in
+`public.user_roles` (`revoked_at is null`). Phase 7B adds no new role value.
+Provisioning and revocation follow the Phase 7A pattern exactly: insert a grant
+row, and revoke by setting `revoked_at` rather than deleting it, because the
+grant history is part of the audit trail. Revocation takes effect on the next
+command — the protected functions re-check `auth.uid()` on every call.
+
+### Authority versus URL decision workflow
+
+Work top-down, one object at a time:
+
+1. **Grant the domain authority first.** `verify`, `reverify`, and `restore` all
+   read the authority covering the URL's host; without a `granted` authority the
+   command fails with `domain_authority_not_found` (`AR203`).
+2. **Register the URL entry** for the specific page you intend to link to.
+   Registration only creates a `candidate`; it never renders publicly.
+3. **Decide** with Evidence that traces to a Raw Item and a Source whose source
+   is not blocked. `verify` promotes a candidate, `reverify` records a fresh
+   verification, `withdraw` stops rendering while keeping history, and `restore`
+   returns a flagged reference to service.
+4. **Withdraw** does not require Evidence; every other promoting decision does.
+
+`www.example.com` and `example.com` are separate authorities and must be granted
+separately — normalization never folds `www.`, never strips query strings, and
+never collapses near-miss domains. Two projects may hold the same URL, but one
+project may not hold the same normalized URL twice.
+
+### last_verified_at semantics
+
+`last_verified_at` is always derived from the most recent successful `verify`
+decision, never from registration time and never from a mutable column. It is
+what the public project page renders next to a verified link, and it is the
+freshness signal for re-review. A `withdraw` decision stops public rendering
+immediately but leaves the derived verification time in the history.
+
+### Security flag coupling and restoration
+
+A matching Phase 7A indicator flags the reference synchronously — there is no
+background job — and the public projection stops rendering it at once. The
+derived state stays `flagged` even after a later verify decision until a human
+releases it: only a reviewer can restore a flagged reference, and only with
+Evidence whose source is not blocked. Release sets `released_at` on the flag
+row; it never deletes it, so the contradiction stays visible. A `blocked`
+project suppresses every one of its references regardless of their own state.
+
+### Stable error codes
+
+The API returns stable domain codes; never branch on human-readable text.
+
+| Code | Meaning | Typical operator action |
+| --- | --- | --- |
+| `reference_not_found` (`AR201`) | Reference ID does not exist or is not visible to this session | Reload the list |
+| `reference_not_decidable` (`AR202`) | The current state does not permit this decision (for example verifying an already verified reference) | Reload and re-read the state, then choose the permitted decision |
+| `domain_authority_not_found` (`AR203`) | Either the authority ID does not exist, or no `granted` domain authority covers the URL's host | Grant the authority first, or reload |
+| `reference_reviewer_required` (`AR204`) | No active `reviewer` / `senior_reviewer` / `admin` grant on the bearer session | Provision or restore the grant |
+| `reference_version_conflict` (`AR206`) | `expectedVersion` is stale | Reload and re-confirm; never auto-adopt the new version |
+| `reference_idempotency_conflict` (`AR207`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |
+| `reference_command_invalid` (`AR208`) | Command failed contract/state validation, violates project-scoped URL uniqueness, or re-releases an already released flag | Fix the command payload |
+| `reference_evidence_required` (`AR209`) | A promoting decision without usable Evidence, or Evidence whose Raw Item/Source does not resolve to the target's source | Select Evidence that traces to a non-blocked Source |
+| `reference_normalization_invalid` (`AR210`) | URL or domain cannot be normalized (scheme, host, length, or control characters) | Correct the value; never hand-normalize it |
+| `reference_persistence_failed` (`AR299`) | Transaction failed and rolled back | Retry once; if it persists, inspect the database logs |
+
+### Focused disposable acceptance commands
+
+```bash
+supabase test db supabase/tests/014_phase_7b_verified_allowlisted_references.test.sql
+supabase test db supabase/tests/015_phase_7b_reference_review_boundary.test.sql
+supabase test db supabase/tests/016_phase_7b_reference_security_locking.test.sql
+pnpm --filter @airdrop/database exec vitest run src/tests/reference-review-repository.integration.test.ts
+pnpm --filter @airdrop/database exec vitest run src/tests/reference-security-coupling.integration.test.ts
+pnpm --filter @airdrop/worker exec vitest run src/ai/tests/reference-golden.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/reference-elements.test.ts
+```
+
+The same fail-closed preflight as the earlier phases applies: confirm the remote
+work directory, project, database/Kong ports `64322`/`64321`, local tunnels
+`16432`/`16433`, the paused seed marker, and the migration, test, and seed hashes
+before any reset. Never target `airdrop-intelligence-os` or ports
+`54321`/`54322`.
+
+### Append-only recovery
+
+Nothing in the ledger is updated in place. To correct a mistaken decision, append
+the correcting decision (`reverify`, `withdraw`, `restore`, or an authority
+`revoke`/`regrant`) and let the read models re-derive state. Do not delete
+reference, authority, decision, flag, or command-receipt rows, and do not edit
+history rows to make a mistake disappear — the contradiction must stay visible.
+The Golden Dataset (`apps/worker/src/ai/fixtures/reference-golden.ts`) is the
+regression net for the extraction boundary: extend it rather than loosening
+grounding, and require that at least one mutation targets the implementation
+instead of the fixture expectations.
+
+### Production exclusion
+
+Phase 7B is local/disposable-verified only. Its three migrations are not applied
+to production, and this runbook authorizes no production operation: no
+migration, no role or account creation, no data backfill, and no deployment.
+Production rollout remains gated behind reviewer supply, a healthy production
+Auth service, a rehearsed pre-migration backup, and explicit authorization.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
