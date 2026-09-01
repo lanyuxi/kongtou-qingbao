@@ -593,13 +593,13 @@ git commit -m "feat(web): resolve official links from verified references"
 
 Add reference-proposal fixtures: explicit official announcement, social-account impersonation, near-miss domain, injected instruction, and invented Evidence locator. Assert that a proposal can only ever become a `candidate` reference and never a canonical verification, and run a mutation check to prove the negative cases actually discriminate.
 
-- [ ] **Step 2: Run Golden RED, then implement the fixture harness**
+- [x] **Step 2: Run Golden RED, then implement the fixture harness**
 
 ```bash
 pnpm --filter @airdrop/worker test -- reference-golden
 ```
 
-- [ ] **Step 3: Run the authorized disposable database and integration matrix**
+- [x] **Step 3: Run the authorized disposable database and integration matrix**
 
 Require explicit user authorization. Fail-closed preflight first, then, in the remote disposable workdir with the pinned CLI 2.112.0:
 
@@ -611,11 +611,13 @@ pnpm --filter @airdrop/database test:integration
 
 Require the full pgTAP matrix, reference/security/promotion/scoring/project integration suites, two-session races, revoked-role behavior, and fixture cleanup to pass. Record actual counts and cleanup proof.
 
-- [ ] **Step 4: Update the runbook**
+> **2026-09-01 COMPLETE (user-authorized):** local preflight (HEAD `23a6826` clean, key 0600, tunnels closed) and remote read-only preflight (CLI 2.112.0, 25 migrations / max `20260831000100`, marker=1, active+rumored=2, **seven file hashes byte-identical to local** incl. seed `f1ceaddc…`, all forbidden/temp paths absent) both passed. One `db reset --yes` exit 0. **Full pgTAP 16 files / 1,501 tests PASS.** Temporary IPv4 tunnels + 0600 four-variable env (values never echoed, shapes verified) and **three-endpoint parity PASS (remote psql = tunnel PostgreSQL = tunnel anon PostgREST = 2)**. **Integration 11 files / 74 tests PASS** (165.70s, incl. reference-review-repository and reference-security-coupling). Independent residue check: ledger 6 tables + outbox + security 2 tables all 0, projects back to the seed baseline (4 / active+rumored 2). Tunnels closed, every local temp deleted, final remote state re-verified. Production not accessed (54321/54322 untouched throughout).
+
+- [x] **Step 4: Update the runbook**
 
 Document reference provisioning, authority-vs-URL decision workflow, `last_verified_at` semantics, the security-flag coupling and restoration path, stable `AR2xx` error meanings, focused disposable test commands, append-only recovery, and production rollout exclusion. No credentials and no production commands.
 
-- [ ] **Step 5: Run secret/unsafe-field review and repository verification**
+- [x] **Step 5: Run secret/unsafe-field review and repository verification**
 
 ```bash
 rg -n 'service_role|DATABASE_URL|reviewer_user_id|internal_note|evidence_locator|candidate_payload' \
@@ -626,11 +628,13 @@ git diff --check
 
 Classify every match manually as a server-only boundary, an explicit denial/leakage test, an internal schema, or a defect. Fix defects before continuing.
 
-- [ ] **Step 6: Invoke completion/code-review skills**
+- [x] **Step 6: Invoke completion/code-review skills**
 
 Use `superpowers:verification-before-completion`, then `superpowers:requesting-code-review`. Resolve every validated Critical/Important finding with a new RED regression and focused/full GREEN evidence.
 
-- [ ] **Step 7: Final workbook/HANDOVER update and commit**
+> **2026-09-01 COMPLETE:** executed as two independent reviewer agents (the superpowers skills are not installed in this workspace). First review over `17fd364..dd3675c` returned **0 Critical / 2 Important / 4 Minor**; every finding was fixed with a RED regression and re-proven (percent-encoding normalization divergence, Golden Dataset signalType/quote assertions, runbook AR202/AR203 correction, stray text, documented pagination trade-off, duplicated `referenceUrlSchema`). Scoped re-review of the fix commit returned **SPEC COMPLIANT / APPROVED / 0C / 0I / READY YES**, and its two follow-up minors (colon divergence, schema duplication) were also fixed.
+
+- [x] **Step 7: Final workbook/HANDOVER update and commit**
 
 Record exact focused/full counts, runtime, migration/type hashes, review findings/resolutions, production non-access, and local-versus-production status.
 
@@ -645,17 +649,19 @@ git commit -m "test(security): complete phase 7b acceptance gates"
 
 ## Final Acceptance Checklist
 
-- [ ] Five Reference Ledger objects, protected commands, RLS, append-only guards, receipts, audit, and outbox are live in disposable tests.
-- [ ] No user-visible official link renders unless it resolves from a `verified` reference under a granted domain authority.
-- [ ] A verified domain does not by itself verify any URL beneath it, proven by an explicit test.
-- [ ] Every verify/reverify/restore decision traces to Evidence → Raw Item → Source whose source is not blocked.
-- [ ] `last_verified_at` is derived from the latest successful verify decision and is always shown next to a verified link.
-- [ ] A matching Phase 7A indicator removes a reference from public rendering synchronously, and only a human Evidence-grounded decision can restore it, with flag history retained.
-- [ ] A blocked project renders no reference links.
-- [ ] AI/collector paths cannot create canonical verification.
-- [ ] Active bearer reviewer/senior reviewer/admin is required; revoked, forged, and ordinary actors fail closed.
-- [ ] Shared target locks prove protect-first ordering for flag-vs-verify and authority-revoke-vs-verify races.
-- [ ] Public projections expose no Evidence locator, note, actor identity, candidate row, or normalization diagnostic.
-- [ ] Reviewer and public UI render all untrusted text inertly and leak no internal data.
-- [ ] Golden Dataset, full pgTAP, all repository integration, Web build, and `pnpm verify` pass.
-- [ ] HANDOVER/workbook/runbook distinguish local completion from production deployment; production remains untouched.
+> All fourteen items verified 2026-09-01. Items 1, 3, 4, 6, 9, 10 carry disposable-database evidence (full pgTAP 1,501 + integration 74); items 2, 5, 7, 8, 11, 12 carry local test + mutation evidence; item 13 is the complete gate run; item 14 is the recorded documentation split.
+
+- [x] Five Reference Ledger objects, protected commands, RLS, append-only guards, receipts, audit, and outbox are live in disposable tests.
+- [x] No user-visible official link renders unless it resolves from a `verified` reference under a granted domain authority.
+- [x] A verified domain does not by itself verify any URL beneath it, proven by an explicit test.
+- [x] Every verify/reverify/restore decision traces to Evidence → Raw Item → Source whose source is not blocked.
+- [x] `last_verified_at` is derived from the latest successful verify decision and is always shown next to a verified link.
+- [x] A matching Phase 7A indicator removes a reference from public rendering synchronously, and only a human Evidence-grounded decision can restore it, with flag history retained.
+- [x] A blocked project renders no reference links.
+- [x] AI/collector paths cannot create canonical verification.
+- [x] Active bearer reviewer/senior reviewer/admin is required; revoked, forged, and ordinary actors fail closed.
+- [x] Shared target locks prove protect-first ordering for flag-vs-verify and authority-revoke-vs-verify races.
+- [x] Public projections expose no Evidence locator, note, actor identity, candidate row, or normalization diagnostic.
+- [x] Reviewer and public UI render all untrusted text inertly and leak no internal data.
+- [x] Golden Dataset, full pgTAP, all repository integration, Web build, and `pnpm verify` pass.
+- [x] HANDOVER/workbook/runbook distinguish local completion from production deployment; production remains untouched.
