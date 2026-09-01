@@ -662,20 +662,17 @@ async function blockSourceBeforeVerification<Result>(input: {
     if (!await release.promise) throw new Error('reference_security_source_blocker_rollback');
   });
   let released = false;
-  let verification: Promise<Result> | null = null;
+  let verification: Promise<Result | unknown> | null = null;
   try {
     const blockerPid = await ready.promise;
-    verification = input.verify();
+    verification = input.verify().catch((error: unknown) => error);
     await waitForBlockedAdvisoryLock(input.observer, blockerPid, 1);
     writeSourceBlock.resolve(true);
     await sourceBlockWritten.promise;
     release.resolve(true);
     released = true;
     await blockerTransaction;
-    const outcome = await verification.then(
-      (value) => value,
-      (error: unknown) => error,
-    );
+    const outcome = await verification;
     return { outcome, incidentId };
   } finally {
     if (!released) {
