@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
+import {
+  createReferenceReviewApiClient,
+  type ReferenceReviewApiClient,
+} from './reference-review-api-client.js';
 import { createReviewApiClient, type ReviewApiClient } from './review-api-client.js';
 import { createReviewSessionController, type ReviewSessionController } from './review-session.js';
 import {
@@ -17,6 +21,7 @@ export interface ReviewBrowserRuntime {
   readonly session: ReviewSessionController;
   readonly api: ReviewApiClient;
   readonly securityApi: SecurityReviewApiClient;
+  readonly referenceApi: ReferenceReviewApiClient;
 }
 
 export function createReviewBrowserRuntime(): ReviewBrowserRuntime {
@@ -31,6 +36,7 @@ export function createReviewBrowserRuntime(): ReviewBrowserRuntime {
     session,
     api: createReviewApiClient(dependencies),
     securityApi: createSecurityReviewApiClient(dependencies),
+    referenceApi: createReferenceReviewApiClient(dependencies),
   };
 }
 

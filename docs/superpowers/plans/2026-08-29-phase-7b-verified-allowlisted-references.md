@@ -496,19 +496,19 @@ git commit -m "feat(web): add reference review bff"
 - Consumes: the Task 7 client, the reviewer shell, the session/pending-action gate, and `safe-review-text.ts`.
 - Produces: the domain-authority and reference review workflow with high-impact confirmations.
 
-- [ ] **Step 1: Write component RED tests**
+- [x] **Step 1: Write component RED tests**
 
 Cover: authority list/detail with grant, revoke, and regrant; reference list/detail with register, verify, reverify, restore, and withdraw; verify/restore requiring an explicit Evidence selection with no auto-selection; high-impact confirmations bound to the authoritative aggregate version; confirmation clearing on field edit or `409`; inert rendering of notes and hostile free text; and internal links formed only from validated UUIDs.
 
-- [ ] **Step 2: Run Web RED**
+- [x] **Step 2: Run Web RED**
 
 ```bash
 pnpm --filter @airdrop/web test -- reference-review-components
 ```
 
-- [ ] **Step 3: Implement the components and pages**
+- [x] **Step 3: Implement the components and pages**
 
-- [ ] **Step 4: Run Web GREEN**
+- [x] **Step 4: Run Web GREEN**
 
 ```bash
 pnpm --filter @airdrop/web test
@@ -517,7 +517,7 @@ pnpm --filter @airdrop/web typecheck
 pnpm --filter @airdrop/web build
 ```
 
-- [ ] **Step 5: Update workbook/HANDOVER and commit**
+- [x] **Step 5: Update workbook/HANDOVER and commit**
 
 ```bash
 git add apps/web/src/components apps/web/src/app/review apps/web/src/tests docs

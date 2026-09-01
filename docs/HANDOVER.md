@@ -1,10 +1,18 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-01（**Phase 7B Task 7 实现完成，本地门禁全绿**；下一步 Task 8 reviewer reference workflow UI。）
+> 最近更新：2026-09-01（**Phase 7B Task 8 实现完成，本地门禁全绿**；下一步 Task 9 public link resolution + unverified-link marking。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–7已完成；Task7 新增三个 lib 模块（cursor 34 行 / handlers 454 行 / api-client 247 行）与五个 BFF 路由，web +75 测试，16 项变异检验全部 killed，打包隔离已扩到新客户端，`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 317 = **1,435 non-skipped / 76 gated skips**）。**本轮未连接数据库、未建隧道、未访问远端或生产。** 下一步 Task8 reviewer reference workflow UI；Task8–10尚未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+> **当前一句话状态（2026-09-01 Phase 7B 实施中）**：Task1–8已完成；Task8 新增四组件（authority-list 146 / authority-detail 328 / reference-list 271 / reference-detail 329 行）、三个页面、shell 导航与 runtime `referenceApi`，web +25 测试，变异检验 19/19 killed，`pnpm verify` exit 0（contracts 170 + domain 410 + database 302 + worker 236 + web 342 = **1,460 non-skipped / 76 gated skips**）。**本轮未连接数据库、未建隧道、未访问远端或生产。** 下一步 Task9 public link resolution + unverified-link marking；Task9–10未实现。生产仍为19个已应用迁移，第20–25个按production unapplied处理。
+
+**2026-09-01 Task 8 reviewer workflow COMPLETE**：四组件 + 三页面。`authority-list.tsx`（146 行）：域名权威列表、状态过滤、游标、`authorityDetailHref`。`authority-detail.tsx`（328 行）：权威详情与不可变历史、决策表单（grant/revoke/regrant），并承载共享的 `ReferenceSubmissionState` 与 `SubmissionMessage`。`reference-list.tsx`（271 行）：引用列表、状态过滤、游标、`referenceDetailHref`，以及候选引用登记表单。`reference-detail.tsx`（329 行）：引用详情（含域名权威上下文、最近核验时间、活跃安全指标）与决策表单（verify/reverify/restore/withdraw）。
+
+**Task 8 五条硬约束**：①**内部链接只由 UUID 校验过的 id 生成**——`authorityDetailHref`/`referenceDetailHref` 用 `uuidPattern` 校验，不过则退为惰性文本，敌意 id 永远变不成可点链接；②**高风险确认绑定 `{id, version}` 快照**——`isAuthorityDecisionConfirmed`/`isReferenceDecisionConfirmed` 同时比对 draft 快照与 `{id, version}`，任一变化即失效，`update()` 与 409 都会清除确认；③**verify/reverify/restore 必须有 Evidence**（由 `decideReferenceCommandV1Schema` 的 refine 强制，非 UI 层判断），withdraw 不需要；④**note 与自由文本一律经 `displayReviewValue`**；⑤所有决策都绑定界面上显示的 aggregate version 作为 `expectedVersion`。
+
+**2026-09-01 Task 8 变异检验 19/19 killed（首轮 14/17，三项存活后补测）**：三项存活都指向同一个测试盲区——**React 会自动转义文本节点，所以只断言 `not.toContain('<script>')` 无法区分「被转义」与「被隐藏」**，`displayReviewValue` 这类防护等于没被覆盖。补 `not.toContain('&lt;script&gt;')` / `&lt;a href` 后 A6/B6 被杀。C3（引用侧「未确认不得提交」）是漏写用例，已补。另注意：B6 首轮存活还因为变异打在 `authority-detail.tsx` 的 `Metadata`，而敌意测试渲染的是 `ReferenceDetail`（两文件各有自己的 `Metadata`），已补 `AuthorityDetail` 敌意用例。**接手者注意：本仓库四个 reference 组件各自持有私有的 `Field`/`Text`/`Metadata`，与安全模块先例一致；改一个不会联动其他。**
+
+**2026-09-01 Task 8 计划外改动（已记录待确认）**：`review-browser-runtime.ts` 增加 `referenceApi` 字段。计划的 Task 8 文件清单只列了 `review-shell.tsx`，但页面需要客户端入口，无此字段则页面拿不到 `ReferenceReviewApiClient`。这是必要连带改动，已在此标注。
 
 **2026-09-01 Task 7 BFF 实现 COMPLETE**：三个模块 + 五个路由。`reference-cursor.ts`（34 行 / SHA `f419ede3…2119`）在页面边界用 `safeParse` 校验三种不透明游标，畸形值一律回落到首页而非抛服务端错误，且三种游标互不可串解（各自 strictObject 的键集不同）。`reference-review-handlers.ts`（454 行 / SHA `c92a6642…16f7`）导出 9 个工厂：引用侧 list/detail/register/decide、权威侧 list/detail/register/decide、以及公开的 `createPublicReferencesHandler`。三条硬约束：①**认证严格先于查询与请求体校验**，401 时仓库零调用；②畸形游标单独映射 `invalid_cursor`（客户端分页错误，不是服务端故障），其余校验失败一律 `invalid_request`；③查询类失败回落 `reference_query_failed` / 'Reference records could not be loaded.'，变更类回落 `reference_persistence_failed` / 'Reference review could not be completed.'，二者不可混用。`decide` 处理器额外要求请求体里的 `referenceId`/`authorityId` 与路径参数逐字相等。`reference-review-api-client.ts`（247 行 / SHA `ffcaf0b8…0596`）每次调用重新取 token、每次变更重新生成幂等键，409 报为类型化 `conflict` 且**从不重试**（调用方必须重载后按新版本重新确认），入参在发出请求前就用 contract schema 校验，不合法则零网络调用。路由：`/api/v1/review/references`（GET 列表 + POST 注册）、`/api/v1/review/references/[referenceId]/decisions`（POST）、`/api/v1/review/references/authorities`（GET + POST）、`/api/v1/review/references/authorities/[authorityId]/decisions`（POST）、`/api/v1/references`（公开 GET，无认证）。
 
@@ -319,7 +327,8 @@ Task 4 fresh 最终本地门禁：五 workspace lint/typecheck 全部 exit 0；�
 | 5 | 7A 联动集成测试（双会话竞态证明） | ✅ 完成 | 第25 migration `20260831000100`（591 行）+ 016（18 断言）；两阶段 disposable 授权后全绿；final review `0C/0I/0M`。**注意：SQL 未随 Task 3 交付**——原计划措辞已被 corrected locking design 取代 |
 | 6 | Strict public reference repositories and projections | ✅ 完成（本地门禁全绿；**无数据库行为证据**） | `reference-public-repository.ts` 211 行 / 15 测试 / 8 项变异检验 killed；全仓 verify 1,360 non-skipped / 76 gated skips。行为级证明需单独 disposable 授权 |
 | 7 | Authenticated reference BFF routes + browser client | ✅ 完成（本地门禁全绿；**两个 detail handler 未挂路由**） | 三模块 34/454/247 行 + 五个路由；web +75 测试；变异检验 16/16 killed；全仓 verify 1,435 non-skipped / 76 gated skips |
-| 8–10 | Reviewer UI / 公开链接解析 / Golden+收口 | ⬜ 待执行 | 详见实施计划；Task 8 需先补两个 detail GET 路由 |
+| 8 | Reviewer reference workflow UI | ✅ 完成（本地门禁全绿） | 四组件 146/328/271/329 行 + 三页面 + shell 导航 + runtime `referenceApi`；web +25 测试；变异检验 19/19 killed；全仓 verify 1,460 non-skipped / 76 gated skips |
+| 9–10 | 公开链接解析 / Golden+收口 | ⬜ 待执行 | 详见实施计划 |
 
 **已落地的关键设计事实（接手者必读）**：
 - 数据模型实际为 **6 张表**（规范写 5 张）：额外加了 `reference_review_commands` 独立回执表（`security_review_commands` 的列与 aggregate 校验是安全专用，硬塞会扭曲语义）；决策历史表各含 `aggregate_version bigint` 列，状态推导按 `aggregate_version desc` 排序（同事务内 `transaction_timestamp()` 恒定，按时间排会退化为随机 UUID 序）。
