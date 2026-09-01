@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { referenceUrlSchema } from './commands.js';
 import {
   domainAuthorityDecisionSchema,
   domainAuthorityStateSchema,
@@ -13,16 +14,6 @@ const uuidSchema = z.uuid();
 const timestampSchema = z.iso.datetime({ offset: true });
 const positiveVersionSchema = z.number().int().safe().positive();
 const internalNoteSchema = z.string().trim().min(1).max(1000).nullable();
-const referenceUrlSchema = z
-  .string()
-  .min(11)
-  .max(2048)
-  .refine((value) => value.startsWith('https://'), {
-    message: 'reference url must use https',
-  })
-  .refine((value) => !value.includes('#'), {
-    message: 'reference url must not contain a fragment',
-  });
 
 const cursorPayloadSchema = z.strictObject({
   lastVerifiedAt: timestampSchema,

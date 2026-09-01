@@ -93,6 +93,25 @@ describe('reference projections', () => {
     }
   });
 
+  it('rejects a public reference whose url carries a control character', () => {
+    // A control character in an href is how an injected value would try to
+    // break out of the attribute, so the projection must reject it with the
+    // same predicate the registration command uses.
+    for (const url of ['https://example.com/claim\u0007', 'https://example.com/cla\u0000im']) {
+      expect(
+        publicProjectReferenceSchema.safeParse({
+          projectId,
+          referenceId,
+          kind: 'official_site',
+          label: '官方领取页',
+          url,
+          lastVerifiedAt: '2026-08-29T00:00:00.000Z',
+        }).success,
+        JSON.stringify(url),
+      ).toBe(false);
+    }
+  });
+
   it('exposes only safe fields on the public domain authority projection', () => {
     expect(
       publicProjectDomainAuthoritySchema.safeParse({
