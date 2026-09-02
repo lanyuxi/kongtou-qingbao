@@ -344,6 +344,10 @@ export {
   publishTutorialVersionCommandV1Schema,
   rejectTutorialCandidateCommandV1Schema,
   retireTutorialCommandV1Schema,
+  tutorialAcceptReceiptSchema,
+  tutorialPublishReceiptSchema,
+  tutorialRejectReceiptSchema,
+  tutorialRetireReceiptSchema,
   tutorialStepSchema,
   tutorialStepsSchema,
 } from './tutorials/commands.js';
@@ -353,12 +357,17 @@ export type {
   PublishTutorialVersionCommandV1,
   RejectTutorialCandidateCommandV1,
   RetireTutorialCommandV1,
+  TutorialAcceptReceipt,
+  TutorialPublishReceipt,
+  TutorialRejectReceipt,
+  TutorialRetireReceipt,
   TutorialStep,
   TutorialSteps,
 } from './tutorials/commands.js';
 export {
   publicTutorialCursorSchema,
   publicTutorialDetailSchema,
+  publicTutorialListItemSchema,
   publicTutorialListQuerySchema,
   publicTutorialListSchema,
   tutorialCandidateCursorSchema,
@@ -376,8 +385,15 @@ export {
 export type {
   PublicTutorialDetail,
   PublicTutorialLink,
+  PublicTutorialListItem,
+  TutorialCandidateCursor,
   TutorialCandidateReviewDetail,
+  TutorialCandidateReviewListItem,
+  TutorialCandidateReviewListQuery,
+  TutorialReviewCursor,
   TutorialReviewDetail,
+  TutorialReviewListItem,
+  TutorialReviewListQuery,
 } from './tutorials/projections.js';
 export { tutorialOutboxEventV1Schema } from './tutorials/events.js';
 export type { TutorialOutboxEventV1 } from './tutorials/events.js';

@@ -102,6 +102,39 @@ export const retireTutorialCommandV1Schema = z.strictObject({
   note: internalNoteSchema,
 });
 
+// Command receipts. The `version` column is the command schema version, not
+// the aggregate version; replayed receipts echo the original result.
+export const tutorialAcceptReceiptSchema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  candidateId: uuidSchema,
+  tutorialId: uuidSchema,
+  tutorialVersion: positiveVersionSchema,
+  replayed: z.boolean(),
+});
+
+export const tutorialRejectReceiptSchema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  candidateId: uuidSchema,
+  replayed: z.boolean(),
+});
+
+export const tutorialPublishReceiptSchema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  tutorialId: uuidSchema,
+  tutorialVersion: positiveVersionSchema,
+  replayed: z.boolean(),
+});
+
+export const tutorialRetireReceiptSchema = z.strictObject({
+  version: z.literal(1),
+  commandId: uuidSchema,
+  tutorialId: uuidSchema,
+  replayed: z.boolean(),
+});
+
 export type TutorialStep = z.infer<typeof tutorialStepSchema>;
 export type TutorialSteps = z.infer<typeof tutorialStepsSchema>;
 export type AcceptTutorialCandidateCommandV1 = z.infer<
@@ -115,3 +148,7 @@ export type PublishTutorialVersionCommandV1 = z.infer<
 >;
 export type RetireTutorialCommandV1 = z.infer<typeof retireTutorialCommandV1Schema>;
 export type TutorialCandidatePayload = z.infer<typeof tutorialCandidatePayloadSchema>;
+export type TutorialAcceptReceipt = z.infer<typeof tutorialAcceptReceiptSchema>;
+export type TutorialRejectReceipt = z.infer<typeof tutorialRejectReceiptSchema>;
+export type TutorialPublishReceipt = z.infer<typeof tutorialPublishReceiptSchema>;
+export type TutorialRetireReceipt = z.infer<typeof tutorialRetireReceiptSchema>;

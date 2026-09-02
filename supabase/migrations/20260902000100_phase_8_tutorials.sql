@@ -367,9 +367,7 @@ select
   t.last_verified_at,
   tv.created_at as published_at,
   (
-    select pg_catalog.count(*)
-    from public.tutorial_step_links as sl
-    where sl.version_id = tv.id
+    select pg_catalog.jsonb_array_length(tv.steps)
   ) as step_count
 from public.tutorials as t
 join public.tutorial_versions as tv
@@ -393,7 +391,11 @@ select
   st.elem ->> 'title' as step_title,
   st.elem ->> 'body' as step_body,
   (lk.elem ->> 'referenceId')::uuid as link_reference_id,
-  reference_row.normalized_url as link_url,
+  case
+    when public.reference_is_publicly_renderable_v1((lk.elem ->> 'referenceId')::uuid)
+    then reference_row.normalized_url
+    else null
+  end as link_url,
   reference_row.label as link_label,
   public.reference_last_verified_at_v1((lk.elem ->> 'referenceId')::uuid)
     as link_last_verified_at,

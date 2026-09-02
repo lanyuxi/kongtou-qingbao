@@ -55,20 +55,20 @@ export const publicTutorialListQuerySchema = z.strictObject({
   limit: z.number().int().min(1).max(50).default(12),
 });
 
+export const publicTutorialListItemSchema = z.strictObject({
+  tutorialId: uuidSchema,
+  projectId: uuidSchema,
+  kind: tutorialKindSchema,
+  title: z.string().min(5).max(200),
+  summary: z.string().min(10).max(2000),
+  version: positiveVersionSchema,
+  lastVerifiedAt: timestampSchema.nullable(),
+  publishedAt: timestampSchema,
+  stepCount: z.number().int().min(2).max(20),
+});
+
 export const publicTutorialListSchema = z.strictObject({
-  items: z.array(
-    z.strictObject({
-      tutorialId: uuidSchema,
-      projectId: uuidSchema,
-      kind: tutorialKindSchema,
-      title: z.string().min(5).max(200),
-      summary: z.string().min(10).max(2000),
-      version: positiveVersionSchema,
-      lastVerifiedAt: timestampSchema.nullable(),
-      publishedAt: timestampSchema,
-      stepCount: z.number().int().min(2).max(20),
-    }),
-  ),
+  items: z.array(publicTutorialListItemSchema),
 });
 
 // Reviewer projections. The candidate queue never embeds the payload body; the
@@ -197,5 +197,16 @@ export const tutorialCandidateReviewDetailSchema = z.strictObject({
 
 export type PublicTutorialDetail = z.infer<typeof publicTutorialDetailSchema>;
 export type PublicTutorialLink = z.infer<typeof publicTutorialLinkSchema>;
-export type TutorialCandidateReviewDetail = z.infer<typeof tutorialCandidateReviewDetailSchema>;
+export type PublicTutorialListItem = z.infer<typeof publicTutorialListItemSchema>;
+export type TutorialCandidateCursor = z.infer<typeof tutorialCandidateCursorSchema>;
+export type TutorialCandidateReviewListQuery = z.infer<
+  typeof tutorialCandidateReviewListQuerySchema
+>;
+export type TutorialCandidateReviewListItem = z.infer<
+  typeof tutorialCandidateReviewListItemSchema
+>;
+export type TutorialReviewCursor = z.infer<typeof tutorialReviewCursorSchema>;
+export type TutorialReviewListQuery = z.infer<typeof tutorialReviewListQuerySchema>;
+export type TutorialReviewListItem = z.infer<typeof tutorialReviewListItemSchema>;
 export type TutorialReviewDetail = z.infer<typeof tutorialReviewDetailSchema>;
+export type TutorialCandidateReviewDetail = z.infer<typeof tutorialCandidateReviewDetailSchema>;
