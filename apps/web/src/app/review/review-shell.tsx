@@ -39,6 +39,8 @@ export function ReviewShell({
         <Link className="review-link" href="/review/security">安全审核</Link>
         {' · '}
         <Link className="review-link" href="/review/references">引用审核</Link>
+        {' · '}
+        <Link className="review-link" href="/review/tutorials">教程审核</Link>
       </nav>
       {signOutPending ? <p className="review-sign-out-state" role="status">正在安全退出…</p> : null}
       <div className="review-content">{children}</div>

@@ -13,6 +13,10 @@ import {
   type SecurityReviewApiClient,
 } from './security-review-api-client.js';
 import {
+  createTutorialReviewApiClient,
+  type TutorialReviewApiClient,
+} from './tutorial-review-api-client.js';
+import {
   createReviewBrowserAuthPort,
   createReviewBrowserSupabaseClient,
 } from './supabase-browser.js';
@@ -22,6 +26,7 @@ export interface ReviewBrowserRuntime {
   readonly api: ReviewApiClient;
   readonly securityApi: SecurityReviewApiClient;
   readonly referenceApi: ReferenceReviewApiClient;
+  readonly tutorialApi: TutorialReviewApiClient;
 }
 
 export function createReviewBrowserRuntime(): ReviewBrowserRuntime {
@@ -37,6 +42,7 @@ export function createReviewBrowserRuntime(): ReviewBrowserRuntime {
     api: createReviewApiClient(dependencies),
     securityApi: createSecurityReviewApiClient(dependencies),
     referenceApi: createReferenceReviewApiClient(dependencies),
+    tutorialApi: createTutorialReviewApiClient(dependencies),
   };
 }
 
