@@ -1205,3 +1205,69 @@ td.num-col {
   color: var(--ink-400);
   font-size: 12px;
 }
+
+/* Phase 8: public tutorial cards and detail steps */
+.tutorial-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tutorial-card-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.tutorial-card-link {
+  color: var(--ink-900);
+  text-decoration: none;
+}
+
+.tutorial-card-link:hover {
+  color: var(--accent);
+}
+
+.tutorial-card-summary {
+  margin: 0 0 8px;
+  color: var(--ink-600);
+  font-size: 13.5px;
+}
+
+.tutorial-card-meta {
+  margin: 0;
+  color: var(--ink-400);
+  font-size: 12.5px;
+}
+
+.tutorial-steps {
+  margin: 16px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 20px;
+}
+
+.tutorial-step-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+
+.tutorial-step-body {
+  margin: 0 0 8px;
+  color: var(--ink-600);
+}
+
+.tutorial-step-links {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--ink-600);
+  font-size: 13.5px;
+}
+
+.tutorial-link-unavailable {
+  color: var(--ink-400);
+}
+
+.tutorial-link-verified {
+  color: var(--ink-400);
+  font-size: 12.5px;
+}

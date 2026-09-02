@@ -2,6 +2,7 @@ import type {
   PublicProjectDomainAuthority,
   PublicProjectReference,
   PublicProjectSecurityState,
+  PublicTutorialListItem,
 } from '@airdrop/contracts';
 import type {
   ProjectDetail,
@@ -11,6 +12,7 @@ import type {
   ProjectSignal,
   ReferencePublicRepository,
   SecurityPublicRepository,
+  TutorialPublicRepository,
 } from '@airdrop/database';
 
 export interface ProjectDetailResult {
@@ -37,6 +39,12 @@ export interface ProjectDetailResult {
    * and must never be rendered as links.
    */
   readonly authorities: readonly PublicProjectDomainAuthority[];
+  /**
+   * Published tutorials for this project. The projection excludes needs-review,
+   * blocked, and retired rows and every tutorial under a blocked project, so
+   * renderers treat this as the single source for the tutorial cards.
+   */
+  readonly tutorials: readonly PublicTutorialListItem[];
 }
 
 // A project detail page renders a bounded set of references; deeper paging
@@ -48,11 +56,13 @@ export interface ProjectDetailResult {
 // a missed link, never an unverified one rendered as an anchor — and a project
 // with more than 100 verified references belongs on a dedicated surface.
 const referenceLimit = 100;
+const tutorialLimit = 20;
 
 export async function loadProjectDetailFromRepository(
   repository: ProjectRepository,
   securityRepository: SecurityPublicRepository,
   referenceRepository: ReferencePublicRepository,
+  tutorialRepository: TutorialPublicRepository,
   slug: string,
 ): Promise<ProjectDetailResult | null> {
   const project = await repository.getProjectBySlug(slug);
@@ -63,7 +73,7 @@ export async function loadProjectDetailFromRepository(
   const scoreId = project.latestScore?.id;
   // All reads start together and compose once, so a slower score read can never
   // rewrite the reference snapshot taken for this render.
-  const [signals, factors, citations, security, references, authorities] = await Promise.all([
+  const [signals, factors, citations, security, references, authorities, tutorials] = await Promise.all([
     repository.listProjectSignals(project.projectId, 20),
     scoreId === undefined ? [] : repository.listCurrentScoreFactors(project.projectId, scoreId),
     scoreId === undefined
@@ -76,7 +86,10 @@ export async function loadProjectDetailFromRepository(
     referenceRepository
       .listGrantedDomainAuthorities({ projectId: project.projectId, limit: referenceLimit })
       .then((page) => page.items),
+    tutorialRepository
+      .listProjectTutorials({ projectId: project.projectId, cursor: null, limit: tutorialLimit })
+      .then((page) => page.items),
   ]);
 
-  return { project, signals, factors, citations, security, references, authorities };
+  return { project, signals, factors, citations, security, references, authorities, tutorials };
 }

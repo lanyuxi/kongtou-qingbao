@@ -11,11 +11,14 @@ import type {
   PublicReferencePage,
   ReferencePublicRepository,
   SecurityPublicRepository,
+  TutorialPublicRepository,
 } from '@airdrop/database';
 import type {
   PublicProjectDomainAuthority,
   PublicProjectReference,
   PublicProjectSecurityState,
+  PublicTutorialDetail,
+  PublicTutorialListItem,
 } from '@airdrop/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -118,6 +121,20 @@ const references: readonly PublicProjectReference[] = [
   },
 ];
 
+const tutorials: readonly PublicTutorialListItem[] = [
+  {
+    tutorialId: 'b1000000-0000-4000-8000-000000000009',
+    projectId,
+    kind: 'airdrop_campaign',
+    title: '官方空投参与教程',
+    summary: '覆盖从钱包连接到任务领取的完整步骤。',
+    version: 1,
+    lastVerifiedAt: '2026-08-30T04:00:00.000Z',
+    publishedAt: '2026-08-30T03:00:00.000Z',
+    stepCount: 2,
+  },
+];
+
 const authorities: readonly PublicProjectDomainAuthority[] = [
   {
     projectId,
@@ -133,10 +150,12 @@ describe('loadProjectDetailFromRepository', () => {
     const securityRepository = new RecordingSecurityPublicRepository();
     const referenceRepository = new RecordingReferencePublicRepository();
 
+    const tutorialRepository = new RecordingTutorialPublicRepository();
     const pendingDetail = loadProjectDetailFromRepository(
       repository,
       securityRepository,
       referenceRepository,
+      tutorialRepository,
       'demo-project',
     );
     await waitForMicrotasks();
@@ -150,10 +169,12 @@ describe('loadProjectDetailFromRepository', () => {
       { kind: 'references', projectId },
       { kind: 'authorities', projectId },
     ]);
+    expect(tutorialRepository.reads).toEqual([{ projectId, limit: 20 }]);
 
     repository.releaseScoreReads();
     securityRepository.release();
     referenceRepository.release();
+    tutorialRepository.release();
     await expect(pendingDetail).resolves.toEqual({
       project: projectWithScore,
       signals,
@@ -162,6 +183,7 @@ describe('loadProjectDetailFromRepository', () => {
       security: securityState,
       references,
       authorities,
+      tutorials,
     });
     expect(repository.signalReads).toEqual([{ projectId, limit: 20 }]);
   });
@@ -172,24 +194,30 @@ describe('loadProjectDetailFromRepository', () => {
     const referenceRepository = new RecordingReferencePublicRepository();
     securityRepository.release();
 
+    const tutorialRepository = new RecordingTutorialPublicRepository();
     const pendingDetail = loadProjectDetailFromRepository(
       repository,
       securityRepository,
       referenceRepository,
+      tutorialRepository,
       'demo-project',
     );
 
     // The score reads stay unresolved while the reference reads resolve, so a
     // late score result cannot rewrite the reference snapshot.
     referenceRepository.release();
+    tutorialRepository.release();
     await waitForMicrotasks();
     referenceRepository.reads.length = 0;
+    tutorialRepository.reads.length = 0;
     repository.releaseScoreReads();
 
     const detail = await pendingDetail;
     expect(detail?.references).toEqual(references);
     expect(detail?.authorities).toEqual(authorities);
+    expect(detail?.tutorials).toEqual(tutorials);
     expect(referenceRepository.reads).toEqual([]);
+    expect(tutorialRepository.reads).toEqual([]);
   });
 
   it('still reads the public security state when the project has no score', async () => {
@@ -197,14 +225,17 @@ describe('loadProjectDetailFromRepository', () => {
     const repository = new RecordingProjectRepository(projectWithoutScore, false);
     const securityRepository = new RecordingSecurityPublicRepository();
     const referenceRepository = new RecordingReferencePublicRepository();
+    const tutorialRepository = new RecordingTutorialPublicRepository();
     securityRepository.release();
     referenceRepository.release();
+    tutorialRepository.release();
 
     await expect(
       loadProjectDetailFromRepository(
         repository,
         securityRepository,
         referenceRepository,
+        tutorialRepository,
         'demo-project',
       ),
     ).resolves.toEqual({
@@ -215,6 +246,7 @@ describe('loadProjectDetailFromRepository', () => {
       security: securityState,
       references,
       authorities,
+      tutorials,
     });
     expect(repository.scoreReads).toEqual([]);
     expect(securityRepository.reads).toEqual([projectId]);
@@ -224,12 +256,14 @@ describe('loadProjectDetailFromRepository', () => {
     const repository = new RecordingProjectRepository(null, false);
     const securityRepository = new RecordingSecurityPublicRepository();
     const referenceRepository = new RecordingReferencePublicRepository();
+    const tutorialRepository = new RecordingTutorialPublicRepository();
 
     await expect(
       loadProjectDetailFromRepository(
         repository,
         securityRepository,
         referenceRepository,
+        tutorialRepository,
         'missing-project',
       ),
     ).resolves.toBeNull();
@@ -237,6 +271,7 @@ describe('loadProjectDetailFromRepository', () => {
     expect(repository.scoreReads).toEqual([]);
     expect(securityRepository.reads).toEqual([]);
     expect(referenceRepository.reads).toEqual([]);
+    expect(tutorialRepository.reads).toEqual([]);
   });
 });
 
@@ -261,6 +296,30 @@ class RecordingReferencePublicRepository implements ReferencePublicRepository {
   release(): void {
     this.referenceRead.resolve({ version: 1, items: references, nextCursor: null });
     this.authorityRead.resolve({ version: 1, items: authorities });
+  }
+}
+
+class RecordingTutorialPublicRepository implements TutorialPublicRepository {
+  readonly reads: { readonly projectId: string; readonly limit: number }[] = [];
+
+  private readonly listRead = createDeferred<{ version: 1; items: readonly PublicTutorialListItem[]; nextCursor: { readonly publishedAt: string; readonly tutorialId: string } | null }>();
+  private readonly detailRead = createDeferred<PublicTutorialDetail>();
+
+  listProjectTutorials(input: {
+    readonly projectId: string;
+    readonly cursor: { readonly publishedAt: string; readonly tutorialId: string } | null;
+    readonly limit?: number;
+  }): Promise<{ version: 1; items: readonly PublicTutorialListItem[]; nextCursor: { readonly publishedAt: string; readonly tutorialId: string } | null }> {
+    this.reads.push({ projectId: input.projectId, limit: input.limit ?? 0 });
+    return this.listRead.promise;
+  }
+
+  getTutorial(): Promise<PublicTutorialDetail> {
+    return this.detailRead.promise;
+  }
+
+  release(): void {
+    this.listRead.resolve({ version: 1, items: tutorials, nextCursor: null });
   }
 }
 

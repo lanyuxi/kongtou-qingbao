@@ -18,6 +18,7 @@ import {
   ScoreFactorGroups,
 } from '../../../components/project-score-evidence.js';
 import { ProjectSecurityBanner } from '../../../components/security-elements.js';
+import { TutorialCardList } from '../../../components/tutorial/public-tutorial.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,7 @@ export default async function ProjectDetailPage({
     notFound();
   }
 
-  const { project, signals, factors, citations, security, references, authorities } = detail;
+  const { project, signals, factors, citations, security, references, authorities, tutorials } = detail;
   const score = project.latestScore;
   const historical = security.posture === 'blocked';
   // Both children already self-render as null when blocked or empty; this guard
@@ -82,6 +83,8 @@ export default async function ProjectDetailPage({
           <GrantedDomainChips authorities={authorities} posture={security.posture} />
         </section>
       ) : null}
+
+      {!historical ? <TutorialCardList items={tutorials} /> : null}
 
       {score === null ? (
         <section className="card">
