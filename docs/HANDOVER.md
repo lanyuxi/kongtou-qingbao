@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–9 完成**（contracts + domain 纯规则 + 迁移 26/pgTAP 017 + tutorial repositories + BFF 路由与边界 + 审核 UI + 公开页 + AI 生成器（含迁移 27 权限边界）+ Golden Dataset，disposable 验收全绿：full pgTAP 17/17、集成 12 文件/78 测试；期间修复迁移 6 处真实缺陷含 incident 联动死代码与视图两处泄漏/语义错误）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。生产仍为 25 迁移，第 26 个上生产需另行显式授权。）
+> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–10 完成**（contracts + domain 纯规则 + 迁移 26/pgTAP 017 + tutorial repositories + BFF 路由与边界 + 审核 UI + 公开页 + AI 生成器（含迁移 27 权限边界）+ Golden Dataset + runbook/敏感扫描/最终矩阵收口，disposable 验收全绿：full pgTAP 17/17、集成 12 文件/78 测试；期间修复迁移 6 处真实缺陷含 incident 联动死代码与视图两处泄漏/语义错误）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。生产仍为 25 迁移，第 26 个上生产需另行显式授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-02 Phase 8 tutorials 进行中，Task 5 后）**：**Phase 8 tutorials 开发进行中**——分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`，**Task 1–9 已完成、Task 10 未开始**（进度看板见 §8.0）；全仓 `pnpm verify` exit 0 = **1,635 non-skipped / 80 gated skips**；Phase 8 disposable 矩阵全绿（full pgTAP **17 files** / 0 失败、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移）。历史背景：Phase 0–7B 均已合入主线 `codex/phase-0-1-foundation`（7B merge `f723457`，提交链 `f63f793..2a63309`；7A merge `00b4497`）；功能分支与 worktree 按惯例保留不删（备份 `backup/pre-7b-merge-main` / `-7b`）；**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行），生产库与代码库（迁移 1–25）完全同构；迁移 26（Phase 8）未上生产，需另行显式授权；生产 web 应用部署仍为独立未办事项。**
+> **当前一句话状态（2026-09-02 Phase 8 tutorials 进行中，Task 5 后）**：**Phase 8 tutorials 开发进行中**——分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`，**Task 1–10 全部完成**（进度看板见 §8.0，Phase 8 本地/disposable 验收闭环；生产仍为 25 迁移，26/27 需另行显式授权）；全仓 `pnpm verify` exit 0 = **1,635 non-skipped / 80 gated skips**；Phase 8 disposable 矩阵全绿（full pgTAP **17 files** / 0 失败、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移）。历史背景：Phase 0–7B 均已合入主线 `codex/phase-0-1-foundation`（7B merge `f723457`，提交链 `f63f793..2a63309`；7A merge `00b4497`）；功能分支与 worktree 按惯例保留不删（备份 `backup/pre-7b-merge-main` / `-7b`）；**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行），生产库与代码库（迁移 1–25）完全同构；迁移 26（Phase 8）未上生产，需另行显式授权；生产 web 应用部署仍为独立未办事项。**
 
 **2026-09-02 Phase 8 tutorials 开工**：分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`（基线 `5fb784f`）。规范 `docs/superpowers/specs/2026-09-02-phase-8-tutorials-design.md`（Approved，D1–D8 采纳）与实施计划（10 任务）已定稿。**运行时变更**：旧 `/tmp/airdrop-node22-pnpm` 声明路径已轮换废弃，改用 managed node 22.22.2-2 + corepack pnpm 11.16.0（shim 已建入该 bin 目录）。进度详见 `docs/tasks/phase-8-tutorials-workbook.md`。
 
@@ -912,13 +912,31 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 7 | 公开页（详情页教程卡 + `/tutorials/[id]`） | ✅ 完成 | public-tutorial 组件 + 公开详情页 + 详情页教程卡 + loader 扩展；web 402→**408**；变异 2/2；build 绿 |
 | 8 | AI 生成器（worker 编排 tick → `tutorial_candidates`） | ✅ 完成 | 迁移 27 + 生成器仓储 + generate-candidates + 编排注册 + pgTAP 018；worker 246→**256**；变异 3/3；full pgTAP **18 files / 0 失败**、集成 12 files / 78 |
 | 9 | Golden Dataset（教程生成边界） | ✅ 完成 | 7 用例 / 10 测试；变异 3/3（strict 放宽 / URL 守卫 / 白名单绕过）；worker 256→**266** |
-| 10 | runbook + disposable 矩阵 + 收口 | ⬜ 未开始 | — |
+| 10 | runbook + disposable 矩阵 + 收口 | ✅ 完成 | runbook Phase 8 章节 + 敏感扫描零缺陷 + 最终矩阵（pgTAP **18/0**、集成 **12/78**、typegen 零漂移、清理）+ 最终台账 14 项 |
+
+### Phase 8 最终验收清单（2026-09-02，Task 10 收口）
+
+| # | 断言 | 状态 | 证据 |
+|---|------|------|------|
+| 1 | 教程只使用已验证、可渲染的台账链接 | ✅ 本地已验证 | 视图经 `reference_is_publicly_renderable_v1` 解析；组件锚点守卫（`renderable && url`）；Task 7 变异 |
+| 2 | `last_verified_at` 可见且 machine-readable | ✅ 本地已验证 | 教程级 `<time dateTime>` + 链接级引用核验时间；runbook 双重语义 |
+| 3 | AI 只产候选，永不直写 canonical | ✅ 本地已验证 | Golden Dataset（越权字段/幻觉/URL 走私）；迁移 27 仅给 worker 候选写权限 |
+| 4 | 不可渲染链接不渲染为锚点 | ✅ 本地已验证 | Task 4 泄漏守卫 + Task 7 守卫，均变异锁定 |
+| 5 | 六类联动同步生效 | ✅ 本地已验证 | pgTAP 017（plan 41）；blocked 永不自动降级 |
+| 6 | blocked 项目抑制其全部教程 | ✅ 本地已验证 | 视图 + 仓储过滤；集成用例 |
+| 7 | 候选不可变、恢复必须新版本 | ✅ 本地已验证 | append-only 约束；publish 生成新版本，无原地编辑 |
+| 8 | 审核人角色要求 fail-closed | ✅ 本地已验证 | AT201（pgTAP 017）+ BFF 401/403 + UI 会话过期处理 |
+| 9 | 幂等（命令与生成） | ✅ 本地已验证 | 命令幂等键与回执；生成 materialHash 门 + 唯一键；pgTAP 017/018 |
+| 10 | 公开投影无泄漏 | ✅ 本地已验证 | 公开详情页与教程页无裸 URL 列；敏感扫描零缺陷 |
+| 11 | 包隔离（server-only 边界） | ✅ 本地已验证 | `@airdrop/database/tutorial-review` browser-denied；bundle 哨兵测试通过 |
+| 12 | 本地门禁与构建 | ✅ 本地已验证 | `pnpm verify` exit 0 = 1,635 non-skipped / 80 gated skips；`next build` 成功 |
+| 13 | 迁移 26/27 上生产 | ⚠️ 需显式授权 | 生产仍 25 迁移；需备份演练 + Auth 健康 + human reviewer + 逐条授权 |
+| 14 | 生产 web 应用部署 | ⚠️ 独立未办事项 | 生产无持久 web 进程（nginx 仅静态站），/srv 检出为 Phase 2 时代快照 |
 
 **当前累计证据**：disposable 验收全绿（reset 26 迁移 → full pgTAP **17 files / 0 失败** → 集成矩阵 **12 files / 78 tests** → 残留核验全零 → 双 typegen SHA `0499c0ab…` 零漂移 → 清理完毕）；迁移 26 已在 disposable 验证但**未上生产**（生产 25 迁移）。
 
 **下一步工作（按序）**：
-1. **Task 10 收口**——runbook Phase 8 章节、敏感扫描、独立复审、最终 disposable 矩阵与台账。
-2. **独立事项（Phase 8 完成后）**：①迁移 26 上生产（需显式授权 + 备份演练沿用 §5 规程）；②生产 web 应用部署（当前无持久 web 进程，nginx 仅静态站）；③Phase 8 分支合并回主线（沿用 7B 双父 merge 惯例）。
+Phase 8 十个任务已全部完成。后续仅剩**独立事项**：：①迁移 26 上生产（需显式授权 + 备份演练沿用 §5 规程）；②生产 web 应用部署（当前无持久 web 进程，nginx 仅静态站）；③Phase 8 分支合并回主线（沿用 7B 双父 merge 惯例）。
 
 ### 8.1 当前状态快照（2026-09-02 Phase 8 Task 5 后）
 
