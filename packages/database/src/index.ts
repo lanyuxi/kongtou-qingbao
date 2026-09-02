@@ -19,6 +19,21 @@ export {
   type ReferencePublicRepository,
 } from './repositories/reference-public-repository.js';
 export {
+  createTutorialPublicRepository,
+  TutorialPublicProjectionQueryError,
+  type PublicTutorialListQuery,
+  type TutorialPublicRepository,
+} from './repositories/tutorial-public-repository.js';
+export {
+  createTutorialCandidateRepository,
+  type TutorialCandidateInsert,
+  type TutorialCandidateRepository,
+  type TutorialGenerationMaterial,
+  type TutorialMaterialReference,
+  type TutorialMaterialSignal,
+  type TutorialRunRecord,
+} from './tutorials/tutorial-candidate-repository.js';
+export {
   createSecurityPublicRepository,
   SecurityPublicProjectionQueryError,
   type PublicBlockedProjectQuery,

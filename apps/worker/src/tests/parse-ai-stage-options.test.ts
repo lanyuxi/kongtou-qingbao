@@ -39,6 +39,7 @@ describe('parseAiStageOptions', () => {
       maxProjects: 25,
       extractTickMs: 60_000,
       scoringTickMs: 300_000,
+      tutorialTickMs: 600_000,
     });
   });
 

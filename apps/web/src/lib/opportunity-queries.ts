@@ -4,6 +4,7 @@ import {
   createProjectRepository,
   createReferencePublicRepository,
   createSecurityPublicRepository,
+  createTutorialPublicRepository,
   type OpportunityListItem,
 } from '@airdrop/database';
 import type { PublicBlockedProjectSecurityPage } from '@airdrop/contracts';
@@ -62,10 +63,12 @@ export async function loadProjectDetail(slug: string): Promise<ProjectDetailResu
   const repository = createProjectRepository(createServerSupabaseClient());
   const securityRepository = createSecurityPublicRepository(createServerSupabaseClient());
   const referenceRepository = createReferencePublicRepository(createServerSupabaseClient());
+  const tutorialRepository = createTutorialPublicRepository(createServerSupabaseClient());
   return loadProjectDetailFromRepository(
     repository,
     securityRepository,
     referenceRepository,
+    tutorialRepository,
     slug,
   );
 }

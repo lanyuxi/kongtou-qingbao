@@ -59,6 +59,7 @@ select results_eq(
       ('profiles'::text, 'profiles_update_authenticated'::text),
       ('project_domain_authorities'::text, 'project_domain_authorities_select_anon'::text),
       ('project_domain_authorities'::text, 'project_domain_authorities_select_authenticated'::text),
+      ('project_references'::text, 'project_references_ai_stage_worker_read'::text),
       ('project_references'::text, 'project_references_select_anon'::text),
       ('project_references'::text, 'project_references_select_authenticated'::text),
       ('project_scores'::text, 'project_scores_ai_stage_worker_insert'::text),
@@ -98,6 +99,14 @@ select results_eq(
       ('signals'::text, 'signals_select_authenticated'::text),
       ('sources'::text, 'sources_select_anon'::text),
       ('sources'::text, 'sources_select_authenticated'::text),
+      ('tutorial_candidates'::text, 'tutorial_candidates_ai_stage_worker_insert'::text),
+      ('tutorial_candidates'::text, 'tutorial_candidates_ai_stage_worker_read'::text),
+      ('tutorial_step_links'::text, 'tutorial_step_links_select_anon'::text),
+      ('tutorial_step_links'::text, 'tutorial_step_links_select_authenticated'::text),
+      ('tutorial_versions'::text, 'tutorial_versions_select_anon'::text),
+      ('tutorial_versions'::text, 'tutorial_versions_select_authenticated'::text),
+      ('tutorials'::text, 'tutorials_select_anon'::text),
+      ('tutorials'::text, 'tutorials_select_authenticated'::text),
       ('user_projects'::text, 'user_projects_delete_authenticated'::text),
       ('user_projects'::text, 'user_projects_insert_authenticated'::text),
       ('user_projects'::text, 'user_projects_select_authenticated'::text),
@@ -138,6 +147,7 @@ select results_eq(
       ('ai_runs', 'ai_runs_ai_stage_worker_write'),
       ('extraction_candidates', 'extraction_candidates_ai_stage_worker_insert'),
       ('extraction_candidates', 'extraction_candidates_ai_stage_worker_read'),
+      ('project_references', 'project_references_ai_stage_worker_read'),
       ('project_scores', 'project_scores_ai_stage_worker_insert'),
       ('project_scores', 'project_scores_ai_stage_worker_read'),
       ('project_sources', 'project_sources_ai_stage_worker_read'),
@@ -147,7 +157,9 @@ select results_eq(
       ('score_factors', 'score_factors_ai_stage_worker_read'),
       ('score_signal_links', 'score_signal_links_ai_stage_worker_insert'),
       ('score_signal_links', 'score_signal_links_ai_stage_worker_read'),
-      ('signals', 'signals_ai_stage_worker_read')
+      ('signals', 'signals_ai_stage_worker_read'),
+      ('tutorial_candidates', 'tutorial_candidates_ai_stage_worker_insert'),
+      ('tutorial_candidates', 'tutorial_candidates_ai_stage_worker_read')
     ) as expected(tablename, policyname)
     order by expected.tablename, expected.policyname
   $$,
@@ -182,7 +194,8 @@ select results_eq(
       ('score_factors', 'score_factors_ai_stage_worker_read'),
       ('score_signal_links', 'score_signal_links_ai_stage_worker_insert'),
       ('score_signal_links', 'score_signal_links_ai_stage_worker_read'),
-      ('signals', 'signals_ai_stage_worker_read')
+      ('signals', 'signals_ai_stage_worker_read'),
+      ('tutorial_candidates', 'tutorial_candidates_ai_stage_worker_read')
     ) as expected(tablename, policyname)
     order by expected.tablename, expected.policyname
   $$,

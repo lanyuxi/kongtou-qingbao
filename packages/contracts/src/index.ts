@@ -317,3 +317,83 @@ export type {
 } from './references/projections.js';
 export { referenceOutboxEventV1Schema } from './references/events.js';
 export type { ReferenceOutboxEventV1 } from './references/events.js';
+
+export {
+  tutorialCandidateStatusSchema,
+  tutorialDecisionSchema,
+  tutorialErrorCodeSchema,
+  tutorialKindSchema,
+  tutorialOutboxEventTypeSchema,
+  tutorialReasonCodeSchema,
+  tutorialStatusSchema,
+  tutorialStatusTriggerSchema,
+} from './tutorials/enums.js';
+export type {
+  TutorialCandidateStatus,
+  TutorialDecision,
+  TutorialErrorCode,
+  TutorialKind,
+  TutorialOutboxEventType,
+  TutorialReasonCode,
+  TutorialStatus,
+  TutorialStatusTrigger,
+} from './tutorials/enums.js';
+export {
+  acceptTutorialCandidateCommandV1Schema,
+  tutorialCandidatePayloadSchema,
+  publishTutorialVersionCommandV1Schema,
+  rejectTutorialCandidateCommandV1Schema,
+  retireTutorialCommandV1Schema,
+  tutorialAcceptReceiptSchema,
+  tutorialPublishReceiptSchema,
+  tutorialRejectReceiptSchema,
+  tutorialRetireReceiptSchema,
+  tutorialStepSchema,
+  tutorialStepsSchema,
+} from './tutorials/commands.js';
+export type {
+  AcceptTutorialCandidateCommandV1,
+  TutorialCandidatePayload,
+  PublishTutorialVersionCommandV1,
+  RejectTutorialCandidateCommandV1,
+  RetireTutorialCommandV1,
+  TutorialAcceptReceipt,
+  TutorialPublishReceipt,
+  TutorialRejectReceipt,
+  TutorialRetireReceipt,
+  TutorialStep,
+  TutorialSteps,
+} from './tutorials/commands.js';
+export {
+  publicTutorialCursorSchema,
+  publicTutorialDetailSchema,
+  publicTutorialListItemSchema,
+  publicTutorialListQuerySchema,
+  publicTutorialListSchema,
+  tutorialCandidateCursorSchema,
+  tutorialCandidateReviewListQuerySchema,
+  tutorialCandidateReviewListItemSchema,
+  tutorialCandidateReviewListSchema,
+  tutorialCandidateReviewDetailSchema,
+  tutorialReviewCursorSchema,
+  tutorialReviewDetailSchema,
+  tutorialReviewListQuerySchema,
+  tutorialReviewListItemSchema,
+  tutorialReviewListSchema,
+  tutorialReviewStatusFilterSchema,
+} from './tutorials/projections.js';
+export type {
+  PublicTutorialDetail,
+  PublicTutorialLink,
+  PublicTutorialListItem,
+  TutorialCandidateCursor,
+  TutorialCandidateReviewDetail,
+  TutorialCandidateReviewListItem,
+  TutorialCandidateReviewListQuery,
+  TutorialReviewCursor,
+  TutorialReviewDetail,
+  TutorialReviewListItem,
+  TutorialReviewListQuery,
+} from './tutorials/projections.js';
+export { tutorialOutboxEventV1Schema } from './tutorials/events.js';
+export type { TutorialOutboxEventV1 } from './tutorials/events.js';

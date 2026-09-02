@@ -3113,6 +3113,469 @@ export type Database = {
         }
         Relationships: []
       }
+      tutorial_candidates: {
+        Row: {
+          confidence: number
+          content_hash: string
+          created_at: string
+          id: string
+          kind: string
+          model_run_id: string | null
+          payload: Json
+          project_id: string
+          source_signal_ids: string[]
+          status: string
+          version: number
+        }
+        Insert: {
+          confidence: number
+          content_hash: string
+          created_at?: string
+          id?: string
+          kind: string
+          model_run_id?: string | null
+          payload: Json
+          project_id: string
+          source_signal_ids?: string[]
+          status?: string
+          version?: number
+        }
+        Update: {
+          confidence?: number
+          content_hash?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          model_run_id?: string | null
+          payload?: Json
+          project_id?: string
+          source_signal_ids?: string[]
+          status?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_candidates_model_run_id_fkey"
+            columns: ["model_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "tutorial_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
+      tutorial_review_commands: {
+        Row: {
+          actor_user_id: string
+          aggregate_id: string
+          created_at: string
+          expected_version: number | null
+          id: string
+          idempotency_key: string
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_version: number | null
+        }
+        Insert: {
+          actor_user_id: string
+          aggregate_id: string
+          created_at?: string
+          expected_version?: number | null
+          id?: string
+          idempotency_key: string
+          input_hash: string
+          operation: string
+          result_payload: Json
+          resulting_version?: number | null
+        }
+        Update: {
+          actor_user_id?: string
+          aggregate_id?: string
+          created_at?: string
+          expected_version?: number | null
+          id?: string
+          idempotency_key?: string
+          input_hash?: string
+          operation?: string
+          result_payload?: Json
+          resulting_version?: number | null
+        }
+        Relationships: []
+      }
+      tutorial_review_decisions: {
+        Row: {
+          actor_user_id: string
+          aggregate_version: number
+          candidate_id: string | null
+          created_at: string
+          decision: string
+          id: string
+          note: string | null
+          reason_code: string | null
+          tutorial_id: string | null
+        }
+        Insert: {
+          actor_user_id: string
+          aggregate_version: number
+          candidate_id?: string | null
+          created_at?: string
+          decision: string
+          id?: string
+          note?: string | null
+          reason_code?: string | null
+          tutorial_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string
+          aggregate_version?: number
+          candidate_id?: string | null
+          created_at?: string
+          decision?: string
+          id?: string
+          note?: string | null
+          reason_code?: string | null
+          tutorial_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_review_decisions_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "tutorial_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_review_decisions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_tutorials"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_review_decisions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutorial_detail"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_review_decisions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "tutorials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tutorial_status_events: {
+        Row: {
+          created_at: string
+          from_status: string
+          id: string
+          to_status: string
+          trigger: string
+          tutorial_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_status: string
+          id?: string
+          to_status: string
+          trigger: string
+          tutorial_id: string
+        }
+        Update: {
+          created_at?: string
+          from_status?: string
+          id?: string
+          to_status?: string
+          trigger?: string
+          tutorial_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_status_events_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_tutorials"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_status_events_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutorial_detail"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_status_events_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "tutorials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tutorial_step_links: {
+        Row: {
+          id: string
+          reference_id: string
+          step_ordinal: number
+          tutorial_id: string
+          version_id: string
+        }
+        Insert: {
+          id?: string
+          reference_id: string
+          step_ordinal: number
+          tutorial_id: string
+          version_id: string
+        }
+        Update: {
+          id?: string
+          reference_id?: string
+          step_ordinal?: number
+          tutorial_id?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_step_links_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_reference_current_state"
+            referencedColumns: ["reference_id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "project_references"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_references"
+            referencedColumns: ["reference_id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_tutorials"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutorial_detail"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "tutorials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_step_links_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "tutorial_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tutorial_versions: {
+        Row: {
+          content_hash: string
+          created_at: string
+          created_by: string
+          id: string
+          source_signal_ids: string[]
+          steps: Json
+          tutorial_id: string
+          version: number
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          created_by: string
+          id?: string
+          source_signal_ids?: string[]
+          steps: Json
+          tutorial_id: string
+          version: number
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          source_signal_ids?: string[]
+          steps?: Json
+          tutorial_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorial_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorial_versions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_tutorials"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_versions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "public_tutorial_detail"
+            referencedColumns: ["tutorial_id"]
+          },
+          {
+            foreignKeyName: "tutorial_versions_tutorial_id_fkey"
+            columns: ["tutorial_id"]
+            isOneToOne: false
+            referencedRelation: "tutorials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tutorials: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          last_verified_at: string | null
+          project_id: string
+          status: string
+          summary: string
+          title: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          last_verified_at?: string | null
+          project_id: string
+          status?: string
+          summary: string
+          title: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          last_verified_at?: string | null
+          project_id?: string
+          status?: string
+          summary?: string
+          title?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       user_projects: {
         Row: {
           notes: string | null
@@ -3864,6 +4327,63 @@ export type Database = {
         }
         Relationships: []
       }
+      public_project_tutorials: {
+        Row: {
+          kind: string | null
+          last_verified_at: string | null
+          project_id: string | null
+          published_at: string | null
+          step_count: number | null
+          summary: string | null
+          title: string | null
+          tutorial_id: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
+      }
       public_safe_security_indicators: {
         Row: {
           id: string | null
@@ -3897,6 +4417,70 @@ export type Database = {
           version: number | null
         }
         Relationships: []
+      }
+      public_tutorial_detail: {
+        Row: {
+          kind: string | null
+          last_verified_at: string | null
+          link_label: string | null
+          link_last_verified_at: string | null
+          link_reference_id: string | null
+          link_renderable: boolean | null
+          link_url: string | null
+          ordinal: number | null
+          project_id: string | null
+          published_at: string | null
+          step_body: string | null
+          step_title: string | null
+          summary: string | null
+          title: string | null
+          tutorial_id: string | null
+          version: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "opportunity_list"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_current_state"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_blocked_projects"
+            referencedColumns: ["target_id"]
+          },
+          {
+            foreignKeyName: "tutorials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "public_project_security_state"
+            referencedColumns: ["project_id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -3950,6 +4534,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      block_tutorials_for_project: {
+        Args: { p_project_id: string }
+        Returns: undefined
       }
       cancel_collection_job: {
         Args: {
@@ -4211,6 +4799,39 @@ export type Database = {
           version: number
         }[]
       }
+      get_tutorial_review_candidate: {
+        Args: { p_candidate_id: string }
+        Returns: {
+          candidateId: string
+          confidence: number
+          createdAt: string
+          kind: string
+          payload: Json
+          projectId: string
+          sourceSignalIds: string[]
+          status: string
+          summary: string
+          title: string
+        }[]
+      }
+      get_tutorial_review_detail: {
+        Args: { p_tutorial_id: string }
+        Returns: {
+          decisions: Json
+          kind: string
+          lastVerifiedAt: string
+          projectId: string
+          status: string
+          statusEvents: Json
+          stepLinks: Json
+          steps: Json
+          summary: string
+          title: string
+          tutorialId: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       has_active_role: {
         Args: { requested_role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean
@@ -4336,6 +4957,39 @@ export type Database = {
           version: number
         }[]
       }
+      list_tutorial_review_candidates: {
+        Args: {
+          p_cursor_created?: string
+          p_cursor_id?: string
+          p_limit?: number
+          p_status?: string
+        }
+        Returns: {
+          candidateId: string
+          createdAt: string
+          kind: string
+          projectId: string
+          status: string
+          title: string
+        }[]
+      }
+      list_tutorial_review_items: {
+        Args: {
+          p_cursor_id?: string
+          p_cursor_updated?: string
+          p_limit?: number
+          p_status?: string
+        }
+        Returns: {
+          kind: string
+          projectId: string
+          status: string
+          title: string
+          tutorialId: string
+          updatedAt: string
+          version: number
+        }[]
+      }
       load_source_collection_context: {
         Args: { requested_project_id: string; requested_source_id: string }
         Returns: {
@@ -4380,6 +5034,10 @@ export type Database = {
       promote_extraction_candidate: {
         Args: { p_actor: string; p_candidate_id: string }
         Returns: string
+      }
+      queue_tutorials_for_review: {
+        Args: { p_trigger: string; p_tutorial_ids: string[] }
+        Returns: undefined
       }
       reconcile_due_source_schedules: {
         Args: { batch_limit: number; now_at: string }
@@ -4550,6 +5208,17 @@ export type Database = {
         Args: { p_signal_id: string }
         Returns: boolean
       }
+      submit_accept_tutorial_candidate: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          candidateId: string
+          commandId: string
+          replayed: boolean
+          tutorialId: string
+          tutorialVersion: number
+          version: number
+        }[]
+      }
       submit_decide_domain_authority: {
         Args: {
           p_authority_id: string
@@ -4591,6 +5260,16 @@ export type Database = {
           version: number
         }[]
       }
+      submit_publish_tutorial_version: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          commandId: string
+          replayed: boolean
+          tutorialId: string
+          tutorialVersion: number
+          version: number
+        }[]
+      }
       submit_register_domain_authority: {
         Args: { p_command_payload: Json; p_idempotency_key: string }
         Returns: {
@@ -4612,6 +5291,28 @@ export type Database = {
           state: string
           version: number
         }[]
+      }
+      submit_reject_tutorial_candidate: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          candidateId: string
+          commandId: string
+          replayed: boolean
+          version: number
+        }[]
+      }
+      submit_retire_tutorial: {
+        Args: { p_command_payload: Json; p_idempotency_key: string }
+        Returns: {
+          commandId: string
+          replayed: boolean
+          tutorialId: string
+          version: number
+        }[]
+      }
+      tutorial_is_publicly_visible_v1: {
+        Args: { p_tutorial_id: string }
+        Returns: boolean
       }
       update_user_task: {
         Args: { expected_version: number; patch: Json; task_id: string }

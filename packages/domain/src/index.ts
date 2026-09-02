@@ -175,3 +175,15 @@ export type {
   ReferenceMatchCandidate,
   ReferenceMatchIndicator,
 } from './references/flag-match.js';
+
+export {
+  resolveTutorialStatusTransition,
+  tutorialTriggerSeverity,
+  type TutorialDemotionStatus,
+} from './tutorials/coupling-matrix.js';
+export { findUnallowlistedTutorialReferences, type TutorialReferenceAllowlistEntry } from './tutorials/allowlist.js';
+export {
+  deriveTutorialPublicationState,
+  type TutorialDecisionRecord,
+  type TutorialPublicationState,
+} from './tutorials/version-rules.js';

@@ -1,10 +1,15 @@
 import postgres from 'postgres';
 
-import { createExtractionRepository, createScoringRepository } from '@airdrop/database';
+import {
+  createExtractionRepository,
+  createScoringRepository,
+  createTutorialCandidateRepository,
+} from '@airdrop/database';
 
 import { createOpenAiCompatibleModelClient } from '../ai/model-client.js';
 import { runExtractionOnce } from '../ai/extract-discovered.js';
 import { runScoringOnce } from '../scoring/score-projects.js';
+import { runTutorialGenerationOnce } from '../tutorials/generate-candidates.js';
 import { createNodeProcessorTimer, createStderrQueueLogger } from '../queue/create-queue-runtime.js';
 import type { Clock } from '../queue/ports.js';
 import { createStageLoop } from './ai-stage-orchestrator.js';
@@ -15,6 +20,7 @@ const STAGE_SHUTDOWN_BOUND_MS = 30_000;
 
 export const DEFAULT_EXTRACT_TICK_MS = 60_000;
 export const DEFAULT_SCORING_TICK_MS = 300_000;
+export const DEFAULT_TUTORIAL_TICK_MS = 600_000;
 
 export interface AiStageRuntimeOptions {
   readonly databaseUrl: string;
@@ -25,6 +31,7 @@ export interface AiStageRuntimeOptions {
   readonly maxProjects: number;
   readonly extractTickMs: number;
   readonly scoringTickMs: number;
+  readonly tutorialTickMs: number;
 }
 
 export class AiStageRuntimeConfigurationError extends Error {
@@ -49,6 +56,7 @@ export function createAiStageRuntime(options: AiStageRuntimeOptions): {
   });
   const extractionRepository = createExtractionRepository(sql);
   const scoringRepository = createScoringRepository(sql);
+  const tutorialRepository = createTutorialCandidateRepository(sql);
   const modelClient = createOpenAiCompatibleModelClient({
     baseUrl: options.modelBaseUrl,
     apiKey: options.modelApiKey,
@@ -83,6 +91,22 @@ export function createAiStageRuntime(options: AiStageRuntimeOptions): {
     },
   };
 
+  const tutorialRunner: StageRunner = {
+    async run() {
+      const summary = await runTutorialGenerationOnce({
+        repository: tutorialRepository,
+        modelClient,
+        maxProjects: options.maxProjects,
+      });
+      return {
+        processed: summary.processed,
+        succeeded: summary.succeeded,
+        candidatesInserted: summary.candidatesInserted,
+        droppedUnallowlisted: summary.droppedUnallowlisted,
+      };
+    },
+  };
+
   const controller = new AbortController();
   const clock: Clock = { now: () => new Date() };
   const timer = createNodeProcessorTimer();
@@ -104,21 +128,31 @@ export function createAiStageRuntime(options: AiStageRuntimeOptions): {
     timer,
     logger,
   });
+  const tutorialLoop = createStageLoop({
+    stage: 'tutorial_generation',
+    runner: tutorialRunner,
+    intervalMs: options.tutorialTickMs,
+    clock,
+    timer,
+    logger,
+  });
 
   let extractionDone = Promise.resolve();
   let scoringDone = Promise.resolve();
+  let tutorialDone = Promise.resolve();
   let stopPromise: Promise<void> | null = null;
 
   return {
     async start(): Promise<void> {
       extractionDone = extractionLoop.run(controller.signal).catch(() => undefined);
       scoringDone = scoringLoop.run(controller.signal).catch(() => undefined);
+      tutorialDone = tutorialLoop.run(controller.signal).catch(() => undefined);
     },
     stop(): Promise<void> {
       stopPromise ??= (async (): Promise<void> => {
         controller.abort();
         await Promise.race([
-          Promise.all([extractionDone, scoringDone]),
+          Promise.all([extractionDone, scoringDone, tutorialDone]),
           new Promise<void>((resolve) => {
             const deadline = setTimeout(resolve, STAGE_SHUTDOWN_BOUND_MS);
             deadline.unref?.();
@@ -154,6 +188,9 @@ function validateOptions(options: AiStageRuntimeOptions): void {
     throw new AiStageRuntimeConfigurationError();
   }
   if (!Number.isInteger(options.scoringTickMs) || options.scoringTickMs < 5_000) {
+    throw new AiStageRuntimeConfigurationError();
+  }
+  if (!Number.isInteger(options.tutorialTickMs) || options.tutorialTickMs < 5_000) {
     throw new AiStageRuntimeConfigurationError();
   }
 }

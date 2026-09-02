@@ -459,6 +459,159 @@ migration, no role or account creation, no data backfill, and no deployment.
 Production rollout remains gated behind reviewer supply, a healthy production
 Auth service, a rehearsed pre-migration backup, and explicit authorization.
 
+## Tutorials (Phase 8)
+
+Tutorials teach a user how to act on a participation opportunity. They are a
+two-layer record like the reference ledger: a **tutorial candidate** is AI- or
+operator-drafted inert material, and a **tutorial** is a published, immutable
+version whose outbound links are all resolved through the Phase 7B reference
+ledger. AI output may only ever create a candidate; publishing requires a human
+decision, and every published version is append-only.
+
+### Candidate generation switch
+
+Generation runs inside the worker as a third orchestration tick, alongside
+extraction and scoring. It is opt-in on exactly the same switch as the other AI
+stages: with both `AIRDROP_AI_STAGE_DATABASE_URL` and `AI_MODEL_API_KEY` set, the
+loop starts; otherwise the worker logs `ai_stage_orchestration_disabled` and
+stays in collection-only mode.
+
+```bash
+AIRDROP_ORCHESTRATION_TUTORIAL_TICK_MS=600000   # optional, default 600000
+```
+
+Per tick the stage selects material per `(project, kind)`:
+
+- **Signals**: `verification in ('verified','corroborated')` **and**
+  `lifecycle = 'published'`, restricted to the six participable claim types
+  (`airdrop_campaign`, `points_program`, `snapshot_notice`, `task_launch`,
+  `token_launch`, `eligibility_rule`). Security and scam signals are coupling
+  triggers, never tutorial material. A project whose security posture is
+  `blocked` is skipped entirely.
+- **Allowlist**: the project's verified, renderable references, read through
+  `public_project_references`. The model may only choose ids from this list, and
+  a draft is dropped whole if any link id or any cited signal id did not come
+  from the prompt (`grounding_failed`) — there is no partial repair.
+- **Idempotency**: the material hash is deterministic over project, kind, signal
+  ids, and allowlist ids, so a repeated tick with unchanged material never calls
+  the model again, and the unique `(project, kind, content_hash)` key makes a
+  repeated write a no-op.
+
+Failure classes map onto the existing `ai_runs` vocabulary:
+`skipped_no_content` (no participable material), `schema_invalid_after_repair`
+(one constrained repair attempt failed), `provider_error`, and
+`grounding_failed` (unallowlisted ids).
+
+### Reviewer workflow (`/review/tutorials`)
+
+Canonical writes require an active `reviewer`, `senior_reviewer`, or `admin`
+grant; Phase 8 adds no new role value, and the protected commands re-check
+`auth.uid()` on every call. Two surfaces share the navigation with the other
+review pages:
+
+1. **Candidate queue** — filter by `pending` / `accepted` / `rejected` and open a
+   candidate to read the raw draft (rendered inertly) beside an editable step
+   list. **Accepting publishes the edited steps, never the raw draft**: step text
+   may not contain a URL, and links are ledger reference ids only. Rejecting
+   requires a reason code.
+2. **Tutorial ledger** — filter by `published` / `needs_review` / `blocked` /
+   `retired`, open a tutorial to read its steps, decision history, and status
+   event timeline, then either publish a new version (re-approval after a
+   demotion) or retire it.
+
+Every mutation is a high-impact command: the UI binds the confirmation checkbox
+to the target `{id, expectedVersion}` pair, so editing the form or receiving a
+409 clears the confirmation and forces a fresh review of the current state.
+
+### last_verified_at semantics
+
+Two distinct stamps are rendered, and they mean different things:
+
+- **Tutorial-level `last_verified_at`** is the time of the most recent human
+  publish or re-publish of the tutorial. It is what the public detail page
+  renders as the freshness signal, and it says only that a reviewer approved this
+  content at that time — never that the tutorial is currently safe.
+- **Link-level `lastVerifiedAt`** comes from the reference ledger: the time of
+  that reference's most recent successful `verify` decision. A step link whose
+  reference is not currently renderable keeps its place as inert text with
+  `renderable: false` and a null url; it must never render as an anchor.
+
+### Security coupling and restoration
+
+Six triggers demote a tutorial, synchronously — there is no background job:
+
+| Trigger | Resulting status |
+| --- | --- |
+| `project_blocked` | `blocked` |
+| `source_blocked` | `needs_review` |
+| `reference_unrenderable` | `needs_review` |
+| `signal_disputed` | `needs_review` |
+| `signal_retracted` | `needs_review` |
+| `lifecycle_changed` | `needs_review` |
+
+Only public-facing statuses participate: a `published` tutorial demotes per the
+trigger severity, a `needs_review` tutorial escalates only under a security
+trigger, and `blocked` / `retired` never change by automation. A `blocked`
+tutorial is suppressed in the public projections entirely. Recovery is never
+automatic and never an in-place edit: fix the underlying condition, then publish
+a **new version** from the review page.
+
+### Stable error codes
+
+The API returns stable domain codes; never branch on human-readable text.
+
+| Code | Meaning | Typical operator action |
+| --- | --- | --- |
+| `tutorial_reviewer_required` (`AT201`) | No active reviewer grant on the bearer session | Provision or restore the grant |
+| `tutorial_not_found` (`AT202`) | Tutorial or candidate ID does not exist for this session | Reload the list |
+| `tutorial_not_decidable` (`AT203`) | The current state does not permit the decision (for example accepting a non-pending candidate) | Reload and re-read the state |
+| `tutorial_version_conflict` (`AT205`) | `expectedVersion` is stale | Reload and re-confirm; never auto-adopt |
+| `tutorial_idempotency_conflict` (`AT207`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |
+| `tutorial_command_invalid` (`AT208`) | Command failed contract validation (steps 2–20, link count, URL-bearing step text, allowlisted ids) | Fix the command payload |
+| `tutorial_reference_not_renderable` (`AT210`) | A step link's reference is not currently renderable | Fix the reference state, then retry |
+| `tutorial_steps_invalid` (`AT211`) | Steps failed the ledger rules | Correct the steps |
+| `tutorial_persistence_failed` (`AT299`) | Transaction failed and rolled back | Retry once; if it persists, inspect the database logs |
+
+### Focused disposable acceptance commands
+
+```bash
+supabase test db supabase/tests/017_phase_8_tutorials.test.sql
+supabase test db supabase/tests/018_phase_8_tutorial_generation.test.sql
+pnpm --filter @airdrop/database exec vitest run src/tests/tutorial-review-repository.integration.test.ts
+pnpm --filter @airdrop/worker exec vitest run src/tutorials/tests/generate-candidates.test.ts
+pnpm --filter @airdrop/worker exec vitest run src/ai/tests/tutorial-golden.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/tutorial-review-handlers.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/public-tutorial.test.ts
+```
+
+The same fail-closed preflight as the earlier phases applies: confirm the remote
+work directory, project, database/Kong ports `64322`/`64321`, local tunnels
+`16432`/`16433`, the paused seed marker, and the migration and test hashes before
+any reset. Never target `airdrop-intelligence-os` or ports `54321`/`54322`.
+
+### Append-only recovery
+
+Nothing in the tutorial ledger is updated in place. Publishing always creates a
+new immutable version; corrections are new versions, never edits of a published
+one. Do not delete candidate, tutorial, version, step-link, decision, command,
+or status-event rows, and do not edit history rows to make a contradiction
+disappear — the timeline is the audit trail. The Golden Dataset
+(`apps/worker/src/ai/fixtures/tutorial-golden.ts`) is the regression net for the
+generation boundary: extend it rather than loosening the allowlist or the strict
+candidate schema, and require that at least one mutation targets the
+implementation instead of the fixture expectations.
+
+### Production exclusion
+
+Phase 8 is local/disposable-verified only. Migrations `20260902000100` (the
+tutorial ledger) and `20260902000200` (the generation write boundary) are not
+applied to production, and this runbook authorizes no production operation.
+Applying them requires the same gates as the earlier phases: a rehearsed
+pre-migration backup, a healthy production Auth service, at least one human
+reviewer, and explicit authorization — granted once per migration, never implied
+by local success. Deploying the web application is a separate, still-outstanding
+item.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
