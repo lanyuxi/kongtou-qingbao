@@ -30,7 +30,8 @@
 | Task | 交付物 | 状态 | 证据 / 关键提交 |
 |---|---|---|---|
 | 1 | 教程契约（enums/commands/projections/events + 候选 payload） | ✅ 完成（本地门禁绿） | 4 模块 + 4 测试文件；contracts 20 files / **207 tests**（+36）；lint/typecheck 绿；变异 2/2 killed（steps 下限 2→1、step body URL 守卫移除——均打在实现上）；index.ts 全量导出。**未访问数据库/远端/生产**。 |
-| 2–10 | 见实施计划 | ⬜ 待执行 | — |
+| 2 | domain 纯规则（耦合矩阵 / 白名单 / 版本派生） | ✅ 完成（本地门禁绿） | 三模块 + 三测试文件；domain 18 files / **428 tests**（+16）；lint/typecheck 绿；变异 2/2 killed 且均打在实现上（M1 source_blocked 严重度反转→3 用例失败；M2 白名单扫描绕过→3 用例失败）。语义要点：blocked 永不自动降级；needs_review 仅在安全触发下升级为 blocked；version/lastVerifiedAt 按 append 顺序 fold（乱序输入被忽略并有用例锁定）。**未访问数据库/远端/生产**。 |
+| 3–10 | 见实施计划 | ⬜ 待执行 | — |
 
 ## 4. 执行记录
 

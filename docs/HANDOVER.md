@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-02（**Phase 8 tutorials 开工：Task 1 contracts 完成（GREEN + 变异 2/2 killed）**；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。）
+> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–2 完成**（contracts + domain 纯规则，变异 4/4 killed）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-09-01 Phase 7B 完结并已合并主线）**：Phase 0–7A 与 **Phase 7B（verified allowlisted references，Task1–10 全部完成）均已合入主线 `codex/phase-0-1-foundation`**；功能分支 `codex/phase-7b-references` 与 worktree `.worktrees/phase-7b-references` 按 Phase 7A 先例**保留不删**（合并前备份：`backup/pre-7b-merge-main` / `backup/pre-7b-merge-7b`）。Task10 七步闭环：Golden Dataset（6 用例/10 测试，变异 5/5 killed）、runbook Phase 7B 章节、敏感扫描零命中、独立复审两轮全部闭环（最终 **SPEC COMPLIANT / APPROVED / 0C / 0I / READY YES**，修掉 % 与冒号两处方向相反的跨层归一化分叉、Golden Dataset 断言区分力、referenceUrlSchema 重复声明、AR202/AR203 修正）、**disposable 矩阵（用户授权）**：full pgTAP **16 files / 1,501 tests PASS** + integration **11 files / 74 tests PASS** + 三端点一致性 PASS（均=2）+ 残留核验全零 + 清理完毕 + 哈希零漂移；最终验收清单 **14/14**。全仓 `pnpm verify` exit 0 = contracts 171 + domain 412 + database 302 + worker 246 + web 354 = **1,485 non-skipped / 76 gated skips**。**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 503→200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行）；生产数据库现已与代码库完全同构。**
