@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–7 完成**（contracts + domain 纯规则 + 迁移 26/pgTAP 017 + tutorial repositories + BFF 路由与边界 + 审核 UI + 公开页，disposable 验收全绿：full pgTAP 17/17、集成 12 文件/78 测试；期间修复迁移 6 处真实缺陷含 incident 联动死代码与视图两处泄漏/语义错误）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。生产仍为 25 迁移，第 26 个上生产需另行显式授权。）
+> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–8 完成**（contracts + domain 纯规则 + 迁移 26/pgTAP 017 + tutorial repositories + BFF 路由与边界 + 审核 UI + 公开页 + AI 生成器（含迁移 27 权限边界），disposable 验收全绿：full pgTAP 17/17、集成 12 文件/78 测试；期间修复迁移 6 处真实缺陷含 incident 联动死代码与视图两处泄漏/语义错误）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。生产仍为 25 迁移，第 26 个上生产需另行显式授权。）
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-02 Phase 8 tutorials 进行中，Task 5 后）**：**Phase 8 tutorials 开发进行中**——分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`，**Task 1–7 已完成、Task 8–10 未开始**（进度看板见 §8.0）；全仓 `pnpm verify` exit 0 = **1,615 non-skipped / 80 gated skips**；Phase 8 disposable 矩阵全绿（full pgTAP **17 files** / 0 失败、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移）。历史背景：Phase 0–7B 均已合入主线 `codex/phase-0-1-foundation`（7B merge `f723457`，提交链 `f63f793..2a63309`；7A merge `00b4497`）；功能分支与 worktree 按惯例保留不删（备份 `backup/pre-7b-merge-main` / `-7b`）；**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行），生产库与代码库（迁移 1–25）完全同构；迁移 26（Phase 8）未上生产，需另行显式授权；生产 web 应用部署仍为独立未办事项。**
+> **当前一句话状态（2026-09-02 Phase 8 tutorials 进行中，Task 5 后）**：**Phase 8 tutorials 开发进行中**——分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`，**Task 1–8 已完成、Task 9–10 未开始**（进度看板见 §8.0）；全仓 `pnpm verify` exit 0 = **1,625 non-skipped / 80 gated skips**；Phase 8 disposable 矩阵全绿（full pgTAP **17 files** / 0 失败、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移）。历史背景：Phase 0–7B 均已合入主线 `codex/phase-0-1-foundation`（7B merge `f723457`，提交链 `f63f793..2a63309`；7A merge `00b4497`）；功能分支与 worktree 按惯例保留不删（备份 `backup/pre-7b-merge-main` / `-7b`）；**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行），生产库与代码库（迁移 1–25）完全同构；迁移 26（Phase 8）未上生产，需另行显式授权；生产 web 应用部署仍为独立未办事项。**
 
 **2026-09-02 Phase 8 tutorials 开工**：分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`（基线 `5fb784f`）。规范 `docs/superpowers/specs/2026-09-02-phase-8-tutorials-design.md`（Approved，D1–D8 采纳）与实施计划（10 任务）已定稿。**运行时变更**：旧 `/tmp/airdrop-node22-pnpm` 声明路径已轮换废弃，改用 managed node 22.22.2-2 + corepack pnpm 11.16.0（shim 已建入该 bin 目录）。进度详见 `docs/tasks/phase-8-tutorials-workbook.md`。
 
@@ -608,7 +608,7 @@ Web3 空投情报与决策平台（Airdrop Intelligence OS）：回答「今天�
 | **Phase 6B Task 8 runbook/安全审查/仓库门禁（DONE）**（2026-08-22） | runbook 新增「Failed AI run review (Phase 6B)」操作节（flat-SQL 审核人供给、`revoked_at` 即时失效语义、`/review/sign-in` 流程、focused 测试命令、disposable-only 集成变量、迁移前向安全、failed-run retry 明确排除；UI 不建账号/角色）；全分支 secret/unsafe-field 扫描逐条人工分类；本地与远端产物 SHA 一致 | 扫描命中全部归类为测试 fixture/禁令/服务端 bearer 管道/既有 schema 列/ACL revoke（grant 仅 `execute` 给 `authenticated` 且函数内复核）；migration SHA `5150c830…`、011 SHA `e9158648…` 本地=远端；disposable reset exit 0 + full pgTAP 11 files / 1031 PASS；Node 22 根 `pnpm verify` exit 0（798 非跳过）；`git diff --check` 清洁；生产未访问 |
 | **Phase 8 Task 1–5 tutorials（进行中，2026-09-02）** | 教程域前五层全部完成并经 disposable 验收：①strict 契约（enums/commands/projections/events，candidate payload 无 URL、steps 2..20、links 0..5 仅 referenceId）；②domain 纯规则（六联动耦合矩阵、allowlist 白名单、版本派生）；③迁移 `20260902000100`（七表两视图、四受保护命令、六联动触发器、outbox 两事件扩展）+ pgTAP `017`（plan 41）——**验收累计修复迁移 6 处真实缺陷**（incident 联动死代码、INSERT...SELECT DEFAULT、signal 枚举外字面量、from_status 失真、step_count 统计链接数而非步骤数、detail 视图泄漏不可渲染引用 URL）；④repositories（bearer 审核 + 匿名公开，含不可渲染链接泄漏守卫；**postgres.js 双重编码教训：jsonb 参数必须 `sql.json(obj)`**）；⑤BFF 路由与边界（8+2 handler、10 路由、结构化游标 ↔ base64url、AT2xx→HTTP 分流） | `37df772` / `5bc8e74` / `34fed52` / `99f9215` / `717182e`（worktree 分支）；disposable：full pgTAP **17 files / 0 失败**、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移；生产未触碰 |
 
-当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 Phase 8 Task 5 后（worktree）`pnpm verify` exit 0**（lint / typecheck / test / build / placeholders），**1,583 个非跳过测试、80 个 environment-gated skips**（contracts 207 / domain 428 / database 326+78 skipped / worker 246+2 skipped / web 408）。Phase 8 disposable 数据库证据（2026-09-02，经授权）：full pgTAP **17 files / 0 失败**（含 017 tutorials plan 41）与 repository integration **12 files / 78 tests PASS**（含 tutorial-review-repository）；迁移 26 生产未应用，按 production unapplied 处理。Phase 7B 历史：合并后主线 verify 1,485 non-skipped、disposable full pgTAP 16 files / 1,501 PASS、integration 11 files / 74 PASS。
+当前测试基线：**Node 22.22.2 / pnpm 11.16.0 下 Phase 8 Task 5 后（worktree）`pnpm verify` exit 0**（lint / typecheck / test / build / placeholders），**1,583 个非跳过测试、80 个 environment-gated skips**（contracts 207 / domain 428 / database 326+78 skipped / worker 256+2 skipped / web 408）。Phase 8 disposable 数据库证据（2026-09-02，经授权）：full pgTAP **17 files / 0 失败**（含 017 tutorials plan 41）与 repository integration **12 files / 78 tests PASS**（含 tutorial-review-repository）；迁移 26 生产未应用，按 production unapplied 处理。Phase 7B 历史：合并后主线 verify 1,485 non-skipped、disposable full pgTAP 16 files / 1,501 PASS、integration 11 files / 74 PASS。
 
 ### ⚠️ 半成品 / 已知缺口
 
@@ -781,6 +781,7 @@ ssh -i ~/.ssh/airdrop_intelligence_ecs_ed25519 root@115.190.206.200 \
 | `AIRDROP_QUEUE_WORKER_ID` | 队列 worker 标识 |
 | `AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS` | 可选：抽取 tick 间隔（默认 60000） |
 | `AIRDROP_ORCHESTRATION_SCORING_TICK_MS` | 可选：评分 tick 间隔（默认 300000） |
+| `AIRDROP_ORCHESTRATION_TUTORIAL_TICK_MS` | ⭐ Phase 8 可选：教程候选生成 tick 间隔（默认 600000） |
 | `AIRDROP_PROMOTION_DATABASE_URL` | ⭐ Phase 6A：治理审核 CLI 的 server-only 连接（`promotion_service_login`，生产已配置） |
 | `AIRDROP_PROMOTION_REVIEWER_USER_ID` | ⭐ Phase 6A：在册审核人 profile UUID（禁止用户名/actor 字符串） |
 | `AIRDROP_EVIDENCE_RECONCILE_LIMIT` | ⭐ Phase 6A 可选：历史对账批量上限（1-100，默认 25） |
@@ -909,17 +910,16 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 5 | BFF 路由与边界 | ✅ 完成 | `717182e`；web 单测 354→376；变异 4/4；`next build` 绿 |
 | 6 | 审核 UI（`/review/tutorials`） | ✅ 完成 | api-client + 5 组件 + 3 页面 + shell 导航；web 376→**402**；变异 4/4；build 绿 |
 | 7 | 公开页（详情页教程卡 + `/tutorials/[id]`） | ✅ 完成 | public-tutorial 组件 + 公开详情页 + 详情页教程卡 + loader 扩展；web 402→**408**；变异 2/2；build 绿 |
-| 8 | AI 生成器（worker 编排 tick → `tutorial_candidates`） | ⬜ 未开始 | — |
+| 8 | AI 生成器（worker 编排 tick → `tutorial_candidates`） | ✅ 完成 | 迁移 27 + 生成器仓储 + generate-candidates + 编排注册 + pgTAP 018；worker 246→**256**；变异 3/3；full pgTAP **18 files / 0 失败**、集成 12 files / 78 |
 | 9 | Golden Dataset（教程生成边界） | ⬜ 未开始 | — |
 | 10 | runbook + disposable 矩阵 + 收口 | ⬜ 未开始 | — |
 
 **当前累计证据**：disposable 验收全绿（reset 26 迁移 → full pgTAP **17 files / 0 失败** → 集成矩阵 **12 files / 78 tests** → 残留核验全零 → 双 typegen SHA `0499c0ab…` 零漂移 → 清理完毕）；迁移 26 已在 disposable 验证但**未上生产**（生产 25 迁移）。
 
 **下一步工作（按序）**：
-1. **Task 8 AI 生成器**——worker 编排 tick 把信号抽取产物转成 `tutorial_candidates`（AI 输出仅到候选，永不直写 canonical）。
-2. Task 9 Golden Dataset——教程生成边界用例（提示注入 / 越权字段 / 幻觉 referenceId / 越权枚举）。
-3. Task 10 收口——runbook Phase 8 章节、敏感扫描、独立复审、最终 disposable 矩阵与台账。
-4. **独立事项（Phase 8 完成后）**：①迁移 26 上生产（需显式授权 + 备份演练沿用 §5 规程）；②生产 web 应用部署（当前无持久 web 进程，nginx 仅静态站）；③Phase 8 分支合并回主线（沿用 7B 双父 merge 惯例）。
+1. **Task 9 Golden Dataset**——教程生成边界用例（提示注入 / 越权字段 / 幻觉 referenceId / 越权枚举）。
+2. Task 10 收口——runbook Phase 8 章节、敏感扫描、独立复审、最终 disposable 矩阵与台账。
+3. **独立事项（Phase 8 完成后）**：①迁移 26 上生产（需显式授权 + 备份演练沿用 §5 规程）；②生产 web 应用部署（当前无持久 web 进程，nginx 仅静态站）；③Phase 8 分支合并回主线（沿用 7B 双父 merge 惯例）。
 
 ### 8.1 当前状态快照（2026-09-02 Phase 8 Task 5 后）
 
@@ -929,7 +929,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 测试 | Node 22.22.2 / pnpm 11.16.0 下 **worktree（Phase 8 Task 5 后）`pnpm verify` exit 0：contracts 207 + domain 428 + database 326 + worker 246 + web 376 = 1,583 non-skipped / 80 gated skips**；lint/typecheck/build/placeholder 全部通过。Phase 8 disposable 证据（2026-09-02，经授权）：reset 26 迁移 exit 0、**full pgTAP 17 files / 0 失败**、**integration 矩阵 12 files / 78 tests PASS**（含 tutorial-review-repository 4 用例），残留核验全零 |
 | Phase 7B worktree | `.worktrees/phase-7b-references` / `codex/phase-7b-references` 已合并主线，分支与 worktree 按既有惯例保留未删除；合并前两端状态有备份引用 `backup/pre-7b-merge-main`、`backup/pre-7b-merge-7b` |
 | 生产库 `airdrop-intelligence-os` | **25 个迁移已应用**（2026-09-02 rollout，最高 `20260831000100`，与代码库完全同构）；迁移前备份 `/root/backups/prod-pre-migration-20260902.sql`（5.06MB，恢复演练 8 表逐表一致）。**auth 容器已补建**（2026-09-02，gotrue v2.195.0 克隆自 disposable，health 503→200）；**human reviewer 已建**（`851202356@qq.com`，id `062f2aae…`，reviewer + security_reviewer 双角色 active，登录实测通过）；ai_runs 131（Phase 3 既有抽取历史）/ outbox 7（6A promotion 事件）/ 新台账表全 0；opportunity_list 12 无回归 |
-| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康；**26 migrations** reset exit 0（含迁移 26），**full pgTAP 17 files / 0 失败**，**repository 集成矩阵 12 files / 78 tests PASS**；cleanup 后台账/outbox/security/tutorial 全 0 回 seed 基线。**只允许对它 reset**；生产未访问 |
+| 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康；**27 migrations** reset exit 0（含迁移 26/27），**full pgTAP 18 files / 0 失败**，**repository 集成矩阵 12 files / 78 tests PASS**；cleanup 后台账/outbox/security/tutorial 全 0 回 seed 基线。**只允许对它 reset**；生产未访问 |
 | 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）

@@ -5,6 +5,7 @@ import {
   createAiStageRuntime,
   DEFAULT_EXTRACT_TICK_MS,
   DEFAULT_SCORING_TICK_MS,
+  DEFAULT_TUTORIAL_TICK_MS,
   type AiStageRuntimeOptions,
 } from './orchestration/create-ai-stage-runtime.js';
 import { createWorkerHealth, transitionWorkerHealth, type WorkerHealth } from './health.js';
@@ -25,6 +26,7 @@ const AI_EXTRACT_MAX_INPUTS = 'AI_EXTRACT_MAX_INPUTS';
 const AI_SCORE_MAX_PROJECTS = 'AI_SCORE_MAX_PROJECTS';
 const ORCHESTRATION_EXTRACT_TICK_MS = 'AIRDROP_ORCHESTRATION_EXTRACT_TICK_MS';
 const ORCHESTRATION_SCORING_TICK_MS = 'AIRDROP_ORCHESTRATION_SCORING_TICK_MS';
+const ORCHESTRATION_TUTORIAL_TICK_MS = 'AIRDROP_ORCHESTRATION_TUTORIAL_TICK_MS';
 
 const DEFAULT_MODEL_BASE_URL = 'https://api.deepseek.com/v1';
 const DEFAULT_MODEL_ID = 'deepseek-chat';
@@ -109,6 +111,12 @@ export function parseAiStageOptions(
     scoringTickMs: parseBoundedInteger(
       environment[ORCHESTRATION_SCORING_TICK_MS],
       DEFAULT_SCORING_TICK_MS,
+      5_000,
+      Number.MAX_SAFE_INTEGER,
+    ),
+    tutorialTickMs: parseBoundedInteger(
+      environment[ORCHESTRATION_TUTORIAL_TICK_MS],
+      DEFAULT_TUTORIAL_TICK_MS,
       5_000,
       Number.MAX_SAFE_INTEGER,
     ),
