@@ -4892,6 +4892,52 @@ export type Database = {
           candidate_version: number
         }[]
       }
+      list_public_score_evidence_citations: {
+        Args: { p_project_id: string; p_project_score_id: string }
+        Returns: {
+          citation_text: string | null
+          evidence_id: string | null
+          evidence_source_field: string | null
+          evidence_verified_at: string | null
+          project_id: string | null
+          project_score_id: string | null
+          signal_id: string | null
+          signal_published_at: string | null
+          signal_title: string | null
+          signal_verification:
+            | Database["public"]["Enums"]["signal_verification"]
+            | null
+          source_id: string | null
+          source_is_official: boolean | null
+          source_name: string | null
+          source_relation_verified_at: string | null
+          source_type: Database["public"]["Enums"]["source_type"] | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "project_current_score_evidence_citations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_public_score_factors: {
+        Args: { p_project_id: string; p_project_score_id: string }
+        Returns: {
+          axis: string | null
+          contribution: number | null
+          detail: string | null
+          factor_code: string | null
+          input_value: number | null
+          project_id: string | null
+          project_score_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "project_current_score_factors"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       list_reference_review_items: {
         Args: {
           p_cursor_id: string

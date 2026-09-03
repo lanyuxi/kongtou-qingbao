@@ -10,12 +10,6 @@ import type { Database } from '../generated/database.types.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const factorSelection =
-  'project_id,project_score_id,axis,factor_code,contribution,input_value,detail';
-const citationSelection =
-  'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at';
-const citationCountSelection = 'project_id';
-const citationPageSize = 1_000;
 
 const axisOrder = { opportunity: 0, risk: 1, confidence: 2 } as const;
 
@@ -50,11 +44,14 @@ export async function listCurrentScoreFactors(
 ): Promise<ProjectScoreFactor[]> {
   validateIdentifiers(projectId, projectScoreId);
 
-  const response = await client
-    .from('project_current_score_factors')
-    .select(factorSelection)
-    .eq('project_id', projectId)
-    .eq('project_score_id', projectScoreId);
+  // A definer RPC executes the public projection as the view owner: the view's
+  // own gate still decides every row, but the per-row RLS evaluation of the
+  // underlying tables disappears (measured ~1.9s -> ~0.15s for anon on
+  // production), which is what made this section time out.
+  const response = await client.rpc('list_public_score_factors', {
+    p_project_id: projectId,
+    p_project_score_id: projectScoreId,
+  });
 
   if (response.error !== null) {
     throw new ProjectScoreFactorQueryError(response.error.code);
@@ -79,71 +76,30 @@ export async function listCurrentScoreEvidenceCitations(
 ): Promise<ProjectEvidenceCitation[]> {
   validateIdentifiers(projectId, projectScoreId);
 
-  const rows: PublicProjectEvidenceCitationRow[] = [];
-  const rowKeys = new Set<string>();
-  let expectedCount: number | undefined;
+  // One definer RPC returns the whole set ordered, so the old
+  // count-then-page loop (two ~1.9s requests per page) is gone. The page-size
+  // and count-changed guards existed only to protect that loop; what remains
+  // is the duplicate-row check, which still protects against a view that would
+  // emit the same (signal, evidence) pair twice.
+  const response = await client.rpc('list_public_score_evidence_citations', {
+    p_project_id: projectId,
+    p_project_score_id: projectScoreId,
+  });
 
-  for (let from = 0; ; from += citationPageSize) {
-    const countResponse = await client
-      .from('project_current_score_evidence_citations')
-      .select(citationCountSelection, { count: 'exact', head: true })
-      .eq('project_id', projectId)
-      .eq('project_score_id', projectScoreId);
-
-    if (countResponse.error !== null) {
-      throw new ProjectEvidenceCitationQueryError(countResponse.error.code);
-    }
-    if (
-      countResponse.count === null ||
-      !Number.isSafeInteger(countResponse.count) ||
-      countResponse.count < 0
-    ) {
-      throw new ProjectEvidenceCitationQueryError('citation_count_missing');
-    }
-    if (expectedCount === undefined) {
-      expectedCount = countResponse.count;
-    } else if (countResponse.count !== expectedCount) {
-      throw new ProjectEvidenceCitationQueryError('citation_count_changed');
-    }
-
-    const response = await client
-      .from('project_current_score_evidence_citations')
-      .select(citationSelection)
-      .eq('project_id', projectId)
-      .eq('project_score_id', projectScoreId)
-      .order('signal_published_at', { ascending: false, nullsFirst: false })
-      .order('signal_id', { ascending: true })
-      .order('evidence_verified_at', { ascending: false })
-      .order('evidence_id', { ascending: true })
-      .range(from, from + citationPageSize - 1);
-
-    if (response.error !== null) {
-      throw new ProjectEvidenceCitationQueryError(response.error.code);
-    }
-
-    const page = response.data ?? [];
-    const expectedPageLength = Math.min(citationPageSize, expectedCount - from);
-    if (page.length !== expectedPageLength) {
-      throw new ProjectEvidenceCitationQueryError('citation_page_size_mismatch');
-    }
-
-    for (const value of page) {
-      const row = publicProjectEvidenceCitationRowSchema.parse(value);
-      const rowKey = `${row.signal_id}:${row.evidence_id}`;
-      if (rowKeys.has(rowKey)) {
-        throw new ProjectEvidenceCitationQueryError('citation_duplicate_row');
-      }
-      rowKeys.add(rowKey);
-      rows.push(row);
-    }
-
-    if (rows.length === expectedCount) {
-      break;
-    }
+  if (response.error !== null) {
+    throw new ProjectEvidenceCitationQueryError(response.error.code);
   }
 
-  if (expectedCount === undefined || rows.length !== expectedCount) {
-    throw new ProjectEvidenceCitationQueryError('citation_count_mismatch');
+  const rows: PublicProjectEvidenceCitationRow[] = [];
+  const rowKeys = new Set<string>();
+  for (const value of response.data ?? []) {
+    const row = publicProjectEvidenceCitationRowSchema.parse(value);
+    const rowKey = `${row.signal_id}:${row.evidence_id}`;
+    if (rowKeys.has(rowKey)) {
+      throw new ProjectEvidenceCitationQueryError('citation_duplicate_row');
+    }
+    rowKeys.add(rowKey);
+    rows.push(row);
   }
 
   const citations = rows.map(mapProjectEvidenceCitation);

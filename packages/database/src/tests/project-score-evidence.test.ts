@@ -83,10 +83,11 @@ describe('ProjectRepository.listCurrentScoreFactors', () => {
         detail: '加权信号强度 80.0%',
       },
     ]);
-    expect(client.fromCalls).toEqual(['project_current_score_factors']);
-    expect(client.filters).toEqual([
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
+    expect(client.rpcCalls).toEqual([
+      {
+        name: 'list_public_score_factors',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
     ]);
   });
 
@@ -95,12 +96,12 @@ describe('ProjectRepository.listCurrentScoreFactors', () => {
 
     await createProjectRepository(client).listCurrentScoreFactors(projectId, scoreId);
 
-    expect(client.selections).toEqual([
-      'project_id,project_score_id,axis,factor_code,contribution,input_value,detail',
+    expect(client.rpcCalls).toEqual([
+      {
+        name: 'list_public_score_factors',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
     ]);
-    expect(client.selections[0]).not.toMatch(
-      /url|raw|candidate|review|hash|provider|audit|outbox|credential/i,
-    );
   });
 
   it('rejects a row containing an extra unsafe field before mapping it', async () => {
@@ -163,15 +164,11 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
         sourceRelationVerifiedAt: '2026-08-22T00:00:00.000Z',
       },
     ]);
-    expect(client.fromCalls).toEqual([
-      'project_current_score_evidence_citations',
-      'project_current_score_evidence_citations',
-    ]);
-    expect(client.filters).toEqual([
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
+    expect(client.rpcCalls).toEqual([
+      {
+        name: 'list_public_score_evidence_citations',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
     ]);
   });
 
@@ -230,7 +227,7 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     ]);
   });
 
-  it('probes exact counts separately before reading ordered citation pages without losing the final conflict', async () => {
+  it('maps every citation from a single definer RPC call', async () => {
     const citationRows = createCitationRows(1_001);
     const client = createQueryRecorder({ citationRows });
 
@@ -242,116 +239,24 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
     expect(citations).toHaveLength(1_001);
     expect(citations.at(-1)).toMatchObject({
       evidenceId: evidenceIdForIndex(1_000),
-      citationText: '经审核但与前述内容冲突的最后一条 Evidence 引用。',
+      citationText: citationRow.citation_text,
     });
-    expect(client.fromCalls).toEqual([
-      'project_current_score_evidence_citations',
-      'project_current_score_evidence_citations',
-      'project_current_score_evidence_citations',
-      'project_current_score_evidence_citations',
-    ]);
-    expect(client.selections).toEqual([
-      'project_id',
-      'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
-      'project_id',
-      'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
-    ]);
-    expect(client.countRequests).toEqual(['exact', null, 'exact', null]);
-    expect(client.headRequests).toEqual([true, false, true, false]);
-    expect(client.filters).toEqual([
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-    ]);
-    expect(client.orders).toEqual([
-      ['signal_published_at', { ascending: false, nullsFirst: false }],
-      ['signal_id', { ascending: true }],
-      ['evidence_verified_at', { ascending: false }],
-      ['evidence_id', { ascending: true }],
-      ['signal_published_at', { ascending: false, nullsFirst: false }],
-      ['signal_id', { ascending: true }],
-      ['evidence_verified_at', { ascending: false }],
-      ['evidence_id', { ascending: true }],
-    ]);
-    expect(client.ranges).toEqual([
-      [0, 999],
-      [1_000, 1_999],
-    ]);
+    // One call instead of one count plus one page per 1_000 rows: the paging
+    // loop was what made this section time out for anonymous readers.
+    expect(client.rpcCalls).toHaveLength(1);
   });
 
-  it.each([
-    {
-      name: 'a null exact count',
-      rows: [citationRow],
-      countPages: [{ count: null }],
-      code: 'citation_count_missing',
-    },
-    {
-      name: 'a changed count on a later page',
-      rows: createCitationRows(1_001),
-      countPages: [{}, { count: 1_002 }],
-      code: 'citation_count_changed',
-    },
-    {
-      name: 'a short page before the expected boundary',
-      rows: createCitationRows(1_001),
-      dataPages: [{ data: createCitationRows(999) }],
-      code: 'citation_page_size_mismatch',
-    },
-    {
-      name: 'a duplicate row that replaces the final citation',
-      rows: createCitationRows(1_001),
-      dataPages: [{}, { data: [createCitationRows(1)[0]] }],
-      code: 'citation_duplicate_row',
-    },
-  ] as const)('fails safely on $name', async ({ rows, countPages, dataPages, code }) => {
-    const client = createQueryRecorder({
-      citationRows: rows,
-      ...(countPages === undefined ? {} : { citationCountPages: countPages }),
-      ...(dataPages === undefined ? {} : { citationDataPages: dataPages }),
-    });
+  it('fails safely on a duplicate (signal, evidence) row', async () => {
+    const rows = createCitationRows(2);
+    const client = createQueryRecorder({ citationRows: [rows[0], rows[0]] });
 
     await expect(
       createProjectRepository(client).listCurrentScoreEvidenceCitations(projectId, scoreId),
     ).rejects.toMatchObject({
       name: 'ProjectEvidenceCitationQueryError',
-      code,
+      code: 'citation_duplicate_row',
       message: 'Unable to read current project score Evidence citations.',
     });
-  });
-
-  it('sanitizes a PostgREST error from a later page', async () => {
-    const client = createQueryRecorder({
-      citationRows: createCitationRows(1_001),
-      citationDataPages: [
-        {},
-        {
-          error: {
-            code: 'PGRST500',
-            message: 'second page body contains private Evidence details',
-            details: 'raw provider response',
-            hint: 'review_note=secret',
-          },
-        },
-      ],
-    });
-
-    const error = await createProjectRepository(client)
-      .listCurrentScoreEvidenceCitations(projectId, scoreId)
-      .catch((cause: unknown) => cause);
-
-    expect(error).toBeInstanceOf(ProjectEvidenceCitationQueryError);
-    expect(error).toMatchObject({
-      name: 'ProjectEvidenceCitationQueryError',
-      code: 'PGRST500',
-      message: 'Unable to read current project score Evidence citations.',
-    });
-    expect(String(error)).not.toMatch(/second page body|private Evidence|raw provider|review_note|secret/i);
   });
 
   it('selects only the exact safe citation projection', async () => {
@@ -359,14 +264,12 @@ describe('ProjectRepository.listCurrentScoreEvidenceCitations', () => {
 
     await createProjectRepository(client).listCurrentScoreEvidenceCitations(projectId, scoreId);
 
-    expect(client.selections).toEqual([
-      'project_id',
-      'project_id,project_score_id,signal_id,signal_title,signal_verification,signal_published_at,evidence_id,citation_text,evidence_source_field,evidence_verified_at,source_id,source_name,source_type,source_is_official,source_relation_verified_at',
+    expect(client.rpcCalls).toEqual([
+      {
+        name: 'list_public_score_evidence_citations',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
     ]);
-    expect(client.selections).not.toContain('*');
-    expect(client.selections.join(',')).not.toMatch(
-      /url|raw|candidate|review|hash|provider|audit|outbox|credential/i,
-    );
   });
 
   it('rejects a row containing an extra unsafe field before mapping it', async () => {
@@ -419,7 +322,7 @@ describe('current score projection input validation and empty results', () => {
         : repository.listCurrentScoreEvidenceCitations(project, score);
 
     await expect(result).rejects.toThrow(RangeError);
-    expect(client.fromCalls).toEqual([]);
+    expect(client.rpcCalls).toEqual([]);
   });
 
   it('returns empty arrays when valid projections contain no rows', async () => {
@@ -439,18 +342,15 @@ describe('current score projection input validation and empty results', () => {
     await expect(repository.listCurrentScoreFactors(projectId, scoreId)).resolves.toEqual([]);
     await expect(repository.listCurrentScoreEvidenceCitations(projectId, scoreId)).resolves.toEqual([]);
 
-    expect(client.fromCalls).toEqual([
-      'project_current_score_factors',
-      'project_current_score_evidence_citations',
-      'project_current_score_evidence_citations',
-    ]);
-    expect(client.filters).toEqual([
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
-      ['project_id', projectId],
-      ['project_score_id', scoreId],
+    expect(client.rpcCalls).toEqual([
+      {
+        name: 'list_public_score_factors',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
+      {
+        name: 'list_public_score_evidence_citations',
+        params: { p_project_id: projectId, p_project_score_id: scoreId },
+      },
     ]);
   });
 });
@@ -467,132 +367,41 @@ interface QueryRecorderOptions {
   readonly citationRows?: readonly unknown[] | null;
   readonly factorError?: FakePostgrestError;
   readonly citationError?: FakePostgrestError;
-  readonly citationCountPages?: readonly CitationPageOverride[];
-  readonly citationDataPages?: readonly CitationPageOverride[];
+}
+
+interface RpcCall {
+  readonly name: string;
+  readonly params: Record<string, unknown>;
 }
 
 interface QueryRecorder {
-  readonly fromCalls: string[];
-  readonly selections: string[];
-  readonly countRequests: (string | null)[];
-  readonly headRequests: boolean[];
-  readonly filters: [string, string][];
-  readonly orders: [string, { readonly ascending: boolean; readonly nullsFirst?: boolean }][];
-  readonly ranges: [number, number][];
+  readonly rpcCalls: RpcCall[];
 }
 
-interface CitationPageOverride {
-  readonly data?: readonly unknown[] | null;
-  readonly count?: number | null;
-  readonly error?: FakePostgrestError | null;
-}
-
+/**
+ * The repository now reads both projections through a single definer RPC, so
+ * the recorder only needs `rpc` — there is no select list, filter chain,
+ * ordering, or paging to assert on any more. What still matters is *which*
+ * function is called and with which identifiers, plus the error mapping.
+ */
 function createQueryRecorder(
-  options: QueryRecorderOptions,
+  options: QueryRecorderOptions = {},
 ): SupabaseClient<Database> & QueryRecorder {
-  const fromCalls: string[] = [];
-  const selections: string[] = [];
-  const countRequests: (string | null)[] = [];
-  const headRequests: boolean[] = [];
-  const filters: [string, string][] = [];
-  const orders: [string, { readonly ascending: boolean; readonly nullsFirst?: boolean }][] = [];
-  const ranges: [number, number][] = [];
-  let citationCountRequestIndex = 0;
-  let citationDataRequestIndex = 0;
+  const rpcCalls: RpcCall[] = [];
 
   const client = {
-    fromCalls,
-    selections,
-    countRequests,
-    headRequests,
-    filters,
-    orders,
-    ranges,
-    from: (relation: string) => {
-      fromCalls.push(relation);
-      const isFactorQuery = relation === 'project_current_score_factors';
-      let requestedCount: string | null = null;
-      let requestedHead = false;
-      let requestedRange: [number, number] | null = null;
-      const query = {
-        select: (
-          columns: string,
-          selectOptions?: { readonly count?: string; readonly head?: boolean },
-        ) => {
-          selections.push(columns);
-          requestedCount = selectOptions?.count ?? null;
-          requestedHead = selectOptions?.head === true;
-          countRequests.push(requestedCount);
-          headRequests.push(requestedHead);
-          return query;
-        },
-        eq: (column: string, value: string) => {
-          filters.push([column, value]);
-          return query;
-        },
-        order: (
-          column: string,
-          orderOptions: { readonly ascending: boolean; readonly nullsFirst?: boolean },
-        ) => {
-          orders.push([column, orderOptions]);
-          return query;
-        },
-        range: (from: number, to: number) => {
-          requestedRange = [from, to];
-          ranges.push(requestedRange);
-          return query;
-        },
-        then: <TResult1 = {
-          data: readonly unknown[] | null;
-          error: FakePostgrestError | null;
-          count: number | null;
-        }>(
-          onfulfilled?:
-            | ((value: {
-                data: readonly unknown[] | null;
-                error: FakePostgrestError | null;
-                count: number | null;
-              }) => TResult1 | PromiseLike<TResult1>)
-            | null,
-        ) => {
-          if (isFactorQuery) {
-            return Promise.resolve({
-              data: options.factorRows ?? null,
-              error: options.factorError ?? null,
-              count: null,
-            }).then(onfulfilled);
-          }
-
-          const requestIndex = requestedHead
-            ? citationCountRequestIndex++
-            : citationDataRequestIndex++;
-          const override = requestedHead
-            ? options.citationCountPages?.[requestIndex]
-            : options.citationDataPages?.[requestIndex];
-          const rows = options.citationRows ?? null;
-          const [from, requestedTo] = requestedRange ?? [0, 999];
-          const to = Math.min(requestedTo, from + 999);
-          const defaultData = rows === null ? null : rows.slice(from, to + 1);
-          return Promise.resolve({
-            data: requestedHead
-              ? null
-              : override !== undefined && 'data' in override
-                ? override.data
-                : defaultData,
-            error:
-              override !== undefined && 'error' in override
-                ? (override.error ?? null)
-                : (options.citationError ?? null),
-            count:
-              override !== undefined && 'count' in override
-                ? (override.count ?? null)
-                : requestedCount === 'exact'
-                  ? (rows?.length ?? 0)
-                  : null,
-          }).then(onfulfilled);
-        },
-      };
-      return query;
+    rpcCalls,
+    rpc: (name: string, params: Record<string, unknown>) => {
+      rpcCalls.push({ name, params });
+      const isFactorQuery = name === 'list_public_score_factors';
+      const error = (isFactorQuery ? options.factorError : options.citationError) ?? null;
+      const data = isFactorQuery
+        ? (options.factorRows ?? null)
+        : (options.citationRows ?? null);
+      return Promise.resolve({
+        data: error === null ? data : null,
+        error,
+      });
     },
   };
 
@@ -600,16 +409,20 @@ function createQueryRecorder(
 }
 
 function createCitationRows(count: number): readonly PublicProjectEvidenceCitationRow[] {
-  return Array.from({ length: count }, (_, index) => ({
+  return Array.from({ length: count }, (_unused, index) => ({
     ...citationRow,
+    signal_id: signalIdForIndex(index),
     evidence_id: evidenceIdForIndex(index),
-    citation_text:
-      index === count - 1 && count > 1
-        ? '经审核但与前述内容冲突的最后一条 Evidence 引用。'
-        : `经审核的 Evidence 引用编号 ${index}，用于分页完整性测试。`,
+    signal_published_at: null,
   }));
 }
 
+function signalIdForIndex(index: number): string {
+  const suffix = String(index + 1).padStart(12, '0');
+  return `30000000-0000-4000-8100-${suffix}`;
+}
+
 function evidenceIdForIndex(index: number): string {
-  return `30000000-0000-4000-8000-${index.toString(16).padStart(12, '0')}`;
+  const suffix = String(index + 1).padStart(12, '0');
+  return `30000000-0000-4000-8200-${suffix}`;
 }
