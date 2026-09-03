@@ -335,6 +335,45 @@ mistake disappear — the contradiction must stay visible. The Golden Dataset
 (`apps/worker/src/ai/fixtures/security-extraction-golden.ts`) is the regression
 net for the extraction boundary; extend it rather than loosening grounding.
 
+### Production deployment (worker)
+
+The worker runs from source with `tsx` (the project's own `pnpm start` path) as
+systemd `airdrop-worker` in `/srv/airdrop-intelligence-worker/`, with runtime
+env in `/etc/airdrop-worker.env` (outside the rsynced tree).
+
+```bash
+rsync -az --delete --exclude '.git' --exclude '.worktrees' --exclude 'dist' \
+  --exclude '.next' --exclude 'supabase' ./ root@<host>:/srv/airdrop-intelligence-worker/
+ssh root@<host> 'cd /srv/airdrop-intelligence-worker && CI=true pnpm install --filter @airdrop/worker... --frozen-lockfile'
+# then: write /etc/airdrop-worker.env and the unit, systemctl enable --now airdrop-worker
+```
+
+Verification after a deploy: `systemctl is-active airdrop-worker`,
+`journalctl -u airdrop-worker` for `status":"ready"` and
+`collection_job_succeeded`, and `raw_items` growth in the database.
+
+**Five traps, all hit during the first deploy:**
+
+1. **`node_modules/.bin/tsx` is a shell wrapper, not JavaScript.** Running
+   `node .../tsx src/index.ts` fails with `SyntaxError`; invoke the bin
+   directly and let its shebang work.
+2. **Do not rsync `node_modules` from macOS.** Native binaries (esbuild) are
+   platform-specific and will fail with `MODULE_NOT_FOUND` on Linux. Install on
+   the host instead (`CI=true pnpm install --filter @airdrop/worker...`).
+3. **`tsc` output is not a deployable artifact.** `pnpm build` only compiles the
+   worker; the `@airdrop/*` workspace packages export `src`, so
+   `node dist/index.js` cannot resolve them. Ship source + `tsx`.
+4. **The host cannot reach the database through its own port mapping**
+   (`127.0.0.1:54322` refuses connections even though docker-proxy listens;
+   same hairpin behaviour as the Supabase API). Connect to the **container IP**
+   on 5432 instead — and remember the IP changes if the db container is
+   recreated: re-read it with `docker inspect` and update the env file.
+5. **Login-role credentials differ from `POSTGRES_PASSWORD`, and
+   `collection_queue_worker_login` was created with `NOINHERIT`** while the
+   other three login roles inherit. Testing inside the container hides both
+   (trust auth + different path): always reproduce through the worker's actual
+   connection string before blaming the code.
+
 ### Production deployment (web app)
 
 The web app ships as a **standalone bundle built locally** — the production
