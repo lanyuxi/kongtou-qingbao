@@ -361,13 +361,31 @@ host has ~650MB of free RAM, far below a production `next build`.
      `lib/env.ts` / `lib/supabase-server.ts`.
 4. `systemctl restart airdrop-web`; nginx proxies `/` to 127.0.0.1:3000 and
    `/supabase/` to Kong 54321.
-5. Known issue: the score-evidence projections
-   (`project_current_score_evidence_citations` / `..._factors`) take ~2s per
-   anonymous read under the security-barrier + RLS evaluation, so the detail
-   page's loader degrades those two sections to their empty state when they
-   time out — the rest of the page renders normally. Optimising the projections
-   (indexing / materialisation) is a follow-up engineering item, not a
-   deployment task.
+5. Known issue (diagnosed 2026-09-03, fix deferred to the receiving team): the
+   score-evidence projections take ~2s per anonymous read on production. Root
+   cause chain, from `EXPLAIN (ANALYZE)` as anon on the production data:
+   - `current_score_citation_path_is_public` is a **SECURITY DEFINER** SQL
+     function, so Postgres **cannot inline it**; the view (and the underlying
+     anon RLS policies on signals / evidence / score links, which call the same
+     function with partially-NULL args) execute the full 8-table EXISTS
+     subquery **per row**.
+   - Each call costs ~100-300ms on the 2GB host (nested definer function
+     `current_project_score_is_public` + planning overhead), multiplied by the
+     ~6 citation rows and by the four call sites -> 1.9-3s, over the legacy
+     `anon|statement_timeout=3s` in some request shapes.
+   - The disposable stack cannot reproduce it: its fixtures contain no
+     production-sized data for this path (the probe query returns 0 rows in
+     ~15ms), so integration tests never exercise the slow path.
+   - Mitigations already in place: `authenticator` statement_timeout 15s, the
+     loader's fail-soft degradation (empty state, no invented data).
+   - Recommended fix for the receiving team (in order of preference): (1)
+     rewrite the two public projections as security-definer RPCs returning the
+     final rows (one definer execution, no per-row function), updating the
+     repositories + pgTAP accordingly; or (2) restructure the views so the
+     path check becomes plain joins, granting anon the required column-level
+     SELECTs on raw_items / discovered_items with row-locked RLS policies —
+     wider exposure, needs a security review. Do NOT simply relax timeouts
+     further.
 
 ### Production exclusion
 
