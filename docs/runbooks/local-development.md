@@ -400,8 +400,8 @@ host has ~650MB of free RAM, far below a production `next build`.
      `lib/env.ts` / `lib/supabase-server.ts`.
 4. `systemctl restart airdrop-web`; nginx proxies `/` to 127.0.0.1:3000 and
    `/supabase/` to Kong 54321.
-5. Known issue (diagnosed 2026-09-03, fix deferred to the receiving team): the
-   score-evidence projections take ~2s per anonymous read on production. Root
+5. RESOLVED 2026-09-03 (migration 29): the score-evidence projections used to
+   take ~2s per anonymous read on production. Root cause and fix below. Root
    cause chain, from `EXPLAIN (ANALYZE)` as anon on the production data:
    - `current_score_citation_path_is_public` is a **SECURITY DEFINER** SQL
      function, so Postgres **cannot inline it**; the view (and the underlying
@@ -417,14 +417,19 @@ host has ~650MB of free RAM, far below a production `next build`.
      ~15ms), so integration tests never exercise the slow path.
    - Mitigations already in place: `authenticator` statement_timeout 15s, the
      loader's fail-soft degradation (empty state, no invented data).
-   - Recommended fix for the receiving team (in order of preference): (1)
-     rewrite the two public projections as security-definer RPCs returning the
-     final rows (one definer execution, no per-row function), updating the
-     repositories + pgTAP accordingly; or (2) restructure the views so the
-     path check becomes plain joins, granting anon the required column-level
-     SELECTs on raw_items / discovered_items with row-locked RLS policies —
-     wider exposure, needs a security review. Do NOT simply relax timeouts
-     further.
+   - Applied fix (option 1): migration 29 adds `list_public_score_factors` and
+     `list_public_score_evidence_citations`, security-definer wrappers that run
+     the unchanged views as the view owner. The views keep their row gate; only
+     the executing role changes, which removes the RLS layer. The repository
+     also collapsed its count-probe-plus-paging loop into one call.
+   - Measured on production after the fix: citations **1.9s -> 0.90s**, factors
+     **0.06s**; the project detail page renders both sections again in ~1.3s.
+   - Remaining headroom (optional, not urgent): the per-row helper call is
+     still there because a SECURITY DEFINER SQL function cannot be inlined.
+     Rewriting `current_score_citation_path_is_public` into plain join
+     predicates should reach ~0.15s, but it duplicates the security logic and
+     needs its own equivalence test on production-sized data — do not attempt
+     without seed data that exercises the path.
 
 ### Production exclusion
 

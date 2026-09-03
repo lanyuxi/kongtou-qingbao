@@ -1,7 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-03（**交付版**：Phase 0–8 全部完成并合入主线 `codex/phase-0-1-foundation`（HEAD `14233a3`，工作树干净）；**生产 web 已上线**——28 迁移与代码库完全同构、web 以 systemd `airdrop-web` 持久运行、公网 `http://115.190.206.200/` 200、REST/auth 健康 200；**worker 已部署**——systemd `airdrop-worker` 运行采集与队列，数据恢复流动（AI 阶段未启用）；**功能开发已按所有者指令暂停，等待下一步命令**。本手册为唯一权威现状描述；操作规程见 `docs/runbooks/local-development.md`（含部署/恢复/验收命令），Phase 8 逐任务台账见 `docs/tasks/phase-8-tutorials-workbook.md`
+> 最近更新：2026-09-03（**交付版**：Phase 0–8 全部完成并合入主线 `codex/phase-0-1-foundation`（HEAD `14233a3`，工作树干净）；**生产 web 已上线**——28 迁移与代码库完全同构、web 以 systemd `airdrop-web` 持久运行、公网 `http://115.190.206.200/` 200、REST/auth 健康 200；**worker 已部署**（采集与队列运行，数据恢复流动；AI 阶段未启用）；**29 迁移**与代码库同构，评分证据慢读已修复（详情页不再降级）；**功能开发已按所有者指令暂停，等待下一步命令**。本手册为唯一权威现状描述；操作规程见 `docs/runbooks/local-development.md`（含部署/恢复/验收命令），Phase 8 逐任务台账见 `docs/tasks/phase-8-tutorials-workbook.md`
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
 > **当前一句话状态（2026-09-03，功能开发暂停待命）**：**代码全部收口、生产 web 与 worker 均已上线，功能开发暂停，等待所有者指令**——主线 `codex/phase-0-1-foundation` HEAD `14233a3` 含 Phase 0–8 全部内容（Phase 8 merge `e79b48f`，功能分支与 worktree 按惯例保留：`codex/phase-8-tutorials` / `.worktrees/phase-8-tutorials`，备份 `backup/pre-8-merge-main` / `-8`）；全仓 `pnpm verify` exit 0 = **1,635 non-skipped / 80 gated skips**（contracts 207 / domain 428 / database 326 / worker 266 / web 408）；**生产 `airdrop-intelligence-os`**：28 个迁移与代码库完全同构（max `20260902000300`）、auth 200、REST 200、web 应用 systemd `airdrop-web` 持久运行（nginx :80 反代 3000，`/supabase/` 反代 Kong 54321）、公网 200；**worker 已部署**——systemd `airdrop-worker`（源码 + tsx，采集与队列运行，`raw_items` 已恢复增长；AI 抽取/评分/教程生成阶段未启用，需 `AI_MODEL_API_KEY`）；**已知问题（唯一）**：项目详情页的评分证据/因子板块在生产为降级空态（anon 读评分证据投影 ~2s+ 偶发超时，loader fail-soft 不造假数据；优化方向=索引/物化，runbook「Production deployment」有记载）；无其它未决事项。
@@ -945,15 +945,15 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 **⚠️ 交付状态（2026-09-03）：功能开发暂停，等待所有者指令。** 接手的 AI 请从以下事实开始：
 
 - **代码**：主线 `codex/phase-0-1-foundation` HEAD `14233a3`，工作树干净；Phase 0–8 全部内容已合入；`pnpm verify` exit 0（1,635 non-skipped / 80 gated skips）。运行门禁用前缀 `env -u NODE_OPTIONS -u NODE_TLS_REJECT_UNAUTHORIZED PATH="/Users/xixi/.workbuddy/binaries/node/versions/22.22.2-2/bin:$PATH" CI=true pnpm verify`。
-- **生产**（115.190.206.200，SSH key `~/.ssh/airdrop_intelligence_ecs_ed25519`）：容器栈 `*-airdrop-intelligence-os`（28 迁移与代码库同构、REST/auth 200）；web = systemd `airdrop-web`（standalone 产物 `/srv/airdrop-intelligence-app/`，env `/etc/airdrop-web.env`）+ nginx 反代 `/` 与 `/supabase/`（Kong 54321）；公网 `http://115.190.206.200/` 200。**worker 已部署**：systemd `airdrop-worker` 运行采集与队列（AI 阶段未启用），数据恢复流动。
+- **生产**（115.190.206.200，SSH key `~/.ssh/airdrop_intelligence_ecs_ed25519`）：容器栈 `*-airdrop-intelligence-os`（29 迁移与代码库同构、REST/auth 200）；web = systemd `airdrop-web`（standalone 产物 `/srv/airdrop-intelligence-app/`，env `/etc/airdrop-web.env`）+ nginx 反代 `/` 与 `/supabase/`（Kong 54321）；公网 `http://115.190.206.200/` 200。**worker 已部署**：systemd `airdrop-worker` 运行采集与队列（AI 阶段未启用），数据恢复流动。
 - **规程**：迁移/备份/验收/部署全部照 `docs/runbooks/local-development.md`；disposable 栈操作前必做 fail-closed 预检（哈希对比 + 端口/项目核对，永不触碰 `airdrop-intelligence-os` 生产栈与 54321/54322）。
 - **行为准则**：生产任何写操作必须逐次取得所有者显式授权；迁移 forward-only；不修改已应用迁移；发现缺陷先验证再修复（先例：迁移 26/27/28 与评分投影降级均为验收/部署期暴露的真实缺陷）。
-- **唯一已知问题**：详情页评分证据/因子板块生产降级空态（根因已确诊：SECURITY DEFINER 函数逐行执行 ~100–300ms，见 runbook「Production deployment (web app)」第 5 条，含两个候选修复方案）。AI 阶段（抽取/评分/教程生成）尚未启用，需所有者提供 key。
+- **已知问题：无**。评分证据慢读已修复并生产验证（迁移 29）。唯一待办是启用 AI 阶段（需所有者提供 `AI_MODEL_API_KEY`）。
 
 **后续候选事项（均未开工，开工前需所有者指令）**——按建议顺序，含依赖链：
 
 1. ~~**生产 worker 部署**~~ ✅ **2026-09-03 完成**：systemd `airdrop-worker` 运行采集与队列，`raw_items` 由 35 增至 56。剩余子项：启用 AI 阶段（需 `AI_MODEL_API_KEY`）——让抽取/评分/教程生成一并运转。依赖：生产连接角色已备（`ai_stage_worker` 等）；`AI_MODEL_API_KEY` 可选——缺则仅跑采集与队列。产出：systemd `airdrop-worker` + 运行 env + 采集/编排验证。
-2. **评分证据投影性能优化**：消除详情页降级，方案已定（definer RPC 优先；视图重构次之，需安全评审）。自包含、有 pgTAP 保障，适合作接手后的第一份工程任务。
+2. ~~**评分证据投影性能优化**~~ ✅ **2026-09-03 完成**：迁移 29 两个 definer RPC + 仓储改单次调用；生产实测 citations 1.9s→0.90s、factors 0.06s，详情页恢复完整渲染（~1.3s）。
 3. **用户认证与私有数据**（清单第 9 项，AGENTS.md Identity 域）：启用 `user_id` RLS 场景与登录流程。**这是 4、5 两项的前置依赖**。
 4. **任务管理**（清单第 6 项，AGENTS.md Execution 域）：user projects / watchlists / tasks / task history。
 5. **通知系统**（清单第 7 项，AGENTS.md Notification 域）：alerts / deliveries / preferences。
@@ -975,7 +975,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康；**27 migrations** reset exit 0（含迁移 26/27），**full pgTAP 18 files / 0 失败**，**repository 集成矩阵 12 files / 78 tests PASS**；cleanup 后台账/outbox/security/tutorial 全 0 回 seed 基线。**只允许对它 reset**；生产未访问 |
 | 运行中的进程 | 生产 web 应用以 systemd `airdrop-web` 持久运行（standalone 产物，`systemctl restart airdrop-web`，日志 `journalctl -u airdrop-web`）；其余按 §4 重新启动 |
 | 生产 worker | ✅ **已部署**：systemd `airdrop-worker`（`/srv/airdrop-intelligence-worker`，源码 + tsx 运行，env `/etc/airdrop-worker.env`，内存上限 400M，实测 ~92M）；采集与队列运行中，部署后 `raw_items` 由 35 增至 56；AI 抽取/评分/教程生成阶段未启用（需 `AI_MODEL_API_KEY`）。注意 db 容器重建后 IP 会变，需按 runbook 更新连接串 |
-| 已知问题 | 项目详情页的评分证据/因子两个板块在生产为**降级空态**（anon 读 `project_current_score_evidence_citations`/`..._factors` 在 security-barrier + RLS 下 ~2s+，偶发超时；loader fail-soft 降级，不造假数据）。优化投影（索引/物化）为后续工程项，见 runbook「Production deployment」 |
+| 已知问题 | 无。原「详情页评分证据/因子降级空态」已由**迁移 29**修复并生产验证：两个 definer RPC（`list_public_score_factors` / `list_public_score_evidence_citations`）跑既有视图，消除 anon 的逐行 RLS 叠加；实测 citations 1.9s→0.90s、factors 0.06s，页面恢复完整渲染。进一步优化（helper 展开为 join，~0.15s）见 runbook「Production deployment (web app)」第 5 条 |
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）
 
