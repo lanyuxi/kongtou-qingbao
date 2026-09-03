@@ -8,7 +8,7 @@
 | Task | 内容 | 状态 | 提交 / 证据 |
 |---|---|---|---|
 | 1 | 契约（`packages/contracts/src/identity/`） | ✅ 完成 | enums（EVM 地址格式、`visibility` 默认 hidden、密钥字段黑名单）/ commands（四个 strict 命令 + `Idempotency-Key` + `expectedVersion`）/ projections（私有行 + 独立公开投影）；contracts 207→**229**；变异 **2/2 killed**（密钥守卫中和→7 失败、strict 放宽→1 失败） |
-| 2 | 迁移 30 + pgTAP 021 | ⬜ 未开始 | — |
+| 2 | 迁移 30 + pgTAP 021 | ✅ 完成（disposable 验收全绿） | 迁移 30：profiles 补 `version`+RLS（本人 select/update，无 insert/delete）、`user_wallet_addresses`（EVM 格式/上限/唯一约束，默认 hidden）、追加式 `user_wallet_address_events`、命令回执、两个受保护命令、`public_identity_wallet_addresses` 公开投影、auth 触发器引导 profile（D5）；pgTAP 021 八项；full pgTAP **21 files / 0 失败**、集成 **12/78**、typegen 确定性零漂移、verify exit 0。**生产未触碰。** |
 | 3 | 仓储（profile / wallet address） | ⬜ 未开始 | — |
 | 4 | BFF 路由与会话边界 | ⬜ 未开始 | — |
 | 5 | 认证流程 UI（依赖 D1） | ⬜ 未开始，阻塞于 D1 + 生产 SMTP 确认 | — |
@@ -31,5 +31,6 @@
 | 日期 | 事项 | 备注 |
 |---|---|---|
 | 2026-09-03 | D1–D6 已获所有者采纳（D4 取保守值 hidden） | 生产 auth 配置核查：`GOTRUE_EXTERNAL_EMAIL_ENABLED=true`、`GOTRUE_MAILER_AUTOCONFIRM=true`、`GOTRUE_SMTP_HOST` 已设置；**`GOTRUE_SITE_URL=http://127.0.0.1:3000` 为容器内部视角，部署 Task 5 前必须改为公网地址**，否则魔法链接回跳到用户本机 |
+| 2026-09-03 | Task 2 迁移 30 + pgTAP 021 | 三处连带修正（**新策略必须同步 006 两份名单**——主目录按 tablename/policyname 严格字母序、命名例外集；并给新策略加 comment 以免落入「未加注释」集）。**教训：scp 目标目录写错把测试文件传进 migrations 目录会导致 reset 只应用 1 个迁移**（远端清理后恢复）。**生产未触碰。** |
 | 2026-09-03 | Task 1 契约 RED→GREEN→变异 | `parseIdentityCommand` 对密钥形似字段**直接拒绝**（不静默丢弃）——发送方是事件而非格式问题；公开投影是独立 schema 而非私有行的过滤副本，新增字段不会自动变公开。**未访问数据库/远端/生产。** |
 | 2026-09-03 | 规范与实施计划草案完成 | 范围闭合在 Identity 域（profiles / roles / public wallet addresses），不侵入 Execution 与 Notification；`profiles` 与 `user_roles` 已存在，钱包地址表为新建；等待 D1–D6 采纳后开工 |

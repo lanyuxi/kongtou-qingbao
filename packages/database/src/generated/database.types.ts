@@ -961,6 +961,30 @@ export type Database = {
           },
         ]
       }
+      identity_command_receipts: {
+        Row: {
+          command: string
+          created_at: string
+          idempotency_key: string
+          response: Json
+          user_id: string
+        }
+        Insert: {
+          command: string
+          created_at?: string
+          idempotency_key: string
+          response: Json
+          user_id: string
+        }
+        Update: {
+          command?: string
+          created_at?: string
+          idempotency_key?: string
+          response?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       outbox_events: {
         Row: {
           aggregate_id: string
@@ -1014,6 +1038,7 @@ export type Database = {
           id: string
           timezone: string
           updated_at: string
+          version: number
         }
         Insert: {
           avatar_url?: string | null
@@ -1022,6 +1047,7 @@ export type Database = {
           id: string
           timezone?: string
           updated_at?: string
+          version?: number
         }
         Update: {
           avatar_url?: string | null
@@ -1030,6 +1056,7 @@ export type Database = {
           id?: string
           timezone?: string
           updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -3784,6 +3811,80 @@ export type Database = {
           },
         ]
       }
+      user_wallet_address_events: {
+        Row: {
+          actor_user_id: string
+          event_type: string
+          id: number
+          occurred_at: string
+          user_id: string
+          visibility: string | null
+          wallet_address_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          event_type: string
+          id?: never
+          occurred_at?: string
+          user_id: string
+          visibility?: string | null
+          wallet_address_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          event_type?: string
+          id?: never
+          occurred_at?: string
+          user_id?: string
+          visibility?: string | null
+          wallet_address_id?: string
+        }
+        Relationships: []
+      }
+      user_wallet_addresses: {
+        Row: {
+          address: string
+          chain: string
+          created_at: string
+          id: string
+          label: string | null
+          updated_at: string
+          user_id: string
+          version: number
+          visibility: string
+        }
+        Insert: {
+          address: string
+          chain?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+          user_id: string
+          version?: number
+          visibility?: string
+        }
+        Update: {
+          address?: string
+          chain?: string
+          created_at?: string
+          id?: string
+          label?: string | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_wallet_addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watchlist_projects: {
         Row: {
           added_at: string
@@ -4183,6 +4284,38 @@ export type Database = {
           version: number | null
         }
         Relationships: []
+      }
+      public_identity_wallet_addresses: {
+        Row: {
+          address: string | null
+          chain: string | null
+          label: string | null
+          user_id: string | null
+          wallet_address_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          chain?: string | null
+          label?: string | null
+          user_id?: string | null
+          wallet_address_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          chain?: string | null
+          label?: string | null
+          user_id?: string | null
+          wallet_address_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_wallet_addresses_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       public_project_domain_authorities: {
         Row: {
@@ -5265,6 +5398,7 @@ export type Database = {
           version: number
         }[]
       }
+      submit_add_wallet_address: { Args: { p_payload: Json }; Returns: Json }
       submit_decide_domain_authority: {
         Args: {
           p_authority_id: string
@@ -5356,6 +5490,7 @@ export type Database = {
           version: number
         }[]
       }
+      submit_update_profile: { Args: { p_payload: Json }; Returns: Json }
       tutorial_is_publicly_visible_v1: {
         Args: { p_tutorial_id: string }
         Returns: boolean

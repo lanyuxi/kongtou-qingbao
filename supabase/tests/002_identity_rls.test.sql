@@ -17,7 +17,10 @@ select ok(
 select columns_are(
   'public',
   'profiles',
-  array['id', 'display_name', 'avatar_url', 'timezone', 'created_at', 'updated_at'],
+  array[
+    'id', 'display_name', 'avatar_url', 'timezone', 'created_at', 'updated_at',
+    'version'
+  ],
   'profiles exposes the identity contract columns in order'
 );
 select columns_are(
