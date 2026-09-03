@@ -335,6 +335,40 @@ mistake disappear — the contradiction must stay visible. The Golden Dataset
 (`apps/worker/src/ai/fixtures/security-extraction-golden.ts`) is the regression
 net for the extraction boundary; extend it rather than loosening grounding.
 
+### Production deployment (web app)
+
+The web app ships as a **standalone bundle built locally** — the production
+host has ~650MB of free RAM, far below a production `next build`.
+
+1. Build locally with the production public env (the browser bundle embeds
+   `NEXT_PUBLIC_SUPABASE_URL=http://115.190.206.200/supabase`, which nginx
+   proxies to the Kong gateway):
+   ```bash
+   NEXT_PUBLIC_SUPABASE_URL="http://115.190.206.200/supabase" \
+   NEXT_PUBLIC_SUPABASE_ANON_KEY="<production anon key>" \
+   pnpm --filter @airdrop/web build
+   ```
+2. Upload three trees over rsync to `/srv/airdrop-intelligence-app/`:
+   `.next/standalone/` (target root), `.next/static/` (into
+   `apps/web/.next/static/`), and `public/` if it exists.
+3. Runtime env lives in **`/etc/airdrop-web.env`**, never inside the deploy
+   directory — `rsync --delete` on the standalone root would wipe it:
+   - `NEXT_PUBLIC_SUPABASE_URL` (public, browser-embedded)
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_INTERNAL_URL=http://127.0.0.1:54321` — the cloud security group
+     blocks hairpin access to the host's own public IP, so server-side fetches
+     (SSR, route handlers) must go through the loopback Kong port. See
+     `lib/env.ts` / `lib/supabase-server.ts`.
+4. `systemctl restart airdrop-web`; nginx proxies `/` to 127.0.0.1:3000 and
+   `/supabase/` to Kong 54321.
+5. Known issue: the score-evidence projections
+   (`project_current_score_evidence_citations` / `..._factors`) take ~2s per
+   anonymous read under the security-barrier + RLS evaluation, so the detail
+   page's loader degrades those two sections to their empty state when they
+   time out — the rest of the page renders normally. Optimising the projections
+   (indexing / materialisation) is a follow-up engineering item, not a
+   deployment task.
+
 ### Production exclusion
 
 Phase 7A is local/disposable-verified only. Its migration is not applied to

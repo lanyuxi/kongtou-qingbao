@@ -16,7 +16,9 @@ export function createServerSupabaseClient(
   environment: NodeJS.ProcessEnv = process.env,
 ): SupabaseClient<Database> {
   const parsed = serverSupabaseEnvironmentSchema.parse({
-    supabaseUrl: environment.NEXT_PUBLIC_SUPABASE_URL,
+    // See lib/env.ts: the server talks to Kong through the loopback port;
+    // the public URL stays reserved for the browser bundle.
+    supabaseUrl: environment.SUPABASE_INTERNAL_URL ?? environment.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   });
 

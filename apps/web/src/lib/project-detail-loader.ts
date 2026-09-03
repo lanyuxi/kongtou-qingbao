@@ -73,12 +73,25 @@ export async function loadProjectDetailFromRepository(
   const scoreId = project.latestScore?.id;
   // All reads start together and compose once, so a slower score read can never
   // rewrite the reference snapshot taken for this render.
+  //
+  // The two score-evidence reads degrade to empty arrays on failure: the
+  // citations/factors projections are heavier than the rest of the page and, on
+  // the production host, a slow anonymous read must not take the whole detail
+  // page down. The page renders its real empty state for that section — no
+  // invented data — while signals, security, references, and tutorials still
+  // render.
   const [signals, factors, citations, security, references, authorities, tutorials] = await Promise.all([
     repository.listProjectSignals(project.projectId, 20),
-    scoreId === undefined ? [] : repository.listCurrentScoreFactors(project.projectId, scoreId),
     scoreId === undefined
       ? []
-      : repository.listCurrentScoreEvidenceCitations(project.projectId, scoreId),
+      : repository
+          .listCurrentScoreFactors(project.projectId, scoreId)
+          .catch(() => []),
+    scoreId === undefined
+      ? []
+      : repository
+          .listCurrentScoreEvidenceCitations(project.projectId, scoreId)
+          .catch(() => []),
     securityRepository.getProjectSecurity(project.projectId),
     referenceRepository
       .listVerifiedReferences({ projectId: project.projectId, cursor: null, limit: referenceLimit })

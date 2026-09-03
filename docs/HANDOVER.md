@@ -931,7 +931,7 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 11 | 包隔离（server-only 边界） | ✅ 本地已验证 | `@airdrop/database/tutorial-review` browser-denied；bundle 哨兵测试通过 |
 | 12 | 本地门禁与构建 | ✅ 本地已验证 | `pnpm verify` exit 0 = 1,635 non-skipped / 80 gated skips；`next build` 成功 |
 | 13 | 迁移 26/27 上生产 | ✅ 2026-09-02 完成 | 备份 `prod-pre-phase8-20260902.sql`（5,266K / `24b67b8d…`）+ 恢复演练 8 表一致 → 逐条 stdin 应用 + 登记 → 生产 27 迁移，与代码库同构 |
-| 14 | 生产 web 应用部署 | ⚠️ 独立未办事项 | 生产无持久 web 进程（nginx 仅静态站），/srv 检出为 Phase 2 时代快照 |
+| 14 | 生产 web 应用部署 | ✅ 2026-09-02 完成 | standalone 本地构建 + rsync 到 `/srv/airdrop-intelligence-app/`；systemd `airdrop-web`（127.0.0.1:3000）；nginx 反代 `/` 与 `/supabase/`（Kong 54321）；服务端 fetch 走 loopback（安全组阻断 hairpin）；已知项：评分证据投影慢读降级为空态（runbook 记载优化项） |
 
 **当前累计证据**：disposable 验收全绿（reset 26 迁移 → full pgTAP **17 files / 0 失败** → 集成矩阵 **12 files / 78 tests** → 残留核验全零 → 双 typegen SHA `0499c0ab…` 零漂移 → 清理完毕）；迁移 26/27 已于 2026-09-02 晚授权应用到**生产**（25→27，备份与恢复演练先行），生产库与代码库完全同构。
 
@@ -948,7 +948,8 @@ Phase 8 十个任务已全部完成。后续仅剩**独立事项**：：①迁�
 | Phase 8 worktree | `.worktrees/phase-8-tutorials` / `codex/phase-8-tutorials` 已合并主线（merge `e79b48f`），分支与 worktree 按既有惯例保留未删除；合并前两端状态有备份引用 `backup/pre-8-merge-main`、`backup/pre-8-merge-8` |
 | 生产库 `airdrop-intelligence-os` | **27 个迁移已应用**（2026-09-02：上午 rollout 20–25，晚间 Phase 8 迁移 26 `phase_8_tutorials` + 27 `phase_8_tutorial_generation` 逐条 stdin 应用并登记，最高 `20260902000200`，与代码库完全同构）；Phase 8 迁移前备份 `/root/backups/prod-pre-phase8-20260902.sql`（5,266K / SHA `24b67b8d…`，恢复演练 8 表逐表一致、194 行错误全为权限类良性）；**auth 容器已补建**（gotrue v2.195.0，health 200）；**human reviewer 已建**（`851202356@qq.com`，reviewer + security_reviewer 双角色 active）；ai_runs 131 / outbox 7 / 新 tutorial 台账全 0；projects 14 / signals 20 / scores 26 / opportunity_list 12 无回归；REST 200 / auth 200 / 公开教程视图 200（0 行，新表无数据）|
 | 隔离测试栈 `airdrop-intelligence-governance-test` | API 64321 / DB 64322、容器健康；**27 migrations** reset exit 0（含迁移 26/27），**full pgTAP 18 files / 0 失败**，**repository 集成矩阵 12 files / 78 tests PASS**；cleanup 后台账/outbox/security/tutorial 全 0 回 seed 基线。**只允许对它 reset**；生产未访问 |
-| 运行中的进程 | 不作为持久项目状态；接手时应按 §4 重新启动并从当次日志确认 web、采集队列及 AI 编排状态 |
+| 运行中的进程 | 生产 web 应用以 systemd `airdrop-web` 持久运行（standalone 产物，`systemctl restart airdrop-web`，日志 `journalctl -u airdrop-web`）；其余按 §4 重新启动 |
+| 已知问题 | 项目详情页的评分证据/因子两个板块在生产为**降级空态**（anon 读 `project_current_score_evidence_citations`/`..._factors` 在 security-barrier + RLS 下 ~2s+，偶发超时；loader fail-soft 降级，不造假数据）。优化投影（索引/物化）为后续工程项，见 runbook「Production deployment」 |
 
 ### 8.2 ✅ Phase 6A 上生产（2026-08-22 已完成；保留操作清单供审计）
 
