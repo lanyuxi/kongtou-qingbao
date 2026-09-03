@@ -1,10 +1,10 @@
 # Airdrop Intelligence OS — 交接手册
 
 > 交接日期：2026-08-14（WorkBuddy → GPT Codex）
-> 最近更新：2026-09-02（**Phase 8 tutorials：Task 1–10 完成并已合并主线 `codex/phase-0-1-foundation`（merge `e79b48f`）**——contracts + domain 纯规则 + 迁移 26/pgTAP 017 + tutorial repositories + BFF 路由与边界 + 审核 UI + 公开页 + AI 生成器（含迁移 27 权限边界）+ Golden Dataset + runbook/敏感扫描/最终矩阵收口，disposable 验收全绿：full pgTAP 17/17、集成 12 文件/78 测试；期间修复迁移 6 处真实缺陷含 incident 联动死代码与视图两处泄漏/语义错误）；Phase 7B 已完结并合并主线，生产 rollout 已完成——25 migrations / auth 200 / reviewer 已建。迁移 26/27 已于同日授权应用到生产（25→27，备份与恢复演练先行），生产库与代码库完全同构。）
+> 最近更新：2026-09-03（**交付版**：Phase 0–8 全部完成并合入主线 `codex/phase-0-1-foundation`（HEAD `14233a3`，工作树干净）；**生产全链路运行**——28 迁移与代码库完全同构、web 应用以 systemd `airdrop-web` 持久运行、公网 `http://115.190.206.200/` 200、REST/auth 健康 200；**功能开发已按所有者指令暂停，等待下一步命令**。本手册为唯一权威现状描述；操作规程见 `docs/runbooks/local-development.md`（含部署/恢复/验收命令），Phase 8 逐任务台账见 `docs/tasks/phase-8-tutorials-workbook.md`
 > 权威规范：仓库根目录 `AGENTS.md`（产品规则与工程约束的唯一事实来源，本手册不重复其内容，只补充现状与经验）
 >
-> **当前一句话状态（2026-09-02 Phase 8 tutorials 进行中，Task 5 后）**：**Phase 8 tutorials 开发进行中**——分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`，**Task 1–10 全部完成**（进度看板见 §8.0，Phase 8 本地/disposable 验收闭环；迁移 26/27 已于同日授权并应用到生产（25→27，备份 `/root/backups/prod-pre-phase8-20260902.sql` + 恢复演练先行），生产库与代码库完全同构）；全仓 `pnpm verify` exit 0 = **1,635 non-skipped / 80 gated skips**；Phase 8 disposable 矩阵全绿（full pgTAP **17 files** / 0 失败、integration **12 files / 78 tests**、typegen SHA `0499c0ab…` 零漂移）。历史背景：Phase 0–7B 均已合入主线 `codex/phase-0-1-foundation`（7B merge `f723457`，提交链 `f63f793..2a63309`；7A merge `00b4497`）；功能分支与 worktree 按惯例保留不删（备份 `backup/pre-7b-merge-main` / `-7b`）；**生产 rollout 已于 2026-09-02 完成：auth 容器补建（health 200）、human reviewer 已建并验证登录、迁移 20–25 已原子应用并登记（19→25，备份与恢复演练先行），生产库与代码库（迁移 1–25）完全同构；迁移 26（Phase 8）未上生产，需另行显式授权；生产 web 应用部署仍为独立未办事项。**
+> **当前一句话状态（2026-09-03，功能开发暂停待命）**：**代码与生产全部收口，暂停功能开发，等待所有者指令**——主线 `codex/phase-0-1-foundation` HEAD `14233a3` 含 Phase 0–8 全部内容（Phase 8 merge `e79b48f`，功能分支与 worktree 按惯例保留：`codex/phase-8-tutorials` / `.worktrees/phase-8-tutorials`，备份 `backup/pre-8-merge-main` / `-8`）；全仓 `pnpm verify` exit 0 = **1,635 non-skipped / 80 gated skips**（contracts 207 / domain 428 / database 326 / worker 266 / web 408）；**生产 `airdrop-intelligence-os`**：28 个迁移与代码库完全同构（max `20260902000300`）、auth 200、REST 200、web 应用 systemd `airdrop-web` 持久运行（nginx :80 反代 3000，`/supabase/` 反代 Kong 54321）、公网 200；**已知问题（唯一）**：项目详情页的评分证据/因子板块在生产为降级空态（anon 读评分证据投影 ~2s+ 偶发超时，loader fail-soft 不造假数据；优化方向=索引/物化，runbook「Production deployment」有记载）；无其它未决事项。
 
 **2026-09-02 Phase 8 tutorials 开工**：分支 `codex/phase-8-tutorials` / worktree `.worktrees/phase-8-tutorials`（基线 `5fb784f`）。规范 `docs/superpowers/specs/2026-09-02-phase-8-tutorials-design.md`（Approved，D1–D8 采纳）与实施计划（10 任务）已定稿。**运行时变更**：旧 `/tmp/airdrop-node22-pnpm` 声明路径已轮换废弃，改用 managed node 22.22.2-2 + corepack pnpm 11.16.0（shim 已建入该 bin 目录）。进度详见 `docs/tasks/phase-8-tutorials-workbook.md`。
 
@@ -883,6 +883,13 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 
 ---
 
+### 2026-09-02 生产部署四坑（Phase 8 首次真实部署暴露）
+
+- **云安全组阻断 hairpin**：主机访问「自己的公网 IP:端口」会被云防火墙拦掉（外部访问 54321/80 一度也被拦——排查时先分清「安全组未放行」与「应用挂起」两种 000）。结论：服务端代码永不 fetch 自己的公网地址，走 `SUPABASE_INTERNAL_URL=http://127.0.0.1:54321`；浏览器端才用公网 URL（nginx `/supabase/` 反代 Kong，只需放行 80 一个端口）。
+- **`rsync --delete` 会吞部署目录内的 env**：首轮 `.env` 写在 `/srv/airdrop-intelligence-app/.env`，第二次 rsync 把它当「源端没有的多余文件」删掉，SSR 报 `supabaseAnonKey` undefined。结论：运行时 env 永远放部署树之外（`/etc/airdrop-web.env` + systemd `EnvironmentFile`）。
+- **角色级 `statement_timeout` 的生效规则**：`pg_db_role_setting` 只在**登录认证时**应用；`SET ROLE anon` 不重载 anon 的 rolconfig，但 Supabase 默认 `anon|statement_timeout=3s` 若在**登录角色**为 anon 的直连会话里生效。PostgREST 用 authenticator 登录（可 `alter role authenticator set statement_timeout`），每请求 `SET ROLE anon` 后会话 timeout 保持登录角色的值——排查 57014 时先 `show statement_timeout` 确认实际生效值，再看 pg_roles 的 rolconfig。
+- **pgTAP boolean 断言**：`has_table_privilege(...)` 经 `\gset` 落库为 `t`/`f`，拼字符串比较不要写 `true/false`；`pg_policies.cmd` 是大写 `'INSERT'`。新增/改动 RLS policy 必须同步 006 的两份精确名单（命名例外集与无 comment 集）与 014 的 invoker 矩阵。
+
 ## 7. 工程约定提醒（摘自 AGENTS.md，易违反项）
 
 - 任何生产依赖新增需文档说明「为何现有依赖/平台原语不够用」
@@ -933,12 +940,23 @@ AIRDROP_DEV_FIXTURE_DATABASE_URL=postgresql://dev_fixture_admin:local-password@1
 | 13 | 迁移 26/27 上生产 | ✅ 2026-09-02 完成 | 备份 `prod-pre-phase8-20260902.sql`（5,266K / `24b67b8d…`）+ 恢复演练 8 表一致 → 逐条 stdin 应用 + 登记 → 生产 27 迁移，与代码库同构 |
 | 14 | 生产 web 应用部署 | ✅ 2026-09-02 完成 | standalone 本地构建 + rsync 到 `/srv/airdrop-intelligence-app/`；systemd `airdrop-web`（127.0.0.1:3000）；nginx 反代 `/` 与 `/supabase/`（Kong 54321）；服务端 fetch 走 loopback（安全组阻断 hairpin）；已知项：评分证据投影慢读降级为空态（runbook 记载优化项） |
 
-**当前累计证据**：disposable 验收全绿（reset 26 迁移 → full pgTAP **17 files / 0 失败** → 集成矩阵 **12 files / 78 tests** → 残留核验全零 → 双 typegen SHA `0499c0ab…` 零漂移 → 清理完毕）；迁移 26/27 已于 2026-09-02 晚授权应用到**生产**（25→27，备份与恢复演练先行），生产库与代码库完全同构。
+**当前累计证据**：disposable 验收全绿（reset **28** 迁移 → full pgTAP **19 files / 0 失败** → 集成矩阵 **12 files / 78 tests** → 残留核验全零 → 双 typegen SHA `0499c0ab…` 零漂移 → 清理完毕）；迁移 26/27 已于 2026-09-02 晚授权应用到**生产**（25→27，备份与恢复演练先行），生产库与代码库完全同构。
 
-**下一步工作（按序）**：
-Phase 8 十个任务已全部完成。后续仅剩**独立事项**：：①迁移 26 上生产（需显式授权 + 备份演练沿用 §5 规程）；②生产 web 应用部署（当前无持久 web 进程，nginx 仅静态站）；③Phase 8 分支合并回主线（沿用 7B 双父 merge 惯例）。
+**⚠️ 交付状态（2026-09-03）：功能开发暂停，等待所有者指令。** 接手的 AI 请从以下事实开始：
 
-### 8.1 当前状态快照（2026-09-02 Phase 8 合并主线后）
+- **代码**：主线 `codex/phase-0-1-foundation` HEAD `14233a3`，工作树干净；Phase 0–8 全部内容已合入；`pnpm verify` exit 0（1,635 non-skipped / 80 gated skips）。运行门禁用前缀 `env -u NODE_OPTIONS -u NODE_TLS_REJECT_UNAUTHORIZED PATH="/Users/xixi/.workbuddy/binaries/node/versions/22.22.2-2/bin:$PATH" CI=true pnpm verify`。
+- **生产**（115.190.206.200，SSH key `~/.ssh/airdrop_intelligence_ecs_ed25519`）：容器栈 `*-airdrop-intelligence-os`（28 迁移同构、REST/auth 200）；web = systemd `airdrop-web`（standalone 产物 `/srv/airdrop-intelligence-app/`，env `/etc/airdrop-web.env`）+ nginx 反代 `/`、`/supabase/`；公网 `http://115.190.206.200/` 200。
+- **规程**：迁移/备份/验收/部署全部照 `docs/runbooks/local-development.md`；disposable 栈操作前必做 fail-closed 预检（哈希对比 + 端口/项目核对，永不触碰 `airdrop-intelligence-os` 生产栈与 54321/54322）。
+- **行为准则**：生产任何写操作必须逐次取得所有者显式授权；迁移 forward-only；不修改已应用迁移；发现缺陷先验证再修复（先例：迁移 26/27/28 与评分投影降级均为验收/部署期暴露的真实缺陷）。
+- **唯一已知问题**：详情页评分证据/因子板块生产降级空态（性能优化项，见 runbook）。其余无未决事项。
+
+**后续候选事项（均未开工，开工前需所有者指令）**：
+1. 评分证据投影性能优化（索引/物化，消除详情页降级）。
+2. HTTPS + 域名接入（当前为 HTTP 裸 IP）。
+3. 下一业务阶段（用户项目/任务管理，见根 `AGENTS.md` 产品范围）。
+4. 清理历史 worktree 与备份分支（7A/7B/8 均保留中，可按需归档）。
+
+### 8.1 当前状态快照（2026-09-03 交付版）
 
 | 维度 | 状态 |
 |------|------|
