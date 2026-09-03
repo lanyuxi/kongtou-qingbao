@@ -1,3 +1,38 @@
+export {
+  addWalletAddressCommandSchema,
+  IdentityForbiddenFieldError,
+  parseIdentityCommand,
+  removeWalletAddressCommandSchema,
+  setWalletAddressVisibilityCommandSchema,
+  updateProfileCommandSchema,
+  type AddWalletAddressCommand,
+  type RemoveWalletAddressCommand,
+  type SetWalletAddressVisibilityCommand,
+  type UpdateProfileCommand
+} from './identity/commands.js';
+export {
+  findForbiddenIdentityKeys,
+  profileAvatarUrlSchema,
+  profileDisplayNameSchema,
+  profileTimezoneSchema,
+  walletAddressSchema,
+  walletChainSchema,
+  walletLabelSchema,
+  walletVisibilitySchema,
+  type WalletChain,
+  type WalletVisibility
+} from './identity/enums.js';
+export {
+  publicIdentityProfileSchema,
+  publicWalletAddressSchema,
+  userProfileRowSchema,
+  walletAddressRowSchema,
+  type PublicIdentityProfile,
+  type PublicWalletAddress,
+  type UserProfileRow,
+  type WalletAddressRow
+} from './identity/projections.js';
+
 export { apiErrorSchema, createApiSuccessSchema } from './api/envelope.js';
 export type { ApiError, ApiSuccess } from './api/envelope.js';
 export {
