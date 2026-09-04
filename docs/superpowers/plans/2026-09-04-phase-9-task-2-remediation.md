@@ -119,7 +119,7 @@ Expected: both exit 0.
 - Consumes: the eight frozen RPC signatures from Task 1.
 - Produces: behavioral tests that fail against migration 30 for missing interfaces or wrong behavior.
 
-- [ ] **Step 1: Expand pgTAP 021 before production SQL changes**
+- [x] **Step 1: Expand pgTAP 021 before production SQL changes**
 
 Add literal assertions for:
 
@@ -145,19 +145,19 @@ Add literal assertions for:
 -- public RPC column lists exclude private metadata
 ```
 
-- [ ] **Step 2: Add a real PostgREST/Auth integration test**
+- [x] **Step 2: Add a real PostgREST/Auth integration test**
 
 Use two Supabase auth clients plus the marker-verified owner PostgreSQL connection. Create run-scoped users and assert owner/non-owner separation, all four command RPCs, replay, version conflict, anonymous public reads, rollback, and exact cleanup. Add this file once to the database `test:integration` script.
 
-- [ ] **Step 3: Run local static gates**
+- [x] **Step 3: Run local static gates**
 
 Run the database TypeScript test without integration environment variables; it must be discovered and skipped only by the existing environment gate. Run database lint and typecheck; all must exit 0.
 
-- [ ] **Step 4: Obtain explicit disposable RED authorization**
+- [x] **Step 4: Obtain explicit disposable RED authorization**
 
 The authorized scope must name: read-only identity/hash/marker preflight, exact test sync if the disposable checkout is remote, one focused pgTAP 021 run, one focused identity integration run, and mandatory cleanup. It must explicitly exclude reset, migration sync/application, typegen, production, and a second run.
 
-- [ ] **Step 5: Verify RED on migration 30**
+- [x] **Step 5: Verify RED on migration 30**
 
 Expected failure reasons must be the missing two commands, broken replay/version behavior, missing append-only guards/outbox events, public read denial, or direct-write bypass. SQL parse errors, fixture errors, missing plan, environment mismatch, or cleanup residue are not accepted RED evidence.
 
@@ -173,11 +173,16 @@ Expected failure reasons must be the missing two commands, broken replay/version
 - Consumes: migration 30 tables and the eight RPC signatures.
 - Produces: complete database-owned Identity mutation and read boundary.
 
-- [ ] **Step 1: Harden tables and append-only audit**
+- [x] **Step 1: Harden tables and append-only audit**
 
-Add receipt input hashes and resulting versions; add append-only profile events; add one Identity ledger mutation rejection function and triggers for receipts, profile events, and wallet events. Revoke browser INSERT/UPDATE/DELETE on private tables and remove the duplicate pre-Phase-9 profile policies while preserving one owner-select policy.
+Add receipt input hashes and resulting versions; add append-only profile events;
+make `profiles.timezone` nullable to match the approved command/projection
+contracts; add one Identity ledger mutation rejection function and triggers for
+receipts, profile events, and wallet events. Revoke browser
+INSERT/UPDATE/DELETE on private tables and remove the duplicate pre-Phase-9
+profile policies while preserving one owner-select policy.
 
-- [ ] **Step 2: Extend the outbox allowlist and strict payload constraint**
+- [x] **Step 2: Extend the outbox allowlist and strict payload constraint**
 
 Append exactly these event types while preserving every previous branch verbatim:
 
@@ -190,7 +195,7 @@ identity.wallet_address.removed.v1
 
 Each payload contains only `version`, `eventType`, `aggregateId`, `aggregateVersion`, and `occurredAt`.
 
-- [ ] **Step 3: Replace the two incomplete commands and add the missing two**
+- [x] **Step 3: Replace the two incomplete commands and add the missing two**
 
 For every command: validate exact keys/types, compute a canonical input hash,
 check an existing receipt before locking/mutating, return the exact response
@@ -200,11 +205,11 @@ write state + audit + receipt + outbox, and map only
 fields use key presence rather than `coalesce`, so an explicit JSON `null`
 clears the field instead of silently retaining the previous value.
 
-- [ ] **Step 4: Add private and public read RPCs**
+- [x] **Step 4: Add private and public read RPCs**
 
 Private RPCs use `auth.uid()` and exact owner filters. Public RPCs are security-definer, return only the contract-safe fields, filter addresses to `visibility = 'public'`, and receive EXECUTE for anon/authenticated only. Revoke function execution from PUBLIC and unrelated worker roles.
 
-- [ ] **Step 5: Update exact policy/function catalog assertions**
+- [x] **Step 5: Update exact policy/function catalog assertions**
 
 Keep the two strict lists in `006_read_models.test.sql` alphabetically ordered and add comments for every new policy/function that the catalogue requires.
 
@@ -219,23 +224,29 @@ Keep the two strict lists in `006_read_models.test.sql` alphabetically ordered a
 - Consumes: remediation migration and RED tests.
 - Produces: PostgreSQL-proven schema and stable generated TypeScript interfaces.
 
-- [ ] **Step 1: Obtain explicit disposable GREEN authorization**
+- [x] **Step 1: Obtain explicit disposable GREEN authorization**
 
 Authorize fail-closed preflight, exact migration/test sync, one reset through migration 31, focused 021, full pgTAP, focused identity integration, full integration, double typegen, residue checks, and cleanup. Production remains excluded.
 
-- [ ] **Step 2: Run reset and focused GREEN**
+The first authorization was consumed safely: reset through migration 31 and focused 021 passed, but full pgTAP exposed four stale direct-profile-write assertions in 002. The run stopped before integration/typegen, cleaned to zero residue, and the stale test was repaired locally. A fresh no-reset rerun authorization is required before Step 2 can be completed.
+
+The no-reset rerun proved focused 002 (61 tests) and the full 001–021 pgTAP matrix (1,644 tests) GREEN. Its focused integration command omitted `CI=true`, so pnpm stopped before Vitest with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; no fixture or database behavior ran. The checkout was restored and cleaned. A narrower integration/typegen-only authorization with `CI=true` is required; the passing pgTAP matrix must not be rerun.
+
+The CI-corrected focused integration then passed 3/3 behaviors, but an independent gate found three wallet outbox rows left behind after the remove command. Cleanup only read current wallet rows, so it lost the deleted wallet aggregate ID, and its own assertion did not inspect outbox/profile events. The run stopped before full integration/typegen and removed exactly those three owned events. The harness now unions current wallets with the append-only wallet event ledger and asserts both additional residue classes. A fresh cleanup-corrected integration/typegen-only authorization is required.
+
+- [x] **Step 2: Run reset and focused GREEN**
 
 After reset, first assert migration count/max version and the paused marker. Run 021 and the identity integration test. Stop immediately on any failure.
 
-- [ ] **Step 3: Run full database matrices**
+- [x] **Step 3: Run full database matrices**
 
 Run all pgTAP files, then the complete database integration command once. Require zero SQL errors, unhandled rejections, timeouts, or fixture residue.
 
-- [ ] **Step 4: Generate types twice**
+- [x] **Step 4: Generate types twice**
 
 Generate twice from the same reset schema, compare byte-for-byte, then mechanically replace `packages/database/src/generated/database.types.ts` with the first stable result.
 
-- [ ] **Step 5: Run local package gates**
+- [x] **Step 5: Run local package gates**
 
 Run database unit tests, lint, typecheck, and `git diff --check`. Expected: all exit 0.
 
@@ -251,15 +262,85 @@ Run database unit tests, lint, typecheck, and `git diff --check`. Expected: all 
 - Consumes: all GREEN evidence.
 - Produces: a trustworthy Task 2 completion checkpoint for repository work.
 
-- [ ] **Step 1: Run mutation checks**
+- [x] **Step 1: Run mutation checks**
 
 Prove at least these mutations are caught: skip receipt lookup, ignore `expectedVersion`, grant browser direct write, omit an audit insert, omit an outbox insert, remove `visibility = 'public'`, and remove the non-owner filter.
 
-- [ ] **Step 2: Run the root gate**
+Disposable mutation protocol (requires a separate explicit authorization):
+
+1. Freeze the final migration-31 SHA and create seven untracked temporary variants. Each variant changes exactly one anchor and must parse as SQL before remote use.
+2. For each variant, overwrite only the remote migration-31 filename, verify its unique SHA, run one disposable reset, then run focused 021 exactly once. A kill is valid only when all 82 planned TAP assertions execute without parse/Bad-plan noise and at least the mapped assertion fails:
+   - receipt lookup → update replay/side-effect assertions;
+   - `expectedVersion` → stale profile-version assertion;
+   - browser direct-write grant → browser write-privilege assertion;
+   - profile audit insert → profile-event count assertion;
+   - identity outbox insert → outbox count/type assertions;
+   - public visibility predicate → hidden-wallet public-read assertion;
+   - `auth.uid()` owner predicate → private profile/wallet isolation assertions.
+3. Do not run integration, full pgTAP, or typegen on a mutant. After each accepted kill, proceed only by replacing migration 31 with the next prevalidated variant and resetting the same disposable database.
+4. In all success or failure paths, overwrite migration 31 with the frozen final file, verify its SHA, perform the eighth and final clean reset, then require focused 021 PASS, migration count/max, marker, and zero owned residue before deleting every mutation temp.
+5. Hard maximum: eight exact migration-file syncs, eight disposable resets, and eight focused-021 invocations (seven expected RED kills plus one final GREEN restoration). Production and ports 54321/54322 remain excluded.
+
+- [x] **Step 2: Run the root gate**
 
 Run exact Node 22.22.2 / pnpm 11.16.0 `pnpm verify`, `pnpm check:placeholders`, and `git diff --check`. Record pass counts and gated skips without treating skips as behavior proof.
 
-- [ ] **Step 3: Reconcile documentation**
+#### Review Fix Round 1（blocks Steps 3–4）
+
+- [x] **R1 Step 1: Add load-bearing RED assertions**
+
+Extend 021 without changing production SQL. Require: `identity_profile_events`
+RLS plus cross-owner filtering and browser write denial; zero direct Identity
+table DML for `service_role` and unrelated worker roles; an exact eight-RPC role
+matrix; changed-payload same-key `ID207` for visibility and remove; value-level
+outbox aggregate/payload/time correlations; and an injected persistence failure
+that returns `ID299` with zero side effects.
+
+- [x] **R1 Step 2: Obtain and run one test-only disposable RED**
+
+Use the current restored final migration 31. After local/remote fail-closed
+preflight, back up and sync only 021, run it once, accept RED only if every
+planned assertion completes and failures are limited to the service/worker DML
+boundary and missing `ID299` mapper, then prove zero residue and restore the
+remote 021. No reset, migration sync, integration, typegen, full pgTAP, second
+run, production, or ports 54321/54322.
+
+- [x] **R1 Step 3: Implement the minimum migration fix**
+
+Extend existing table DML revokes to `service_role` and unrelated workers. Add
+one exception boundary to each mutation RPC that rethrows stable
+`ID201`–`ID208`/`ID299` and maps every other caught persistence failure to
+`identity_persistence_failed` / `ID299`. Do not change command ordering,
+payloads, versions, read projections, schemas, or generated types.
+
+- [x] **R1 Step 4: Obtain and run disposable GREEN**
+
+Sync the repaired migration 31 and 021 with exact hashes, perform one reset,
+then require focused 021, full pgTAP, focused Identity integration, the complete
+database integration matrix, zero residue, and final state/hash cleanup. The
+function/table shapes do not change, so generated types must remain byte-identical;
+verify their committed hash rather than hand-editing generated output. Production
+remains excluded.
+
+Before sync, back up the remote migration 31, 002, and 021 as exact local
+restore anchors. The normal path has exactly one reset. A second reset is
+authorized only if the repaired migration or a required GREEN gate fails: first
+restore all three anchors, then use the second reset plus the restored focused
+021 to prove the prior disposable baseline and stop. On the successful path,
+temporarily sync the corrected 002 for the full pgTAP matrix and restore only
+that test file after evidence; keep the repaired migration 31 and R1 021 as the
+new disposable checkout state. Run one remote type generation and require its
+bytes to match the committed generated file; do not replace the file.
+
+- [x] **R1 Step 5: Re-run local gates and scoped review**
+
+Run fresh root `pnpm verify`, placeholders, diff check, and independent scoped
+review. PostgreSQL `RETURNS TABLE` OUT parameters do not expose nullability to
+the generator; keep the deterministic generated file unchanged and require the
+Task 3 repository boundary to use the approved nullable contracts rather than
+trusting raw RPC return nullability.
+
+- [x] **Step 3: Reconcile documentation**
 
 Mark Task 2 complete only if every acceptance item has fresh evidence. Keep migration 31 production-unapplied and Task 3 as the next task.
 
