@@ -19,6 +19,8 @@ export {
   walletChainSchema,
   walletLabelSchema,
   walletVisibilitySchema,
+  identityErrorCodeSchema,
+  type IdentityErrorCode,
   type WalletChain,
   type WalletVisibility
 } from './identity/enums.js';
@@ -32,6 +34,16 @@ export {
   type UserProfileRow,
   type WalletAddressRow
 } from './identity/projections.js';
+export {
+  addWalletAddressReceiptSchema,
+  removeWalletAddressReceiptSchema,
+  setWalletAddressVisibilityReceiptSchema,
+  updateProfileReceiptSchema,
+  type AddWalletAddressReceipt,
+  type RemoveWalletAddressReceipt,
+  type SetWalletAddressVisibilityReceipt,
+  type UpdateProfileReceipt,
+} from './identity/receipts.js';
 
 export { apiErrorSchema, createApiSuccessSchema } from './api/envelope.js';
 export type { ApiError, ApiSuccess } from './api/envelope.js';

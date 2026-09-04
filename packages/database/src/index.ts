@@ -1,5 +1,17 @@
 export { createBrowserSupabaseClient, type BrowserSupabaseClientOptions } from './client.js';
 export type { Database, Json } from './generated/database.types.js';
+export {
+  createIdentityProfileRepository,
+  createIdentityProfileRepositoryFromRpc,
+  createIdentityWalletAddressRepository,
+  createIdentityWalletAddressRepositoryFromRpc,
+  IdentityRepositoryError,
+  type IdentityProfileRepository,
+  type IdentityRepositoryOptions,
+  type IdentityRpc,
+  type IdentityRpcCall,
+  type IdentityWalletAddressRepository,
+} from './identity/index.js';
 export type {
   DomainAuthorityReviewListResult,
   ReferenceReviewListResult,

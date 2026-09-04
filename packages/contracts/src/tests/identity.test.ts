@@ -10,6 +10,7 @@ import {
 } from '../identity/commands.js';
 import {
   findForbiddenIdentityKeys,
+  identityErrorCodeSchema,
   walletAddressSchema,
   walletVisibilitySchema,
 } from '../identity/enums.js';
@@ -19,6 +20,12 @@ import {
   userProfileRowSchema,
   walletAddressRowSchema,
 } from '../identity/projections.js';
+import {
+  addWalletAddressReceiptSchema,
+  removeWalletAddressReceiptSchema,
+  setWalletAddressVisibilityReceiptSchema,
+  updateProfileReceiptSchema,
+} from '../identity/receipts.js';
 
 const walletAddressId = '40000000-0000-4000-8000-000000000001';
 const address = '0x1234567890abcdef1234567890abcdef12345678';
@@ -189,5 +196,88 @@ describe('identity projections', () => {
     // The private row itself must not satisfy the public schema: visibility,
     // version and timestamps stay out of anything anonymous readers see.
     expect(publicWalletAddressSchema.safeParse(walletRow).success).toBe(false);
+  });
+});
+
+describe('identity repository receipts and errors', () => {
+  const commandId = '40000000-0000-4000-8000-000000000099';
+  const profileId = '40000000-0000-4000-8000-000000000002';
+
+  it('accepts only the frozen strict command receipt shapes', () => {
+    expect(
+      updateProfileReceiptSchema.parse({
+        version: 1,
+        commandId,
+        profileId,
+        profileVersion: 2,
+        replayed: false,
+      }),
+    ).toMatchObject({ commandId, profileId, replayed: false });
+    expect(
+      addWalletAddressReceiptSchema.parse({
+        version: 1,
+        commandId,
+        walletAddressId,
+        walletAddressVersion: 1,
+        profileVersion: 3,
+        replayed: true,
+      }),
+    ).toMatchObject({ walletAddressId, profileVersion: 3, replayed: true });
+    expect(
+      setWalletAddressVisibilityReceiptSchema.parse({
+        version: 1,
+        commandId,
+        walletAddressId,
+        walletAddressVersion: 2,
+        replayed: false,
+      }),
+    ).toMatchObject({ walletAddressVersion: 2 });
+    expect(
+      removeWalletAddressReceiptSchema.parse({
+        version: 1,
+        commandId,
+        walletAddressId,
+        walletAddressVersion: 3,
+        replayed: true,
+      }),
+    ).toMatchObject({ walletAddressVersion: 3 });
+  });
+
+  it('rejects receipt extras and invalid versions', () => {
+    expect(
+      updateProfileReceiptSchema.safeParse({
+        version: 1,
+        commandId,
+        profileId,
+        profileVersion: 0,
+        replayed: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      addWalletAddressReceiptSchema.safeParse({
+        version: 1,
+        commandId,
+        walletAddressId,
+        walletAddressVersion: 1,
+        profileVersion: 2,
+        replayed: false,
+        internal: 'leak',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('exposes only the frozen identity repository error codes', () => {
+    expect(identityErrorCodeSchema.options).toEqual([
+      'identity_session_required',
+      'identity_profile_not_found',
+      'identity_address_invalid',
+      'identity_address_duplicate',
+      'identity_address_limit_reached',
+      'identity_version_conflict',
+      'identity_idempotency_conflict',
+      'identity_command_invalid',
+      'identity_query_failed',
+      'identity_persistence_failed',
+    ]);
   });
 });

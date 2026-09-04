@@ -16,6 +16,21 @@ export const walletVisibilitySchema = z.enum(['hidden', 'public']);
 export type WalletChain = z.infer<typeof walletChainSchema>;
 export type WalletVisibility = z.infer<typeof walletVisibilitySchema>;
 
+export const identityErrorCodeSchema = z.enum([
+  'identity_session_required',
+  'identity_profile_not_found',
+  'identity_address_invalid',
+  'identity_address_duplicate',
+  'identity_address_limit_reached',
+  'identity_version_conflict',
+  'identity_idempotency_conflict',
+  'identity_command_invalid',
+  'identity_query_failed',
+  'identity_persistence_failed',
+]);
+
+export type IdentityErrorCode = z.infer<typeof identityErrorCodeSchema>;
+
 export const profileDisplayNameSchema = z
   .string()
   .trim()

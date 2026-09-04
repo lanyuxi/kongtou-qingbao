@@ -5,6 +5,11 @@ import postgres, { type TransactionSql } from 'postgres';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { Database, Json } from '../generated/database.types.js';
+import {
+  createIdentityProfileRepository,
+  createIdentityWalletAddressRepository,
+  IdentityRepositoryError,
+} from '../identity/index.js';
 
 type PublicSchema = Database['public'];
 type IdentityFunctionOverrides = {
@@ -75,6 +80,29 @@ const fixture = {
   otherEmail: `identity-other-${randomUUID()}@example.invalid`,
   address: `0x${randomUUID().replaceAll('-', '').padEnd(40, '1').slice(0, 40)}`,
 } as const;
+const repositoryFixture = {
+  ownerEmail: `identity-repository-owner-${randomUUID()}@example.invalid`,
+  otherEmail: `identity-repository-other-${randomUUID()}@example.invalid`,
+  ownerClientIndex: 2,
+  otherClientIndex: 3,
+} as const;
+
+describe('Identity integration fixture isolation', () => {
+  it('assigns repository round trips to dedicated auth users', () => {
+    expect(new Set([
+      fixture.ownerEmail,
+      fixture.otherEmail,
+      repositoryFixture.ownerEmail,
+      repositoryFixture.otherEmail,
+    ])).toHaveLength(4);
+    expect(new Set([
+      0,
+      1,
+      repositoryFixture.ownerClientIndex,
+      repositoryFixture.otherClientIndex,
+    ])).toHaveLength(4);
+  });
+});
 
 const integrationEnvironment = readIntegrationEnvironment();
 const describeIntegration = integrationEnvironment === null ? describe.skip : describe;
@@ -88,24 +116,42 @@ describeIntegration('Identity command boundary PostgREST/Auth integration', () =
     : [
         createAuthClient(integrationEnvironment.supabaseUrl, integrationEnvironment.anonKey),
         createAuthClient(integrationEnvironment.supabaseUrl, integrationEnvironment.anonKey),
+        createAuthClient(integrationEnvironment.supabaseUrl, integrationEnvironment.anonKey),
+        createAuthClient(integrationEnvironment.supabaseUrl, integrationEnvironment.anonKey),
       ];
   const anonClient = integrationEnvironment === null
     ? null
     : createAuthClient(integrationEnvironment.supabaseUrl, integrationEnvironment.anonKey);
   const createdUserIds = new Set<string>();
   let ownerUserId = '';
+  let repositoryOwnerUserId = '';
   let walletAddressId = '';
 
   beforeAll(async () => {
     const sql = requireOwner(ownerSql);
     await assertFixturePausedMarker(sql);
-    if (authClients.length !== 2) throw new Error('identity_auth_clients_missing');
+    if (authClients.length !== 4) throw new Error('identity_auth_clients_missing');
 
     const users = await Promise.all([
       signUpFixture(authClients[0]!, sql, fixture.ownerEmail, fixturePassword, createdUserIds),
       signUpFixture(authClients[1]!, sql, fixture.otherEmail, fixturePassword, createdUserIds),
+      signUpFixture(
+        authClients[repositoryFixture.ownerClientIndex]!,
+        sql,
+        repositoryFixture.ownerEmail,
+        fixturePassword,
+        createdUserIds,
+      ),
+      signUpFixture(
+        authClients[repositoryFixture.otherClientIndex]!,
+        sql,
+        repositoryFixture.otherEmail,
+        fixturePassword,
+        createdUserIds,
+      ),
     ]);
     ownerUserId = users[0]!.userId;
+    repositoryOwnerUserId = users[repositoryFixture.ownerClientIndex]!.userId;
   });
 
   afterAll(async () => {
@@ -279,6 +325,91 @@ describeIntegration('Identity command boundary PostgREST/Auth integration', () =
         idempotencyKey: `wallet-remove-stale-${randomUUID()}`,
       },
     }), 'ID206', 'identity_version_conflict');
+  });
+
+  it('round-trips repositories with replay, version conflicts, D4 projections, and owner-only wallet mutations', async () => {
+    const owner = requireClient(authClients[repositoryFixture.ownerClientIndex]);
+    const other = requireClient(authClients[repositoryFixture.otherClientIndex]);
+    const ownerSession = await owner.auth.getSession();
+    const otherSession = await other.auth.getSession();
+    const ownerToken = ownerSession.data.session?.access_token;
+    const otherToken = otherSession.data.session?.access_token;
+    if (ownerToken === undefined || otherToken === undefined) {
+      throw new Error('identity_repository_session_missing');
+    }
+    const options = {
+      url: integrationEnvironment?.supabaseUrl ?? '',
+      anonKey: integrationEnvironment?.anonKey ?? '',
+    };
+    const profiles = createIdentityProfileRepository(options);
+    const wallets = createIdentityWalletAddressRepository(options);
+    const before = await profiles.getMine({ accessToken: ownerToken });
+    const updateCommand = {
+      idempotencyKey: `repository-profile-${randomUUID()}`,
+      expectedVersion: before.version,
+      displayName: 'Repository Owner',
+      avatarUrl: null,
+      timezone: 'Asia/Shanghai',
+    };
+    const update = await profiles.update({ accessToken: ownerToken, command: updateCommand });
+    await expect(profiles.update({ accessToken: ownerToken, command: updateCommand }))
+      .resolves.toEqual({ ...update, replayed: true });
+    await expect(profiles.update({
+      accessToken: ownerToken,
+      command: { ...updateCommand, idempotencyKey: `repository-stale-${randomUUID()}` },
+    })).rejects.toEqual(new IdentityRepositoryError('identity_version_conflict'));
+
+    const walletAddress = `0x${randomUUID().replaceAll('-', '').padEnd(40, '3').slice(0, 40)}`;
+    const add = await wallets.add({
+      accessToken: ownerToken,
+      command: {
+        idempotencyKey: `repository-add-${randomUUID()}`,
+        expectedVersion: update.profileVersion,
+        chain: 'evm',
+        address: walletAddress,
+        label: 'repository',
+        visibility: 'hidden',
+      },
+    });
+    await expect(wallets.setVisibility({
+      accessToken: otherToken,
+      command: {
+        idempotencyKey: `repository-other-${randomUUID()}`,
+        expectedVersion: 1,
+        walletAddressId: add.walletAddressId,
+        visibility: 'public',
+      },
+    })).rejects.toEqual(new IdentityRepositoryError('identity_command_invalid'));
+    const visible = await wallets.setVisibility({
+      accessToken: ownerToken,
+      command: {
+        idempotencyKey: `repository-visible-${randomUUID()}`,
+        expectedVersion: add.walletAddressVersion,
+        walletAddressId: add.walletAddressId,
+        visibility: 'public',
+      },
+    });
+    await expect(profiles.getPublic({ userId: repositoryOwnerUserId })).resolves.toEqual({
+      userId: repositoryOwnerUserId,
+      displayName: 'Repository Owner',
+      avatarUrl: null,
+    });
+    await expect(wallets.listPublic({ userId: repositoryOwnerUserId })).resolves.toEqual([
+      {
+        walletAddressId: add.walletAddressId,
+        chain: 'evm',
+        address: walletAddress,
+        label: 'repository',
+      },
+    ]);
+    await expect(wallets.remove({
+      accessToken: ownerToken,
+      command: {
+        idempotencyKey: `repository-remove-${randomUUID()}`,
+        expectedVersion: visible.walletAddressVersion,
+        walletAddressId: add.walletAddressId,
+      },
+    })).resolves.toMatchObject({ walletAddressId: add.walletAddressId, replayed: false });
   });
 
   it('denies direct browser writes and preserves transactional audit/outbox rows', async () => {
