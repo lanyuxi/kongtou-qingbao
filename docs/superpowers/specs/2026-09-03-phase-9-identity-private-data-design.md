@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 设计规范
 
-> 状态：**草案，待所有者采纳决策 D1–D6 后进入实施计划**。本规范只覆盖 AGENTS.md「Data ownership」中的 **Identity 域**（profiles、roles、public wallet addresses），为后续 Execution（任务管理）与 Notification 两域提供身份与私有行基础。
+> 状态：**Approved（2026-09-03，所有者已采纳 D1–D6）**。Phase 9 Task 1 contracts 已完成；Task 2 正按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 修复验收缺口，Task 3 尚未开始。本规范只覆盖 AGENTS.md「Data ownership」中的 **Identity 域**（profiles、roles、public wallet addresses），为后续 Execution（任务管理）与 Notification 两域提供身份与私有行基础。
 
 ## 1. Goal
 

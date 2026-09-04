@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 待所有者采纳**。D1（登录方式）阻塞 Task 5；D3/D4 阻塞 Task 1 的枚举与校验；其余决策影响细节但不阻塞骨架。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 的原始提交没有满足已批准验收，后续以 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 为权威补救计划；补救完成前不得进入 Task 3。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -8,17 +8,18 @@
 
 **Files:** `packages/contracts/src/identity/{enums,commands,projections}.ts` + 测试，index 导出。
 
-- [ ] **Step 1: RED**——strict 命令/投影；钱包地址按 D3 格式校验；**任何密钥形似字段一律拒绝**（不静默丢弃）；枚举不含未采纳项
-- [ ] **Step 2: GREEN + lint/typecheck + 变异**（密钥字段未被拒 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(contracts): add identity contracts`
+- [x] **Step 1: RED**——strict 命令/投影；钱包地址按 D3 格式校验；**任何密钥形似字段一律拒绝**（不静默丢弃）；枚举不含未采纳项
+- [x] **Step 2: GREEN + lint/typecheck + 变异**（密钥字段未被拒 → 用例失败）
+- [x] **Step 3: 文档 + 提交** `feat(contracts): add identity contracts`（`5240b84`）
 
-## Task 2: 迁移 30 + pgTAP 021（Identity 表与 RLS 四角色矩阵）
+## Task 2: 迁移 30 + pgTAP 021（修复中）
 
 **Files:** `supabase/migrations/20260903000200_phase_9_identity.sql`（profiles RLS 补齐、`user_wallet_addresses`、`user_wallet_address_events`、命令/回执、受保护命令）、`supabase/tests/021_phase_9_identity.test.sql`。
 
-- [ ] **Step 1: RED**——匿名不可读写；本人可读写；**他人读写全部被拒**；地址唯一与上限；事件表追加不可变；命令幂等与版本冲突
-- [ ] **Step 2: GREEN + disposable 验证**（reset + focused pgTAP）
-- [ ] **Step 3: 文档 + 提交** `feat(db): add identity ledger`
+- [x] **原始提交**——migration 30 / pgTAP 021 已以 `0f8e000` 提交，但 2026-09-04 复核发现四角色、四命令、幂等/版本、append-only、public read 与 outbox 验收均不完整，不能视为 Task 2 完成。
+- [ ] **Step 1: RED**——按补救计划写出匿名/本人/他人/无会话、四命令、直接写拒绝、幂等/版本、审计/outbox 与公开投影测试，并在 migration 30 上取得有效失败证据。
+- [ ] **Step 2: GREEN + disposable 验证**——用 forward-only migration 31 修复并完成 focused/full pgTAP、integration 与 deterministic typegen。
+- [ ] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`
 
 ## Task 3: 仓储（`packages/database/src/identity/`）
 
