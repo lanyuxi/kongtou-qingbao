@@ -150,24 +150,25 @@ export async function runWorker(
 
   await runtime.start();
   health = transitionWorkerHealth(health, 'ready', clock);
+  const shutdown = new Promise<void>((resolve) => {
+    let stopped = false;
+    const finish = (): void => {
+      if (stopped) return;
+      stopped = true;
+      resolve();
+    };
+    ports.onSignal((): void => {
+      if (health.status !== 'ready') return;
+      health = transitionWorkerHealth(health, 'stopping', clock);
+      ports.emit(health);
+      void boundedStop(runtime, shutdownBoundMs).then(finish);
+    });
+  });
   ports.emit(health);
 
   const keepAlive = setInterval(() => undefined, KEEP_ALIVE_INTERVAL_MS);
   try {
-    await new Promise<void>((resolve) => {
-      let stopped = false;
-      const finish = (): void => {
-        if (stopped) return;
-        stopped = true;
-        resolve();
-      };
-      ports.onSignal((): void => {
-        if (health.status !== 'ready') return;
-        health = transitionWorkerHealth(health, 'stopping', clock);
-        ports.emit(health);
-        void boundedStop(runtime, shutdownBoundMs).then(finish);
-      });
-    });
+    await shutdown;
   } finally {
     clearInterval(keepAlive);
   }
