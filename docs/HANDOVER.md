@@ -1,5 +1,7 @@
 # Airdrop Intelligence OS — 交接手册
 
+**2026-09-04 Phase 9 Task 2 ATOMIC COMMIT COMPLETE**：在 worker 独立提交后，剩余工作树精确回到 12 个 Task 2 路径；staged scope/diff check 通过且无 `apps/worker`，计划提交 `c990196 fix(db): complete identity command boundary` 已创建（12 files，3,037 insertions / 146 deletions）。该提交由 disposable focused 021 91、full pgTAP 1,653、focused/full integration 3/81、single typegen byte-equal、7/7 mutations、clean final state、fresh root verify 1,654 与两轮最终 review 0/0/0 支撑；migration30/31 仍未应用生产。下一步仅做 self-referential docs completion：勾 remediation Step4 与 Phase 9 Task2 Step3、看板改为完成并记录 `3cc34aa`/`c990196`，通过 placeholder/diff 后创建 docs-only follow-up；随后 worktree 必须 clean，Task 3 repositories 成为下一任务。
+
 **2026-09-04 worker lifecycle race ATOMIC COMMIT COMPLETE**：提升权限仅用于写入已授权主仓 `.git`；staged check 精确两文件且 diff clean，提交 `3cc34aa fix(worker): register shutdown handlers before ready` 已创建，包含 `apps/worker/src/index.ts` 与 `apps/worker/src/tests/health.test.ts` 的 42 insertions / 16 deletions，无其他路径。该提交已由 health 3×9/9、worker 267、root verify 1,654 与独立 review 0/0/0 支撑。下一步复核剩余工作树精确回到原 Task 2 十二路径，随后创建计划中的 `fix(db): complete identity command boundary` 原子提交。
 
 **2026-09-04 worker atomic commit sandbox retry required**：首次精确两文件 `git add` 在创建主仓 `.git/worktrees/phase-9-identity/index.lock` 前因 workspace sandbox 对 `.git` 只读而 exit 128（Operation not permitted）；没有 staged file、commit 或 source 变化。下一步在 owner 已明确授权提交的范围内，以提升权限原样执行仅 `apps/worker/src/index.ts` + `apps/worker/src/tests/health.test.ts` 的 staged check 与 `fix(worker): register shutdown handlers before ready`，不扩大文件集合。

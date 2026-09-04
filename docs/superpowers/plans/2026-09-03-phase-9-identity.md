@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成首轮 RED/GREEN/mutation evidence及 Fix Round 1；最终 scoped re-review 为 0 Critical / 0 Important / 0 Minor。Task 2 验收完成，待原子提交；Task 3 repositories 为下一开发任务。migration 30/31 仍未应用生产。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成首轮 RED/GREEN/mutation evidence及 Fix Round 1；最终 scoped re-review 为 0 Critical / 0 Important / 0 Minor，并已提交 `c990196`。Task 3 repositories 为下一开发任务。migration 30/31 仍未应用生产。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -12,14 +12,14 @@
 - [x] **Step 2: GREEN + lint/typecheck + 变异**（密钥字段未被拒 → 用例失败）
 - [x] **Step 3: 文档 + 提交** `feat(contracts): add identity contracts`（`5240b84`）
 
-## Task 2: 迁移 30 + forward-only migration 31 + pgTAP 021（验收完成，待原子提交）
+## Task 2: 迁移 30 + forward-only migration 31 + pgTAP 021（完成，`c990196`）
 
 **Files:** `supabase/migrations/20260903000200_phase_9_identity.sql`（profiles RLS 补齐、`user_wallet_addresses`、`user_wallet_address_events`、命令/回执、受保护命令）、`supabase/tests/021_phase_9_identity.test.sql`。
 
 - [x] **原始提交**——migration 30 / pgTAP 021 已以 `0f8e000` 提交，但 2026-09-04 复核发现四角色、四命令、幂等/版本、append-only、public read 与 outbox 验收均不完整，不能视为 Task 2 完成。
 - [x] **Step 1: RED**——按补救计划写出匿名/本人/他人/无会话、四命令、直接写拒绝、幂等/版本、审计/outbox 与公开投影测试，并在 migration 30 上取得有效失败证据。
 - [x] **Step 2: GREEN + disposable 验证**——用 forward-only migration 31 修复并完成 focused/full pgTAP、integration、deterministic typegen 与 7/7 mutation checks。
-- [ ] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`
+- [x] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`（`c990196`）
 
 ## Task 3: 仓储（`packages/database/src/identity/`）
 

@@ -344,7 +344,7 @@ trusting raw RPC return nullability.
 
 Mark Task 2 complete only if every acceptance item has fresh evidence. Keep migration 31 production-unapplied and Task 3 as the next task.
 
-- [ ] **Step 4: Commit the independently testable Task 2 repair**
+- [x] **Step 4: Commit the independently testable Task 2 repair** (`c990196`)
 
 Use conventional subject:
 
