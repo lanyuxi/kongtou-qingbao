@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成首轮 RED/GREEN/mutation evidence及 Fix Round 1；最终 scoped re-review 为 0 Critical / 0 Important / 0 Minor，并已提交 `c990196`。Task 3 repositories 为下一开发任务。migration 30/31 仍未应用生产。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已通过 RED/GREEN、local mutation、no-reset disposable focused/full integration 与最终 re-review，并提交 `5668e7c`。Task 4 BFF 为下一开发任务。migration 30/31 仍未应用生产。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -21,13 +21,13 @@
 - [x] **Step 2: GREEN + disposable 验证**——用 forward-only migration 31 修复并完成 focused/full pgTAP、integration、deterministic typegen 与 7/7 mutation checks。
 - [x] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`（`c990196`）
 
-## Task 3: 仓储（`packages/database/src/identity/`）
+## Task 3: 仓储（`packages/database/src/identity/`，完成，`5668e7c`）
 
 **Files:** `profileRepository`、`walletAddressRepository`、集成测试。
 
-- [ ] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、公开投影仅含 D4 允许字段；越权访问被拒
-- [ ] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(database): add identity repositories`
+- [x] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、公开投影仅含 D4 允许字段；越权访问被拒
+- [x] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
+- [x] **Step 3: 文档 + 提交** `feat(database): add identity repositories`（`5668e7c`）
 
 ## Task 4: BFF 路由与会话边界
 
