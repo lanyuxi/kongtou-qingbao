@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已提交 `5668e7c`；Task 4 BFF 已通过 RED/GREEN、local mutation、Fix Round 1 与 scoped re-review，并提交 `aff2070`。下一开发任务为 Task 6 settings UI；Task 5 auth flow 仍需先确认生产 SMTP。migration 30/31 仍未应用生产。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已提交 `5668e7c`；Task 4 BFF 已提交 `aff2070`；Task 6 settings UI 已提交 `0b9d021`；Task 5 auth flow 已完成（RED→GREEN→8/8 变异→门禁）。下一开发任务为 Task 7 收口。migration 30/31 仍未应用生产。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -41,9 +41,9 @@
 
 **Files:** 登录页、`/auth/callback`、登出、会话过期恢复（pending action）+ 测试。
 
-- [ ] **Step 1: RED**——未登录访问私有页重定向并保留待办动作；会话过期 → 401 后恢复
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity auth flow`
+- [x] **Step 1: RED**——未登录访问私有页重定向并保留待办动作；会话过期 → 401 后恢复
+- [x] **Step 2: GREEN + 变异**（邮箱格式、`next` 开放重定向、回跳错误参数、无会话、single-flight gate、登出失败、密码字段，8/8 killed）
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity auth flow`（`6853808` 之后的新提交）
 
 ## Task 6: 设置 UI（profile 与钱包地址，完成，`0b9d021`）
 
