@@ -4,9 +4,9 @@ import { useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 
 import {
-  IdentityAuthState,
   MagicLinkForm,
   submitMagicLinkRequestOnce,
+  type IdentityAuthState,
 } from '../../components/identity/identity-auth-elements.js';
 import { useIdentityBrowserRuntime } from '../../lib/identity-browser-runtime.js';
 import {
