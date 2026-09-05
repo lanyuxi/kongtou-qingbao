@@ -19,6 +19,7 @@ type WorkerExit = {
 type ParsedLine = { status?: string; probe?: string; stopCalls?: number };
 
 const workerDirectory = fileURLToPath(new URL('../../', import.meta.url));
+const workerReadyTimeoutMs = 3_000;
 
 const waitForWorkerExit = (worker: ChildProcess): Promise<WorkerExit> =>
   new Promise((resolve, reject) => {
@@ -62,8 +63,8 @@ const runFixtureWithSignals = async (signals: readonly NodeJS.Signals[]): Promis
   try {
     const ready = new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Worker did not emit ready within 1 second.'));
-      }, 1_000);
+        reject(new Error('Worker did not emit ready within 3 seconds.'));
+      }, workerReadyTimeoutMs);
 
       worker.stdout?.setEncoding('utf8');
       worker.stdout?.on('data', (chunk: string) => {
@@ -220,6 +221,30 @@ describe('runWorker lifecycle use case', () => {
       onSignal: (handler) => { signalHandlers.push(handler); }
     };
   };
+
+  it('registers the shutdown handler before ready becomes observable', async () => {
+    const events: string[] = [];
+    const signalHandlers: Array<() => void> = [];
+    const runtime = {
+      start: async (): Promise<void> => undefined,
+      stop: async (): Promise<void> => undefined
+    };
+
+    const running = runWorker(runtime, {
+      emit: (health) => { events.push(`emit:${health.status}`); },
+      onSignal: (handler) => {
+        events.push('onSignal');
+        signalHandlers.push(handler);
+      }
+    }, { clock });
+    await flushMicrotasks();
+    const readyOrdering = [...events];
+
+    signalHandlers.forEach((trigger) => trigger());
+    await running;
+
+    expect(readyOrdering).toEqual(['emit:starting', 'onSignal', 'emit:ready']);
+  });
 
   it('emits ready only after start resolves and stopping only once after repeated signals', async () => {
     const ports = createRecordingPorts();

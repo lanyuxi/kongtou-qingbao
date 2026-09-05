@@ -223,31 +223,34 @@ select results_eq(
   $$values ('11111111-1111-4111-8111-111111111111'::uuid)$$,
   'an authenticated owner can read only their own profile'
 );
-select lives_ok(
+select throws_like(
   $$update public.profiles set display_name = 'Owner' where id = '11111111-1111-4111-8111-111111111111'$$,
-  'an authenticated owner can update mutable profile fields'
+  'permission denied for table profiles',
+  'an authenticated owner cannot update profiles directly'
 );
-select is(
-  (select display_name from public.profiles),
-  'Owner',
-  'the owner profile update is persisted'
+select lives_ok(
+  $$
+    select public.submit_update_profile(
+      '{"idempotencyKey":"identity-rls-owner-update","expectedVersion":1,"displayName":"Owner","avatarUrl":null,"timezone":"UTC"}'::jsonb
+    )
+  $$,
+  'an authenticated owner can update mutable profile fields through the command boundary'
 );
 select ok(
-  (select updated_at > '2000-01-01 00:00:00+00'::timestamptz from public.profiles),
-  'the profile update trigger advances updated_at'
+  (
+    select display_name = 'Owner'
+      and avatar_url is null
+      and timezone = 'UTC'
+      and version = 2
+      and updated_at > '2000-01-01 00:00:00+00'::timestamptz
+    from public.profiles
+  ),
+  'the profile command persists fields, advances version, and updates the timestamp'
 );
-select results_eq(
-  $$
-    with changed as (
-      update public.profiles
-      set display_name = 'Not allowed'
-      where id = '22222222-2222-4222-8222-222222222222'
-      returning 1
-    )
-    select count(*)::bigint from changed
-  $$,
-  $$values (0::bigint)$$,
-  'an authenticated owner cannot update another profile'
+select throws_like(
+  $$update public.profiles set display_name = 'Not allowed' where id = '22222222-2222-4222-8222-222222222222'$$,
+  'permission denied for table profiles',
+  'an authenticated owner cannot update another profile directly'
 );
 select throws_like(
   $$update public.profiles set id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' where id = '11111111-1111-4111-8111-111111111111'$$,

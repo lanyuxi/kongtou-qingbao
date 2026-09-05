@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 的原始提交没有满足已批准验收，后续以 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 为权威补救计划；补救完成前不得进入 Task 3。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已提交 `5668e7c`；Task 4 BFF 已提交 `aff2070`；Task 6 settings UI 已提交 `0b9d021`；Task 5 auth flow 已完成（RED→GREEN→8/8 变异→门禁）。下一开发任务为 Task 7 收口。migration 30/31 仍未应用生产。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -12,46 +12,46 @@
 - [x] **Step 2: GREEN + lint/typecheck + 变异**（密钥字段未被拒 → 用例失败）
 - [x] **Step 3: 文档 + 提交** `feat(contracts): add identity contracts`（`5240b84`）
 
-## Task 2: 迁移 30 + pgTAP 021（修复中）
+## Task 2: 迁移 30 + forward-only migration 31 + pgTAP 021（完成，`c990196`）
 
 **Files:** `supabase/migrations/20260903000200_phase_9_identity.sql`（profiles RLS 补齐、`user_wallet_addresses`、`user_wallet_address_events`、命令/回执、受保护命令）、`supabase/tests/021_phase_9_identity.test.sql`。
 
 - [x] **原始提交**——migration 30 / pgTAP 021 已以 `0f8e000` 提交，但 2026-09-04 复核发现四角色、四命令、幂等/版本、append-only、public read 与 outbox 验收均不完整，不能视为 Task 2 完成。
-- [ ] **Step 1: RED**——按补救计划写出匿名/本人/他人/无会话、四命令、直接写拒绝、幂等/版本、审计/outbox 与公开投影测试，并在 migration 30 上取得有效失败证据。
-- [ ] **Step 2: GREEN + disposable 验证**——用 forward-only migration 31 修复并完成 focused/full pgTAP、integration 与 deterministic typegen。
-- [ ] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`
+- [x] **Step 1: RED**——按补救计划写出匿名/本人/他人/无会话、四命令、直接写拒绝、幂等/版本、审计/outbox 与公开投影测试，并在 migration 30 上取得有效失败证据。
+- [x] **Step 2: GREEN + disposable 验证**——用 forward-only migration 31 修复并完成 focused/full pgTAP、integration、deterministic typegen 与 7/7 mutation checks。
+- [x] **Step 3: 文档 + 提交** `fix(db): complete identity command boundary`（`c990196`）
 
-## Task 3: 仓储（`packages/database/src/identity/`）
+## Task 3: 仓储（`packages/database/src/identity/`，完成，`5668e7c`）
 
 **Files:** `profileRepository`、`walletAddressRepository`、集成测试。
 
-- [ ] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、公开投影仅含 D4 允许字段；越权访问被拒
-- [ ] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(database): add identity repositories`
+- [x] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、公开投影仅含 D4 允许字段；越权访问被拒
+- [x] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
+- [x] **Step 3: 文档 + 提交** `feat(database): add identity repositories`（`5668e7c`）
 
-## Task 4: BFF 路由与会话边界
+## Task 4: BFF 路由与会话边界（完成，`aff2070`）
 
 **Files:** `apps/web/src/app/api/v1/identity/*`、`lib/identity-handlers.ts` + 测试。
 
-- [ ] **Step 1: RED**——无会话 → `ID201`/401；他人资源 → 403/404（不泄漏存在性）；命令类回落 `_persistence_failed`，查询类 `_query_failed`；畸形游标 → `invalid_cursor`
-- [ ] **Step 2: GREEN + 变异**（认证优先于查询 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity bff`
+- [x] **Step 1: RED**——无会话 → `ID201`/401；他人资源 → 404（不泄漏存在性）；命令类回落 `_persistence_failed`，查询类 `_query_failed`；D3 上限 5 且无 Identity cursor contract，未知 query 按 `invalid_request` 拒绝
+- [x] **Step 2: GREEN + 变异**（profile/wallet collection/wallet item 认证优先级、四成功命令参数/回执与 verifier failure 三态均有 RED 证据）
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity bff`（`aff2070`）
 
 ## Task 5: 认证流程 UI（依赖 D1）
 
 **Files:** 登录页、`/auth/callback`、登出、会话过期恢复（pending action）+ 测试。
 
-- [ ] **Step 1: RED**——未登录访问私有页重定向并保留待办动作；会话过期 → 401 后恢复
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity auth flow`
+- [x] **Step 1: RED**——未登录访问私有页重定向并保留待办动作；会话过期 → 401 后恢复
+- [x] **Step 2: GREEN + 变异**（邮箱格式、`next` 开放重定向、回跳错误参数、无会话、single-flight gate、登出失败、密码字段，8/8 killed）
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity auth flow`（`6853808` 之后的新提交）
 
-## Task 6: 设置 UI（profile 与钱包地址）
+## Task 6: 设置 UI（profile 与钱包地址，完成，`0b9d021`）
 
 **Files:** `/settings/profile`、`/settings/wallets` 页面与组件 + 测试。
 
-- [ ] **Step 1: RED**——越权字段不可提交；重复地址/上限/版本冲突展示稳定错误码（不按文案分支）；页面显著提示永不索取私钥
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity settings`
+- [x] **Step 1: RED**——越权字段不可提交；重复地址/上限/版本冲突展示稳定错误码（不按文案分支）；页面显著提示永不索取私钥
+- [x] **Step 2: GREEN + 变异**
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity settings`（`0b9d021`）
 
 ## Task 7: 收口
 

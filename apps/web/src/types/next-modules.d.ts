@@ -22,7 +22,13 @@ declare module 'next/navigation' {
     replace(href: string): void;
   }
 
+  export interface ReadonlyURLSearchParams {
+    get(name: string): string | null;
+    toString(): string;
+  }
+
   export function usePathname(): string;
   export function useRouter(): AppRouterInstance;
+  export function useSearchParams(): ReadonlyURLSearchParams;
   export function notFound(): never;
 }

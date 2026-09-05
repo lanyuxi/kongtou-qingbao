@@ -16,6 +16,7 @@ const primaryNav: readonly NavItem[] = [
   { label: '情报', href: null },
   { label: '任务', href: null },
   { label: '关注列表', href: null },
+  { label: '设置', href: '/settings/profile' },
 ];
 
 export function AppShell({ children }: { readonly children: ReactNode }) {
@@ -70,6 +71,9 @@ export function PublicShellBoundary({
               已连接远程数据源
             </span>
           </div>
+          <Link className="topbar-settings-link" href="/settings/profile">
+            设置
+          </Link>
         </header>
         <div className="content">{children}</div>
       </div>
@@ -81,5 +85,6 @@ function isActive(pathname: string, href: string): boolean {
   if (href === '/') {
     return pathname === '/';
   }
+  if (href === '/settings/profile') return pathname.startsWith('/settings/');
   return pathname === href || pathname.startsWith(`${href}/`);
 }

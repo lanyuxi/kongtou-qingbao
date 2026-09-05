@@ -501,6 +501,16 @@ a {
   color: var(--ink-500);
 }
 
+.topbar-settings-link {
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.topbar-settings-link:hover {
+  color: var(--accent-ink);
+}
+
 .topbar-dot {
   width: 7px;
   height: 7px;
@@ -1008,6 +1018,142 @@ td.num-col {
   color: var(--ink-700);
 }
 
+.settings-page {
+  width: min(780px, 100%);
+}
+
+.identity-safety {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  background: var(--warn-bg);
+  color: var(--ink-700);
+}
+
+.identity-safety strong {
+  color: var(--ink-900);
+}
+
+.identity-card h2 {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 17px;
+}
+
+.identity-card > p {
+  margin: 5px 0 16px;
+  color: var(--ink-500);
+}
+
+.identity-version {
+  font-variant-numeric: tabular-nums;
+}
+
+.identity-form {
+  display: grid;
+  gap: 14px;
+}
+
+.identity-field {
+  display: grid;
+  gap: 5px;
+}
+
+.identity-field label,
+.identity-wallet-actions label {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.identity-field input,
+.identity-wallet-actions select {
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-900);
+  font: inherit;
+  padding: 7px 10px;
+}
+
+.identity-field input:focus-visible,
+.identity-wallet-actions select:focus-visible,
+.identity-primary-button:focus-visible {
+  outline: 3px solid rgba(31, 94, 255, 0.25);
+  outline-offset: 2px;
+}
+
+.identity-primary-button {
+  border-color: var(--accent-ink);
+  background: var(--accent);
+  color: #fff;
+}
+
+.identity-primary-button:disabled,
+.identity-wallet-actions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.identity-message {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+.identity-message-error {
+  background: var(--bad-bg);
+  color: var(--bad);
+}
+
+.identity-message-success {
+  background: var(--good-bg);
+  color: var(--good);
+}
+
+.identity-wallet-list {
+  display: grid;
+}
+
+.identity-wallet-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.identity-wallet-row:last-child {
+  border-bottom: 0;
+}
+
+.identity-wallet-row > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.identity-wallet-row code {
+  overflow-wrap: anywhere;
+  color: var(--ink-700);
+}
+
+.identity-wallet-row span {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.identity-wallet-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .sidebar {
     display: none;
@@ -1023,6 +1169,12 @@ td.num-col {
 
   .score-factor-groups {
     grid-template-columns: 1fr;
+  }
+
+  .identity-wallet-row,
+  .identity-wallet-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
@@ -1270,4 +1422,47 @@ td.num-col {
 .tutorial-link-verified {
   color: var(--ink-400);
   font-size: 12.5px;
+}
+
+/* Identity authentication flow (Phase 9 Task 5) */
+
+.identity-auth-page {
+  max-width: 560px;
+}
+
+.identity-auth-safety {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.identity-auth-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.identity-session-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.identity-session-state {
+  color: var(--ink-500);
+  font-size: 13px;
+}
+
+.identity-session-bar .identity-message {
+  margin: 0;
+  flex: 1;
 }

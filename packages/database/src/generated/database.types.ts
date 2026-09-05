@@ -965,22 +965,70 @@ export type Database = {
         Row: {
           command: string
           created_at: string
+          expected_version: number
+          id: string
           idempotency_key: string
+          input_hash: string
           response: Json
+          resulting_version: number
           user_id: string
         }
         Insert: {
           command: string
           created_at?: string
+          expected_version: number
+          id?: string
           idempotency_key: string
+          input_hash: string
           response: Json
+          resulting_version: number
           user_id: string
         }
         Update: {
           command?: string
           created_at?: string
+          expected_version?: number
+          id?: string
           idempotency_key?: string
+          input_hash?: string
           response?: Json
+          resulting_version?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      identity_profile_events: {
+        Row: {
+          actor_user_id: string
+          avatar_url: string | null
+          display_name: string | null
+          event_type: string
+          id: number
+          occurred_at: string
+          profile_version: number
+          timezone: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          avatar_url?: string | null
+          display_name?: string | null
+          event_type: string
+          id?: never
+          occurred_at?: string
+          profile_version: number
+          timezone?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          avatar_url?: string | null
+          display_name?: string | null
+          event_type?: string
+          id?: never
+          occurred_at?: string
+          profile_version?: number
+          timezone?: string | null
           user_id?: string
         }
         Relationships: []
@@ -1036,7 +1084,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
-          timezone: string
+          timezone: string | null
           updated_at: string
           version: number
         }
@@ -1045,7 +1093,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id: string
-          timezone?: string
+          timezone?: string | null
           updated_at?: string
           version?: number
         }
@@ -1054,7 +1102,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
-          timezone?: string
+          timezone?: string | null
           updated_at?: string
           version?: number
         }
@@ -3814,30 +3862,42 @@ export type Database = {
       user_wallet_address_events: {
         Row: {
           actor_user_id: string
+          address: string
+          chain: string
           event_type: string
           id: number
+          label: string | null
           occurred_at: string
           user_id: string
           visibility: string | null
           wallet_address_id: string
+          wallet_address_version: number
         }
         Insert: {
           actor_user_id: string
+          address: string
+          chain: string
           event_type: string
           id?: never
+          label?: string | null
           occurred_at?: string
           user_id: string
           visibility?: string | null
           wallet_address_id: string
+          wallet_address_version: number
         }
         Update: {
           actor_user_id?: string
+          address?: string
+          chain?: string
           event_type?: string
           id?: never
+          label?: string | null
           occurred_at?: string
           user_id?: string
           visibility?: string | null
           wallet_address_id?: string
+          wallet_address_version?: number
         }
         Relationships: []
       }
@@ -4887,6 +4947,25 @@ export type Database = {
           version: number
         }[]
       }
+      get_my_identity_profile: {
+        Args: never
+        Returns: {
+          avatarUrl: string
+          displayName: string
+          timezone: string
+          updatedAt: string
+          userId: string
+          version: number
+        }[]
+      }
+      get_public_identity_profile: {
+        Args: { p_user_id: string }
+        Returns: {
+          avatarUrl: string
+          displayName: string
+          userId: string
+        }[]
+      }
       get_reference_review_detail: {
         Args: { p_reference_id: string }
         Returns: {
@@ -5023,6 +5102,28 @@ export type Database = {
         Returns: {
           candidate_id: string
           candidate_version: number
+        }[]
+      }
+      list_my_wallet_addresses: {
+        Args: never
+        Returns: {
+          address: string
+          chain: string
+          createdAt: string
+          label: string
+          updatedAt: string
+          version: number
+          visibility: string
+          walletAddressId: string
+        }[]
+      }
+      list_public_identity_wallet_addresses: {
+        Args: { p_user_id: string }
+        Returns: {
+          address: string
+          chain: string
+          label: string
+          walletAddressId: string
         }[]
       }
       list_public_score_evidence_citations: {
@@ -5481,6 +5582,7 @@ export type Database = {
           version: number
         }[]
       }
+      submit_remove_wallet_address: { Args: { p_payload: Json }; Returns: Json }
       submit_retire_tutorial: {
         Args: { p_command_payload: Json; p_idempotency_key: string }
         Returns: {
@@ -5489,6 +5591,10 @@ export type Database = {
           tutorialId: string
           version: number
         }[]
+      }
+      submit_set_wallet_address_visibility: {
+        Args: { p_payload: Json }
+        Returns: Json
       }
       submit_update_profile: { Args: { p_payload: Json }; Returns: Json }
       tutorial_is_publicly_visible_v1: {

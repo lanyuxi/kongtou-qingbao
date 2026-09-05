@@ -44,7 +44,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "node scripts/require-integration-env.mjs && vitest run --no-file-parallelism src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts src/tests/schedule-command-repository.integration.test.ts src/tests/scoring-repository.integration.test.ts src/tests/promotion-repository.integration.test.ts src/tests/failed-ai-run-review-repository.integration.test.ts src/tests/security-review-repository.integration.test.ts src/tests/security-candidate-ingress.integration.test.ts src/tests/reference-review-repository.integration.test.ts src/tests/reference-security-coupling.integration.test.ts src/tests/tutorial-review-repository.integration.test.ts"
+    "test:integration": "node scripts/require-integration-env.mjs && vitest run --no-file-parallelism src/tests/project-repository.integration.test.ts src/tests/source-collection-repository.integration.test.ts src/tests/durable-queue-repository.integration.test.ts src/tests/schedule-command-repository.integration.test.ts src/tests/scoring-repository.integration.test.ts src/tests/promotion-repository.integration.test.ts src/tests/failed-ai-run-review-repository.integration.test.ts src/tests/security-review-repository.integration.test.ts src/tests/security-candidate-ingress.integration.test.ts src/tests/reference-review-repository.integration.test.ts src/tests/reference-security-coupling.integration.test.ts src/tests/tutorial-review-repository.integration.test.ts src/tests/identity-command-boundary.integration.test.ts"
   },
   "dependencies": {
     "@airdrop/contracts": "workspace:*",
