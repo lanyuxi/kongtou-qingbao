@@ -708,6 +708,209 @@ reviewer, and explicit authorization — granted once per migration, never impli
 by local success. Deploying the web application is a separate, still-outstanding
 item.
 
+## Identity and private data (Phase 9)
+
+Identity gives a real end user a sign-in and a block of **private rows** that
+only they can see: their profile and their public wallet addresses. It also
+establishes the `user_id = auth.uid()` RLS pattern that Execution (tasks,
+watchlists) and Notification will reuse, so those domains must not redesign
+authorization.
+
+Three rules are absolute and are enforced in more than one layer:
+
+1. **Only public wallet addresses are stored.** No interface, table, or log may
+   carry a private key, seed phrase, keystore, wallet password, or signing
+   secret. The contract layer rejects any secret-shaped field outright rather
+   than silently dropping it, because a sender that emits one is an incident
+   rather than a formatting problem.
+2. **Private rows belong to their user.** Anonymous visitors see only what D4
+   allows to be public, and only through the public read projections.
+3. **Roles are never self-service.** `user_roles` writes stay on the existing
+   administrative path; profile and wallet changes never affect a grant.
+
+### Decided scope (D1–D6)
+
+| Decision | Value |
+| --- | --- |
+| D1 Sign-in method | Email magic link only |
+| D2 Self-service sign-up | Open; sign-up creates a profile |
+| D3 Wallet scope | EVM public addresses only (`0x` + 40 hex), maximum 5 |
+| D4 Address visibility | Default `hidden`; the user publishes an address explicitly |
+| D5 Profile bootstrap | Upsert on sign-in, with an `auth.users` trigger as the backstop |
+| D6 First-version scope | Sign-in, sign-out, session, profile, wallet addresses |
+
+Anything outside D6 — watchlists, tasks, notification preferences, third-party
+OAuth, MFA, teams, and every form of wallet connection or chain interaction — is
+explicitly out of scope.
+
+### Sign-in, callback, and sign-out
+
+`/settings/profile` and `/settings/wallets` are the private surfaces. When a
+private query answers `identity_session_required`, the page redirects to
+`/auth/sign-in?next=…` and the intended path rides along as the pending action;
+after the callback succeeds the user lands back where they started. Sign-out
+lives in a session bar rendered by both settings pages and returns to a public
+page only once the session is actually cleared, so a failed sign-out never looks
+like a completed one.
+
+The `IdentityAuthPort` deliberately exposes **no password credential method**.
+End-user sign-in is magic-link only, and a test pins the controller to exactly
+three entry points, so a password path cannot be added without failing the
+suite.
+
+The `next` parameter is sanitized before use. It must be a same-origin absolute
+path: protocol-relative (`//host`), backslash (`/\host`), absolute URLs,
+`javascript:` values, and control characters all fall back to
+`/settings/profile`, and a `next` pointing back into `/auth/*` is rejected so
+the flow cannot loop on itself.
+
+#### Never exchange the PKCE code explicitly
+
+This is the one trap in the flow. `createBrowserSupabaseClient` sets
+`detectSessionInUrl: true`, so `@supabase/auth-js` consumes the `?code=` on the
+callback URL during `getSession()` — it happens inside `_initialize()`. A PKCE
+code is **single use**, so an explicit `exchangeCodeForSession(code)` alongside
+that is a second attempt with an already-consumed code and fails every time.
+
+The callback therefore does two things and nothing more:
+
+1. Reject the callback outright when the provider redirects back with `error`,
+   `error_code`, or `error_description` parameters. Failing here first matters —
+   otherwise a stale local session can be mistaken for a successful sign-in on
+   an expired link.
+2. Otherwise resolve the outcome with `getSession()` and let the client library
+   own the exchange.
+
+If a deployment ever needs a different GoTrue link format, change this one
+place rather than adding a second exchange path.
+
+### Command boundary
+
+Migration 31 closes the write path. Browser roles lose `insert`, `update`,
+`delete`, and `truncate` on all five Identity tables, and a
+`reject_identity_ledger_mutation()` trigger backs the revoke. Every write goes
+through one of four mutation functions, granted to `authenticated` only:
+
+| Function | Purpose |
+| --- | --- |
+| `submit_update_profile(jsonb)` | Display name, avatar URL, timezone |
+| `submit_add_wallet_address(jsonb)` | Add an EVM address, default `hidden` |
+| `submit_set_wallet_address_visibility(jsonb)` | Publish or hide one address |
+| `submit_remove_wallet_address(jsonb)` | Remove one address |
+
+Reads go through four projections. `get_my_identity_profile()` and
+`list_my_wallet_addresses()` are `authenticated`-only;
+`get_public_identity_profile(uuid)` and
+`list_public_identity_wallet_addresses(uuid)` are granted to `anon` and
+`authenticated` and return only the D4-allowed fields. The public projection is
+a **separate schema**, not a filtered copy of the private row, so adding a
+column to the private row never publishes it by accident.
+
+### Four-role authorization matrix
+
+Verified by pgTAP `supabase/tests/021_phase_9_identity.test.sql` (91
+assertions) across `anon`, `authenticated`, `service_role`, and
+`ai_stage_worker`:
+
+| Surface | Anonymous | Owner | Other signed-in user | No session / expired |
+| --- | --- | --- | --- | --- |
+| Read own private rows | n/a | Allowed through the private read functions | n/a | Denied — `ID201` |
+| Read another user's private rows | Denied | Denied by RLS | Denied by RLS | Denied — `ID201` |
+| Write profile or addresses | Denied (`42501`) | Allowed through the four mutation functions | Denied for the other user's rows | Denied — `ID201` |
+| Direct table DML on the five ledger tables | Denied | Denied — revoked plus the rejection trigger | Denied | Denied |
+| Append to the event tables | Denied | Denied — only the commands append | Denied | Denied |
+| Public profile and public addresses | Allowed | Allowed | Allowed | Allowed |
+
+Expired and absent sessions are the same case to the database: PostgREST sees an
+anonymous caller and the BFF fails closed with `401` and `identity_session_required`
+instead of guessing an identity.
+
+### Stable error codes
+
+The API returns stable domain codes; never branch on human-readable text.
+
+| Code | Meaning | Typical operator action |
+| --- | --- | --- |
+| `identity_session_required` (`ID201`) | No valid session on the bearer token | Sign in again; the pending action is preserved |
+| `identity_profile_not_found` (`ID202`) | Profile row missing for this user | Trigger the D5 backstop, then reload |
+| `identity_address_invalid` (`ID203`) | Address failed the EVM format or chain check | Correct the value |
+| `identity_address_duplicate` (`ID204`) | The same address already exists for this user | Reuse the existing record |
+| `identity_address_limit_reached` (`ID205`) | Already at the D3 maximum of five | Remove one before adding |
+| `identity_version_conflict` (`ID206`) | `expectedVersion` is stale | Reload and re-confirm; never auto-adopt the new version |
+| `identity_idempotency_conflict` (`ID207`) | Same `Idempotency-Key` reused with a different body | Generate a fresh key |
+| `identity_command_invalid` (`ID208`) | Command failed contract or state validation | Fix the command payload |
+| `identity_persistence_failed` (`ID299`) | Transaction failed and rolled back | Retry once; if it persists, inspect the database logs |
+
+Query failures fall back to `identity_query_failed` and mutation failures to
+`identity_persistence_failed`; the two are never interchangeable.
+
+### Focused disposable acceptance commands
+
+```bash
+supabase test db supabase/tests/021_phase_9_identity.test.sql
+pnpm --filter @airdrop/database exec vitest run src/tests/identity-command-boundary.integration.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/identity-handlers.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/identity-api-client.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/identity-auth-flow.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/identity-settings-components.test.ts
+```
+
+The same fail-closed preflight as the earlier phases applies: confirm the remote
+work directory, project, database/Kong ports `64322`/`64321`, local tunnels
+`16432`/`16433`, the paused seed marker, and the migration, test, and seed hashes
+before any reset. Never target `airdrop-intelligence-os` or ports
+`54321`/`54322`. After an Identity run, the cleanup assertion must return the
+fixture ledger to its baseline with no residual profile events, wallet events,
+or outbox rows.
+
+### Append-only recovery
+
+Nothing in the Identity ledger is updated in place. Address removal keeps the
+event row with a forced `chain`/`address`/`version` snapshot, profile changes
+append to `identity_profile_events`, and every command writes a receipt and an
+outbox event in the same transaction. Do not delete receipt, event, or outbox
+rows and do not edit history rows to make a mistake disappear — the
+contradiction must stay visible. A corrected profile is a new version reached
+through `submit_update_profile`, never an edit of an old one.
+
+### Production exclusion and rollout gates
+
+Phase 9 is local/disposable-verified only. Migrations `20260903000200` (the
+Identity ledger) and `20260904000100` (the command boundary) are **not applied to
+production**, and this runbook authorizes no production operation.
+
+Before an Identity rollout can even be considered, all of the following must hold:
+
+1. **`GOTRUE_SITE_URL` points at the public origin.** It is currently
+   `http://127.0.0.1:3000`, which is the container's own view. Left unchanged,
+   every magic link sends the user back to their own machine and sign-in is
+   impossible.
+2. **SMTP is confirmed end to end** — `GOTRUE_EXTERNAL_EMAIL_ENABLED`,
+   `GOTRUE_MAILER_AUTOCONFIRM`, and `GOTRUE_SMTP_HOST` are set, and a real link
+   has been delivered.
+3. **The production Auth service is healthy** (`/auth/v1/health` returns 200).
+4. **A pre-migration backup exists and a restore has been rehearsed.**
+5. **Explicit authorization is granted once per migration**, never implied by
+   local success.
+
+Apply in order, one migration at a time, following the Phase 6A stdin pattern:
+
+```bash
+ssh … "docker exec -i supabase_db_airdrop-intelligence-os psql -U postgres -d postgres -v ON_ERROR_STOP=1" \
+  < supabase/migrations/20260903000200_phase_9_identity.sql
+ssh … "docker exec -i supabase_db_airdrop-intelligence-os psql -U postgres -d postgres -v ON_ERROR_STOP=1" \
+  < supabase/migrations/20260904000100_phase_9_identity_command_boundary.sql
+```
+
+Register each applied migration with a row in
+`supabase_migrations.schema_migrations(version, statements, name)`, then verify:
+the new tables exist and are empty, REST and Auth are healthy, both public
+projections return without error, and `auth.users` is intact.
+
+Deploying the web application remains a separate, still-outstanding item —
+production currently serves only the static site, so an applied migration alone
+does not put this flow in front of users.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
