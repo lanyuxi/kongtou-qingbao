@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 设计规范
 
-> 状态：**Approved（2026-09-03，所有者已采纳 D1–D6）**。Phase 9 Task 1 contracts、Task 2 database boundary 与 Task 3 repositories 均已完成；Task 3 通过 strict contract/repository RED、local mutation、no-reset disposable focused 5/5、full database integration 83/83 与最终 re-review 0/0/0，并提交 `5668e7c`。Task 4 BFF 为下一开发任务。migration 30/31 仍未应用生产。本规范只覆盖 AGENTS.md「Data ownership」中的 **Identity 域**（profiles、roles、public wallet addresses），为后续 Execution（任务管理）与 Notification 两域提供身份与私有行基础。
+> 状态：**Approved（2026-09-03，所有者已采纳 D1–D6）**。Phase 9 Task 1 contracts、Task 2 database boundary、Task 3 repositories 与 Task 4 BFF 均已完成；Task 4 通过 focused 38/38、web 446/446、auth/command mutation、Fix Round 1 与 scoped re-review，并提交 `aff2070`。下一开发任务为 Task 6 settings UI；Task 5 auth flow 仍需先确认生产 SMTP。migration 30/31 仍未应用生产。本规范只覆盖 AGENTS.md「Data ownership」中的 **Identity 域**（profiles、roles、public wallet addresses），为后续 Execution（任务管理）与 Notification 两域提供身份与私有行基础。
 
 ## 1. Goal
 

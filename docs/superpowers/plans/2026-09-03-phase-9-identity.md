@@ -1,6 +1,6 @@
 # Phase 9 Identity（用户认证与私有数据）— 实施计划
 
-> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已通过 RED/GREEN、local mutation、no-reset disposable focused/full integration 与最终 re-review，并提交 `5668e7c`。Task 4 BFF 为下一开发任务。migration 30/31 仍未应用生产。
+> 前置：规范 `docs/superpowers/specs/2026-09-03-phase-9-identity-private-data-design.md` 的 **D1–D6 已于 2026-09-03 获所有者采纳**。Task 2 已按 `docs/superpowers/plans/2026-09-04-phase-9-task-2-remediation.md` 完成并提交 `c990196`；Task 3 repositories 已提交 `5668e7c`；Task 4 BFF 已通过 RED/GREEN、local mutation、Fix Round 1 与 scoped re-review，并提交 `aff2070`。下一开发任务为 Task 6 settings UI；Task 5 auth flow 仍需先确认生产 SMTP。migration 30/31 仍未应用生产。
 >
 > 分支：`codex/phase-9-identity` / worktree `.worktrees/phase-9-identity`（沿用 7B/8 的分支惯例）。每个任务独立可测，验收通过后提交（AGENTS.md「Change workflow」）。
 
@@ -29,13 +29,13 @@
 - [x] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
 - [x] **Step 3: 文档 + 提交** `feat(database): add identity repositories`（`5668e7c`）
 
-## Task 4: BFF 路由与会话边界
+## Task 4: BFF 路由与会话边界（完成，`aff2070`）
 
 **Files:** `apps/web/src/app/api/v1/identity/*`、`lib/identity-handlers.ts` + 测试。
 
-- [ ] **Step 1: RED**——无会话 → `ID201`/401；他人资源 → 403/404（不泄漏存在性）；命令类回落 `_persistence_failed`，查询类 `_query_failed`；畸形游标 → `invalid_cursor`
-- [ ] **Step 2: GREEN + 变异**（认证优先于查询 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity bff`
+- [x] **Step 1: RED**——无会话 → `ID201`/401；他人资源 → 404（不泄漏存在性）；命令类回落 `_persistence_failed`，查询类 `_query_failed`；D3 上限 5 且无 Identity cursor contract，未知 query 按 `invalid_request` 拒绝
+- [x] **Step 2: GREEN + 变异**（profile/wallet collection/wallet item 认证优先级、四成功命令参数/回执与 verifier failure 三态均有 RED 证据）
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity bff`（`aff2070`）
 
 ## Task 5: 认证流程 UI（依赖 D1）
 
