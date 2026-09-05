@@ -1423,3 +1423,46 @@ td.num-col {
   color: var(--ink-400);
   font-size: 12.5px;
 }
+
+/* Identity authentication flow (Phase 9 Task 5) */
+
+.identity-auth-page {
+  max-width: 560px;
+}
+
+.identity-auth-safety {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.identity-auth-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.identity-session-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.identity-session-state {
+  color: var(--ink-500);
+  font-size: 13px;
+}
+
+.identity-session-bar .identity-message {
+  margin: 0;
+  flex: 1;
+}
