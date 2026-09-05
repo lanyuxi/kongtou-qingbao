@@ -45,13 +45,13 @@
 - [ ] **Step 2: GREEN + 变异**
 - [ ] **Step 3: 文档 + 提交** `feat(web): add identity auth flow`
 
-## Task 6: 设置 UI（profile 与钱包地址）
+## Task 6: 设置 UI（profile 与钱包地址，完成，`0b9d021`）
 
 **Files:** `/settings/profile`、`/settings/wallets` 页面与组件 + 测试。
 
-- [ ] **Step 1: RED**——越权字段不可提交；重复地址/上限/版本冲突展示稳定错误码（不按文案分支）；页面显著提示永不索取私钥
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add identity settings`
+- [x] **Step 1: RED**——越权字段不可提交；重复地址/上限/版本冲突展示稳定错误码（不按文案分支）；页面显著提示永不索取私钥
+- [x] **Step 2: GREEN + 变异**
+- [x] **Step 3: 文档 + 提交** `feat(web): add identity settings`（`0b9d021`）
 
 ## Task 7: 收口
 
