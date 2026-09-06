@@ -11,7 +11,7 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 
 | Task | 内容 | 状态 | 提交 / 证据 |
 |---|---|---|---|
-| 1 | 契约（`packages/contracts/src/execution/`） | ⬜ 未开始 | — |
+| 1 | 契约（`packages/contracts/src/execution/`） | ✅ 完成 | 四模块（enums / commands / projections / receipts）+ `src/tests/execution.test.ts` **42 PASS**；contracts 232→**274**；lint/typecheck/build 绿；fresh root verify **1,868 PASS / 84 gated skips**；**变异 9/9 killed**（密钥守卫中和→9 失败、strict 放宽、完成态不变式、标题/名称长度、控制字符、行级完成态不变式、幂等键边界、投影 strict）。**未访问数据库/远端/生产**。 |
 | 2 | 命令边界（迁移 32 + pgTAP 022 + 006 同步） | ⬜ 未开始 | — |
 | 3 | 仓储（task / watchlist / participation） | ⬜ 未开始 | — |
 | 4 | BFF 路由与会话边界 | ⬜ 未开始 | — |
@@ -61,4 +61,5 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 
 | 日期 | 事项 | 备注 |
 |---|---|---|
+| 2026-09-06 | Task 1 契约 COMPLETE | 分支 `codex/phase-10-execution` / worktree `.worktrees/phase-10-execution` 建于 `d126e51`（新 worktree 需 `pnpm install`，不继承主 worktree 依赖）。RED（module-missing 42 failed）→ GREEN **42 PASS** → lint/typecheck/build 绿 → fresh root verify **1,868 PASS / 84 gated skips**（contracts 232→274，其余四包不变）→ **变异 9/9 killed** → `diff` 校验还原干净。**两个中途修正**：①contracts 顶层共享 `src/enums.ts` 里**早已定义** `participationStatusSchema`/`taskStatusSchema`/`taskPrioritySchema`（与迁移 5 同值）——typecheck 报 Duplicate identifier 才暴露；按「只有共享声明才不漂移」的既有教训改为**从 `../enums.js` 再导出**，未做第二份声明，index.ts 相应去掉重复导出；②控制字符字面量再次把测试文件变 binary，改为 `\u0000`/`\u007f` 转义。**未访问数据库/远端/生产。** |
 | 2026-09-06 | 规范 + 计划 + 工作簿定稿，D1–D4 获所有者采纳 | 调研修正了初始假设：Execution 已有 schema 与 plan(228) 覆盖，本 Phase 是「硬化 + 建应用层」而非从零建表。规范据此重写了「Existing State」与「Risks」两节。未访问数据库/远端/生产。下一步建分支与 worktree，开始 Task 1 契约 RED。 |

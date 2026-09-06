@@ -45,6 +45,67 @@ export {
   type UpdateProfileReceipt,
 } from './identity/receipts.js';
 
+export {
+  ExecutionForbiddenFieldError,
+  addWatchlistProjectCommandSchema,
+  createTaskCommandSchema,
+  createWatchlistCommandSchema,
+  deleteTaskCommandSchema,
+  deleteWatchlistCommandSchema,
+  parseExecutionCommand,
+  removeWatchlistProjectCommandSchema,
+  renameWatchlistCommandSchema,
+  setParticipationStatusCommandSchema,
+  updateTaskCommandSchema,
+  type AddWatchlistProjectCommand,
+  type CreateTaskCommand,
+  type CreateWatchlistCommand,
+  type DeleteTaskCommand,
+  type DeleteWatchlistCommand,
+  type RemoveWatchlistProjectCommand,
+  type RenameWatchlistCommand,
+  type SetParticipationStatusCommand,
+  type UpdateTaskCommand,
+} from './execution/commands.js';
+export {
+  executionErrorCodeSchema,
+  findForbiddenExecutionKeys,
+  participationNotesSchema,
+  taskTitleSchema,
+  watchlistNameSchema,
+  type ExecutionErrorCode,
+} from './execution/enums.js';
+export {
+  userProjectParticipationRowSchema,
+  userTaskRowSchema,
+  watchlistProjectRowSchema,
+  watchlistRowSchema,
+  type UserProjectParticipationRow,
+  type UserTaskRow,
+  type WatchlistProjectRow,
+  type WatchlistRow,
+} from './execution/projections.js';
+export {
+  addWatchlistProjectReceiptSchema,
+  createTaskReceiptSchema,
+  createWatchlistReceiptSchema,
+  deleteTaskReceiptSchema,
+  deleteWatchlistReceiptSchema,
+  removeWatchlistProjectReceiptSchema,
+  renameWatchlistReceiptSchema,
+  setParticipationStatusReceiptSchema,
+  updateTaskReceiptSchema,
+  type AddWatchlistProjectReceipt,
+  type CreateTaskReceipt,
+  type CreateWatchlistReceipt,
+  type DeleteTaskReceipt,
+  type DeleteWatchlistReceipt,
+  type RemoveWatchlistProjectReceipt,
+  type RenameWatchlistReceipt,
+  type SetParticipationStatusReceipt,
+  type UpdateTaskReceipt,
+} from './execution/receipts.js';
+
 export { apiErrorSchema, createApiSuccessSchema } from './api/envelope.js';
 export type { ApiError, ApiSuccess } from './api/envelope.js';
 export {

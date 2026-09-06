@@ -15,9 +15,9 @@
 
 **Files:** `packages/contracts/src/execution/{enums,commands,projections,receipts}.ts` + 测试，index 导出。
 
-- [ ] **Step 1: RED**——strict 命令/投影/回执（`additionalProperties: false`）；枚举只允许数据库既有字面量；任务标题去空白与长度边界；`completed` 与 `completed_at` 必须自洽；**任何越权字段一律拒绝**（不静默丢弃）
-- [ ] **Step 2: GREEN + lint/typecheck + 变异**（密钥形似字段未被拒 → 用例失败；strict 放宽 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(contracts): add execution contracts`
+- [x] **Step 1: RED**——strict 命令/投影/回执（`additionalProperties: false`）；枚举只允许数据库既有字面量；任务标题去空白与长度边界；`completed` 与 `completed_at` 必须自洽；**任何越权字段一律拒绝**（不静默丢弃）
+- [x] **Step 2: GREEN + lint/typecheck + 变异**（密钥形似字段未被拒 → 用例失败；strict 放宽 → 用例失败）——**变异 9/9 killed**
+- [x] **Step 3: 文档 + 提交** `feat(contracts): add execution contracts`
 
 ## Task 2: 命令边界（迁移 32 + pgTAP 022）
 
