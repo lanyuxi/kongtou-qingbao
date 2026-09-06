@@ -27,7 +27,7 @@ select ok(
 select columns_are(
   'public',
   'watchlists',
-  array['id', 'user_id', 'name', 'is_default', 'created_at', 'updated_at'],
+  array['id', 'user_id', 'name', 'is_default', 'created_at', 'updated_at', 'version'],
   'watchlists exposes the private execution contract columns in order'
 );
 select columns_are(
@@ -39,7 +39,7 @@ select columns_are(
 select columns_are(
   'public',
   'user_projects',
-  array['user_id', 'project_id', 'participation_status', 'notes', 'started_at', 'updated_at'],
+  array['user_id', 'project_id', 'participation_status', 'notes', 'started_at', 'updated_at', 'version'],
   'user_projects exposes the private execution contract columns in order'
 );
 select columns_are(
@@ -405,10 +405,10 @@ select ok(
   'only authenticated browser users can execute the versioned task command'
 );
 select ok(
-  has_table_privilege('authenticated', 'public.watchlists', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.watchlist_projects', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.user_projects', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.user_tasks', 'SELECT,DELETE')
+  has_table_privilege('authenticated', 'public.watchlists', 'SELECT')
+    and has_table_privilege('authenticated', 'public.watchlist_projects', 'SELECT')
+    and has_table_privilege('authenticated', 'public.user_projects', 'SELECT')
+    and has_table_privilege('authenticated', 'public.user_tasks', 'SELECT')
     and not has_table_privilege('anon', 'public.watchlists', 'SELECT,INSERT,UPDATE,DELETE')
     and not has_table_privilege('anon', 'public.watchlist_projects', 'SELECT,INSERT,UPDATE,DELETE')
     and not has_table_privilege('anon', 'public.user_projects', 'SELECT,INSERT,UPDATE,DELETE')
@@ -420,23 +420,20 @@ select ok(
   'table grants expose private execution records only to authenticated owners subject to RLS'
 );
 select ok(
-  has_column_privilege('authenticated', 'public.watchlists', 'user_id', 'INSERT')
-    and has_column_privilege('authenticated', 'public.watchlists', 'name', 'UPDATE')
-    and not has_column_privilege('authenticated', 'public.watchlists', 'user_id', 'UPDATE')
-    and has_column_privilege('authenticated', 'public.user_projects', 'user_id', 'INSERT')
-    and has_column_privilege('authenticated', 'public.user_projects', 'notes', 'UPDATE')
-    and not has_column_privilege('authenticated', 'public.user_projects', 'user_id', 'UPDATE')
-    and has_column_privilege('authenticated', 'public.user_tasks', 'user_id', 'INSERT')
-    and not has_any_column_privilege('authenticated', 'public.user_tasks', 'UPDATE'),
-  'column grants keep ownership immutable and close direct task updates'
+  has_table_privilege('authenticated', 'public.watchlists', 'SELECT')
+    and not has_any_column_privilege('authenticated', 'public.watchlists', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.user_projects', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.user_tasks', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.watchlist_projects', 'INSERT,UPDATE'),
+  'commands own every write, so authenticated holds read-only grants on execution tables'
 );
 
 with expected(table_name, privilege_vector) as (
   values
-    ('watchlists', 't|f|f|t|f|f|f'),
-    ('watchlist_projects', 't|f|f|t|f|f|f'),
-    ('user_projects', 't|f|f|t|f|f|f'),
-    ('user_tasks', 't|f|f|t|f|f|f')
+    ('watchlists', 't|f|f|f|f|f|f'),
+    ('watchlist_projects', 't|f|f|f|f|f|f'),
+    ('user_projects', 't|f|f|f|f|f|f'),
+    ('user_tasks', 't|f|f|f|f|f|f')
 )
 select is(
   pg_catalog.format(

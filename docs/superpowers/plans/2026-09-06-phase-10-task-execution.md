@@ -23,10 +23,11 @@
 
 **Files:** `supabase/migrations/20260906000100_phase_10_execution_command_boundary.sql`、`supabase/tests/022_phase_10_execution.test.sql`，并同步 `006` 策略目录。
 
-- [ ] **Step 1: RED**——先写 022 的四角色矩阵、命令幂等与精确 replay、版本冲突、上限与重名、追加式事件不可变、outbox 与状态同事务、浏览器直写被拒绝；在**当前 schema**上取得有效失败证据
-- [ ] **Step 2: GREEN**——迁移 32：`user_task_events` + `execution_command_receipts` 两表、四表 revoke 直写 + 拒绝触发器、九个受保护命令、四个只读 RPC、默认关注列表触发器、outbox 事件；`update_user_task` 保留既有校验顺序，在其后补回执/历史/outbox
-- [ ] **Step 3: 同步 pgTAP 006 策略目录三份名单**
-- [ ] **Step 4: 文档 + 提交** `feat(db): add execution command boundary`
+- [x] **Step 1: RED**——先写 022 的四角色矩阵、命令幂等与精确 replay、版本冲突、上限与重名、追加式事件不可变、outbox 与状态同事务、浏览器直写被拒绝；在**当前 schema**上取得有效失败证据
+  - **注：本机无 Docker/Postgres，RED 无法在本地取得**；022 已按 plan(72) 写就，须在 disposable 上先验证「当前 schema 下 72 断言全红」再应用迁移
+- [ ] **Step 2: GREEN**——迁移 32 已写就（2 新表、四表+两新表 revoke 直写、9 命令、4 只读 RPC、默认列表触发器、outbox 扩展）；**待 disposable 验证**
+- [x] **Step 3: 同步 pgTAP 006 策略目录三份名单**——目录加 `user_task_events_select_owner`；005 两处 `columns_are` 与授权断言更新为新契约（authenticated 只读）
+- [ ] **Step 4: 文档 + 提交** `feat(db): add execution command boundary`（DB 验证通过后再提交）
 
 ## Task 3: 仓储（`packages/database/src/execution/`）
 

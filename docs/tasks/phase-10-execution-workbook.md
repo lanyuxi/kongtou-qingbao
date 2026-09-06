@@ -12,7 +12,7 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 | Task | 内容 | 状态 | 提交 / 证据 |
 |---|---|---|---|
 | 1 | 契约（`packages/contracts/src/execution/`） | ✅ 完成 | 四模块（enums / commands / projections / receipts）+ `src/tests/execution.test.ts` **42 PASS**；contracts 232→**274**；lint/typecheck/build 绿；fresh root verify **1,868 PASS / 84 gated skips**；**变异 9/9 killed**（密钥守卫中和→9 失败、strict 放宽、完成态不变式、标题/名称长度、控制字符、行级完成态不变式、幂等键边界、投影 strict）。**未访问数据库/远端/生产**。 |
-| 2 | 命令边界（迁移 32 + pgTAP 022 + 006 同步） | ⬜ 未开始 | — |
+| 2 | 命令边界（迁移 32 + pgTAP 022 + 006 同步） | 🟠 代码完成，**DB 验证待授权** | 迁移 32（1,589 行：2 新表 + 四表 revoke 直写 + 拒绝触发器 + 9 命令 + 4 只读 RPC + 默认列表触发器 + outbox 扩展）+ pgTAP 022（**plan(72)**）+ **006 同步** + **005 契约更新**。**本机无 Docker/Postgres，SQL 未执行**，见下方日志详述 |
 | 3 | 仓储（task / watchlist / participation） | ⬜ 未开始 | — |
 | 4 | BFF 路由与会话边界 | ⬜ 未开始 | — |
 | 5 | 任务 UI（`/tasks`） | ⬜ 未开始 | — |
@@ -61,5 +61,6 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 
 | 日期 | 事项 | 备注 |
 |---|---|---|
+| 2026-09-06 | Task 2 代码完成，**SQL 未执行，DB 验证待所有者授权** | ①**本机无 Docker 也无 Postgres**（此前误把 `docker ps 2>/dev/null` 的空输出当成「无容器」），`pnpm db:start` 失败 → 本地 pgTAP 不可行，DB 验证必须走 disposable（需授权）。②迁移 32 写完：`user_task_events` + `execution_command_receipts`、四表 + 两新表 revoke `insert/update/delete/truncate`（角色清单与迁移 31 逐字对齐）、9 个 receipt-first 命令、4 个只读 RPC、profile 触发器自动建「默认关注」（幂等 `on conflict`）、outbox 按迁移 31 的「读旧约束表达式再 OR 并」模式扩展四类事件。③pgTAP 022 **plan(72)**：形态/函数面/ACL、无会话 EX201、直写 42501、命令全流程（创建→replay→幂等冲突→版本冲突→未知字段→半完成态）、material 与 no-op 更新、列表重名/默认列表保护/20 上限、跨用户不可达、历史与回执 55000 不可变、自清理。④**同步 006**：目录新增 `user_task_events_select_owner`（按 C 排序落在 user_tasks 之前）、service_role 无私有读名单加两新表。⑤**005 契约更新（非削弱）**：`columns_are` 两处补 `version`；列级授权断言与精确 ACL 向量改为「authenticated 只读」——迁移 32 把 DELETE 也 revoke 了，而 005 原本断言 authenticated **有** `SELECT,DELETE`，这正是 D1 要收紧的旧契约。断言数仍为 228。**风险声明：1,589 行 SQL 与 72 断言均未在真实 PostgreSQL 上跑过**，Phase 9 迁移 31 在有真实库反馈的情况下仍经历了修复轮，本迁移需在 disposable 上按 RED→应用→修复→GREEN 推进。**未访问数据库/远端/生产。** |
 | 2026-09-06 | Task 1 契约 COMPLETE | 分支 `codex/phase-10-execution` / worktree `.worktrees/phase-10-execution` 建于 `d126e51`（新 worktree 需 `pnpm install`，不继承主 worktree 依赖）。RED（module-missing 42 failed）→ GREEN **42 PASS** → lint/typecheck/build 绿 → fresh root verify **1,868 PASS / 84 gated skips**（contracts 232→274，其余四包不变）→ **变异 9/9 killed** → `diff` 校验还原干净。**两个中途修正**：①contracts 顶层共享 `src/enums.ts` 里**早已定义** `participationStatusSchema`/`taskStatusSchema`/`taskPrioritySchema`（与迁移 5 同值）——typecheck 报 Duplicate identifier 才暴露；按「只有共享声明才不漂移」的既有教训改为**从 `../enums.js` 再导出**，未做第二份声明，index.ts 相应去掉重复导出；②控制字符字面量再次把测试文件变 binary，改为 `\u0000`/`\u007f` 转义。**未访问数据库/远端/生产。** |
 | 2026-09-06 | 规范 + 计划 + 工作簿定稿，D1–D4 获所有者采纳 | 调研修正了初始假设：Execution 已有 schema 与 plan(228) 覆盖，本 Phase 是「硬化 + 建应用层」而非从零建表。规范据此重写了「Existing State」与「Risks」两节。未访问数据库/远端/生产。下一步建分支与 worktree，开始 Task 1 契约 RED。 |

@@ -113,6 +113,7 @@ select results_eq(
       ('user_projects'::text, 'user_projects_select_authenticated'::text),
       ('user_projects'::text, 'user_projects_update_authenticated'::text),
       ('user_roles'::text, 'user_roles_select_authenticated'::text),
+      ('user_task_events'::text, 'user_task_events_select_owner'::text),
       ('user_tasks'::text, 'user_tasks_delete_authenticated'::text),
       ('user_tasks'::text, 'user_tasks_insert_authenticated'::text),
       ('user_tasks'::text, 'user_tasks_select_authenticated'::text),
@@ -429,7 +430,8 @@ select ok(
   pg_catalog.format('service role has no private support read on %s', expected.table_name)
 )
 from (
-  values ('watchlists'), ('watchlist_projects'), ('user_projects'), ('user_tasks')
+  values ('watchlists'), ('watchlist_projects'), ('user_projects'), ('user_tasks'),
+    ('user_task_events'), ('execution_command_receipts')
 ) as expected(table_name);
 
 select ok(
