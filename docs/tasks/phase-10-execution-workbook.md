@@ -12,7 +12,7 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 | Task | 内容 | 状态 | 提交 / 证据 |
 |---|---|---|---|
 | 1 | 契约（`packages/contracts/src/execution/`） | ✅ 完成 | 四模块（enums / commands / projections / receipts）+ `src/tests/execution.test.ts` **42 PASS**；contracts 232→**274**；lint/typecheck/build 绿；fresh root verify **1,868 PASS / 84 gated skips**；**变异 9/9 killed**（密钥守卫中和→9 失败、strict 放宽、完成态不变式、标题/名称长度、控制字符、行级完成态不变式、幂等键边界、投影 strict）。**未访问数据库/远端/生产**。 |
-| 2 | 命令边界（迁移 32 + pgTAP 022 + 006 同步） | 🟠 GREEN 达成，干净 reset 复验中 | 迁移 32（1,589 行）+ pgTAP 022（**plan(68)** 68/68）+ 005（**230/230**）+ 006（**83/83**）；全套 pgTAP **22 files / 1,725 断言 / 0 失败 / 无 Bad plan**。见下方日志：7 个真实缺陷已修 |
+| 2 | 命令边界（迁移 32 + pgTAP 022 + 005/006 同步） | ✅ 完成 | 迁移 32（1,589 行）+ pgTAP 022（**68/68**）+ 005（**230/230**）+ 006（**83/83**）；**干净 reset 从零应用后全套 pgTAP 22 files / 1,725 断言 / 0 失败 / 无 Bad plan**；残留核验零残留、日志已清理。提交 `6ecd82a` + `ce8da3b`。7 个真实缺陷见下方段落 |
 | 3 | 仓储（task / watchlist / participation） | ⬜ 未开始 | — |
 | 4 | BFF 路由与会话边界 | ⬜ 未开始 | — |
 | 5 | 任务 UI（`/tasks`） | ⬜ 未开始 | — |
