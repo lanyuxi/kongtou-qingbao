@@ -30,7 +30,7 @@ create table public.user_task_events (
   priority public.task_priority not null,
   occurred_at timestamptz not null,
   constraint user_task_events_type_valid check (
-    event_type in ('created', 'updated', 'deleted')
+    event_type in ('created', 'updated', 'deleted', 'status_changed')
   ),
   constraint user_task_events_version_positive check (task_version > 0)
 );
@@ -50,6 +50,8 @@ comment on policy user_task_events_select_owner
 on public.user_task_events is
   'A user may read their own task history; nothing else may touch this table.';
 
+grant select on table public.user_task_events to authenticated;
+
 -- No write policy: only the protected commands below may append, and they run
 -- as the owner.
 
@@ -58,6 +60,10 @@ create table public.execution_command_receipts (
   command text not null,
   user_id uuid not null,
   response jsonb not null,
+  id uuid not null default extensions.gen_random_uuid(),
+  input_hash text null,
+  expected_version bigint null,
+  resulting_version bigint null,
   created_at timestamptz not null default pg_catalog.transaction_timestamp(),
   constraint execution_command_receipts_pkey primary key (command, user_id, idempotency_key)
 );
@@ -183,13 +189,8 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(
-      pg_catalog.format('create_task|%s|%s', v_user_id, 'payload'), 'sha256'
-    ),
-    'hex'
-  ) || extensions.encode(
-    extensions.digest(p_payload::text, 'sha256'), 'hex'
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'create_task', 'payload', p_payload)
   );
 
   perform pg_catalog.pg_advisory_xact_lock(
@@ -265,11 +266,7 @@ begin
       'aggregateVersion', 1,
       'occurredAt', pg_catalog.to_char(
         v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-      ),
-      'userId', v_user_id,
-      'title', p_payload ->> 'title',
-      'status', v_status::text,
-      'priority', v_priority::text
+      )
     ),
     v_now
   );
@@ -360,13 +357,8 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(
-      pg_catalog.format('update_task|%s', v_user_id), 'sha256'
-    ),
-    'hex'
-  ) || extensions.encode(
-    extensions.digest(p_payload::text, 'sha256'), 'hex'
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'update_task', 'payload', p_payload)
   );
 
   perform pg_catalog.pg_advisory_xact_lock(
@@ -433,9 +425,10 @@ begin
     v_next_completed_at := v_task.completed_at;
   end if;
 
-  if (p_payload ->> 'status')::public.task_status is not null
-    and v_next_status <> 'completed'
-    and v_next_completed_at is not null
+  if p_payload ->> 'status' is not null
+    and (
+      (v_next_status = 'completed') <> (v_next_completed_at is not null)
+    )
   then
     raise exception 'execution_command_invalid' using errcode = 'EX211';
   end if;
@@ -512,10 +505,7 @@ begin
       'aggregateVersion', v_next_version,
       'occurredAt', pg_catalog.to_char(
         v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-      ),
-      'userId', v_user_id,
-      'status', v_next_status::text,
-      'priority', v_next_priority::text
+      )
     ),
     v_now
   );
@@ -570,9 +560,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('delete_task|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'delete_task', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':delete_task:' || v_key, 0)
@@ -634,8 +624,7 @@ begin
       'aggregateVersion', v_task.version,
       'occurredAt', pg_catalog.to_char(
         v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-      ),
-      'userId', v_user_id
+      )
     ),
     v_now
   );
@@ -698,9 +687,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('create_watchlist|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'create_watchlist', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':create_watchlist:' || v_key, 0)
@@ -801,9 +790,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('rename_watchlist|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'rename_watchlist', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':rename_watchlist:' || v_key, 0)
@@ -909,9 +898,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('delete_watchlist|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'delete_watchlist', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':delete_watchlist:' || v_key, 0)
@@ -1009,9 +998,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('add_watchlist_project|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'add_watchlist_project', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':add_watchlist_project:' || v_key, 0)
@@ -1093,9 +1082,7 @@ begin
       'aggregateVersion', v_next_version,
       'occurredAt', pg_catalog.to_char(
         v_now at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'
-      ),
-      'userId', v_user_id,
-      'projectId', p_payload ->> 'projectId'
+      )
     ),
     v_now
   );
@@ -1152,9 +1139,9 @@ begin
   end if;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('remove_watchlist_project|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'remove_watchlist_project', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':remove_watchlist_project:' || v_key, 0)
@@ -1280,9 +1267,9 @@ begin
   end;
 
   v_key := p_payload ->> 'idempotencyKey';
-  v_input_hash := extensions.encode(
-    extensions.digest(pg_catalog.format('set_participation_status|%s', v_user_id), 'sha256'), 'hex'
-  ) || extensions.encode(extensions.digest(p_payload::text, 'sha256'), 'hex');
+  v_input_hash := public.security_command_input_hash_v1(
+    pg_catalog.jsonb_build_object('operation', 'set_participation_status', 'payload', p_payload)
+  );
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(v_user_id::text || ':set_participation_status:' || v_key, 0)

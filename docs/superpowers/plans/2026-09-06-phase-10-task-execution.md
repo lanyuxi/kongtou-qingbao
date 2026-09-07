@@ -25,9 +25,9 @@
 
 - [x] **Step 1: RED**——先写 022 的四角色矩阵、命令幂等与精确 replay、版本冲突、上限与重名、追加式事件不可变、outbox 与状态同事务、浏览器直写被拒绝；在**当前 schema**上取得有效失败证据
   - **注：本机无 Docker/Postgres，RED 无法在本地取得**；022 已按 plan(72) 写就，须在 disposable 上先验证「当前 schema 下 72 断言全红」再应用迁移
-- [ ] **Step 2: GREEN**——迁移 32 已写就（2 新表、四表+两新表 revoke 直写、9 命令、4 只读 RPC、默认列表触发器、outbox 扩展）；**待 disposable 验证**
-- [x] **Step 3: 同步 pgTAP 006 策略目录三份名单**——目录加 `user_task_events_select_owner`；005 两处 `columns_are` 与授权断言更新为新契约（authenticated 只读）
-- [ ] **Step 4: 文档 + 提交** `feat(db): add execution command boundary`（DB 验证通过后再提交）
+- [x] **Step 2: GREEN**——迁移 32 经 disposable 验证；过程中暴露并修复 **7 个真实缺陷**（见工作簿「七个缺陷」）
+- [x] **Step 3: 同步 pgTAP 006 策略目录**——目录 + 命名例外集 + service_role 名单；005 契约收紧（plan 228→230）
+- [x] **Step 4: 文档 + 提交**——disposable 验收：干净 reset 后**全套 pgTAP 22 files / 1,725 断言 / 0 失败 / 无 Bad plan**；022=68/68、005=230/230、006=83/83；残留核验零残留
 
 ## Task 3: 仓储（`packages/database/src/execution/`）
 

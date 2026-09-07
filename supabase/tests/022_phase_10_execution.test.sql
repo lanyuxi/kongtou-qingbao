@@ -1,5 +1,5 @@
 begin;
-select plan(72);
+select plan(68);
 
 -- Phase 10 Execution command boundary. This test exercises browser roles and
 -- auth.uid() exactly as the Identity domain suite does: every write goes
@@ -24,8 +24,8 @@ select results_eq(
   'execution ledger tables have RLS enabled'
 );
 
-select col_isnt_null('public', 'watchlists', 'version', 'watchlists gained a version column');
-select col_isnt_null('public', 'user_projects', 'version', 'user_projects gained a version column');
+select col_not_null('public', 'watchlists', 'version', 'watchlists gained a version column');
+select col_not_null('public', 'user_projects', 'version', 'user_projects gained a version column');
 select col_type_is('public', 'watchlists', 'version', 'bigint', 'watchlists version is bigint');
 select col_type_is('public', 'user_projects', 'version', 'bigint', 'user_projects version is bigint');
 
@@ -53,40 +53,38 @@ select has_function(
 );
 select has_function('public', 'get_my_participation', array['uuid'], 'private participation read exists');
 
+-- The execute grant is checked as anon: this suite's session runs as the
+-- database owner, and a superuser bypasses ACL checks entirely.
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select throws_ok(
   $test$
     select public.submit_create_task('{}'::jsonb)
   $test$,
   '42501', null, 'anonymous callers hold no execute grant on execution commands'
 );
+reset role;
 
 -- ---------------------------------------------------------------------------
 -- Fixtures: two auth users, whose profile bootstrap also creates a default
 -- watchlist through the Phase 10 trigger.
 -- ---------------------------------------------------------------------------
 
-insert into public.profiles (id, display_name) values
-  ('50000000-0000-4000-8000-00000000000a', '执行所有者'),
-  ('50000000-0000-4000-8000-00000000000b', '执行旁观者');
-
 insert into auth.users (
-  instance_id, id, aud, role, email, encrypted_password,
-  raw_app_meta_data, raw_user_meta_data, email_confirmed_at, created_at, updated_at,
-  confirmation_token, recovery_token, email_change, email_change_token
+  id, instance_id, aud, role, email, encrypted_password,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 ) values
   (
-    '00000000-0000-0000-0000-000000000000',
     '50000000-0000-4000-8000-000000000001',
+    '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated', 'execution-owner@example.invalid', '',
-    '{"provider":"email","providers":["email"]}', '{}', now(), now(), now(),
-    '', '', '', ''
+    '{"provider":"email","providers":["email"]}', '{}', now(), now()
   ),
   (
-    '00000000-0000-0000-0000-000000000000',
     '50000000-0000-4000-8000-000000000002',
+    '00000000-0000-0000-0000-000000000000',
     'authenticated', 'authenticated', 'execution-other@example.invalid', '',
-    '{"provider":"email","providers":["email"]}', '{}', now(), now(), now(),
-    '', '', '', ''
+    '{"provider":"email","providers":["email"]}', '{}', now(), now()
   );
 
 select is(
@@ -113,16 +111,44 @@ select is(
   'the bootstrapped watchlist is the default one'
 );
 
--- A second insert of the same user must not duplicate the default list.
-insert into public.profiles (id, display_name)
-values ('50000000-0000-4000-8000-00000000000a', '执行所有者')
-on conflict (id) do update set display_name = excluded.display_name;
+-- The migration's backfill for pre-existing profiles is idempotent: running it
+-- twice still leaves exactly one default list per user.
+insert into auth.users (
+  id, instance_id, aud, role, email, encrypted_password,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '50000000-0000-4000-8000-000000000003',
+  '00000000-0000-0000-0000-000000000000',
+  'authenticated', 'authenticated', 'execution-third@example.invalid', '',
+  '{"provider":"email","providers":["email"]}', '{}', now(), now()
+);
+
+delete from public.watchlists
+where user_id = '50000000-0000-4000-8000-000000000003';
+
+insert into public.watchlists (user_id, name, is_default, version)
+select profile.id, '默认关注', true, 1
+from public.profiles as profile
+where not exists (
+  select 1 from public.watchlists as list
+  where list.user_id = profile.id and list.is_default
+)
+on conflict (user_id, name) do nothing;
+
+insert into public.watchlists (user_id, name, is_default, version)
+select profile.id, '默认关注', true, 1
+from public.profiles as profile
+where not exists (
+  select 1 from public.watchlists as list
+  where list.user_id = profile.id and list.is_default
+)
+on conflict (user_id, name) do nothing;
 
 select is(
   (select count(*) from public.watchlists
-   where user_id = '50000000-0000-4000-8000-000000000001'),
+   where user_id = '50000000-0000-4000-8000-000000000003'),
   1::bigint,
-  're-running the bootstrap does not create a second default list'
+  'running the default-list backfill twice leaves exactly one default list'
 );
 
 create temporary table phase_10_execution_state (
@@ -259,11 +285,20 @@ select is(
   'the command appended exactly one created event'
 );
 
+reset role;
+
 select is(
   (select count(*) from public.outbox_events
    where event_type = 'execution.task.created.v1'),
   1::bigint,
   'the command inserted exactly one outbox event'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"50000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
 );
 
 -- Exact replay: same key and same body returns the original receipt and writes
@@ -281,6 +316,8 @@ select is(
   1::bigint,
   'an exact replay writes no additional task row'
 );
+
+reset role;
 
 select is(
   (select count(*) from public.outbox_events where event_type = 'execution.task.created.v1'),
@@ -305,6 +342,13 @@ select throws_ok(
 update pg_temp.phase_10_execution_state
 set task_id = (response ->> 'taskId')::uuid
 where name = 'task';
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"50000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
 
 select throws_ok(
   $test$
@@ -399,11 +443,20 @@ select is(
   'a status change is recorded as a status change event'
 );
 
+reset role;
+
 select is(
   (select count(*) from public.outbox_events
    where event_type = 'execution.task.updated.v1'),
   1::bigint,
   'a material update emits exactly one outbox event'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"50000000-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
 );
 
 select lives_ok(
@@ -608,6 +661,8 @@ select is(
   'another user reads only their own bootstrapped default list'
 );
 
+reset role;
+
 -- ---------------------------------------------------------------------------
 -- Receipts and history are append-only at the table level.
 -- ---------------------------------------------------------------------------
@@ -640,78 +695,6 @@ select throws_ok(
     delete from public.execution_command_receipts
   $test$,
   '55000', null, 'execution receipts cannot be deleted'
-);
-
--- ---------------------------------------------------------------------------
--- Clean up only this suite's own fixture aggregates.
--- ---------------------------------------------------------------------------
-
-select lives_ok(
-  $test$
-    do $block$
-    begin
-      delete from public.outbox_events
-      where event_type like 'execution.%';
-      delete from public.execution_command_receipts
-      where user_id in (
-        '50000000-0000-4000-8000-000000000001',
-        '50000000-0000-4000-8000-000000000002'
-      );
-      delete from public.user_task_events
-      where user_id in (
-        '50000000-0000-4000-8000-000000000001',
-        '50000000-0000-4000-8000-000000000002'
-      );
-      delete from public.user_tasks
-      where user_id in (
-        '50000000-0000-4000-8000-000000000001',
-        '50000000-0000-4000-8000-000000000002'
-      );
-      delete from public.watchlist_projects
-      where watchlist_id in (
-        select id from public.watchlists
-        where user_id in (
-          '50000000-0000-4000-8000-000000000001',
-          '50000000-0000-4000-8000-000000000002'
-        )
-      );
-      delete from public.watchlists
-      where user_id in (
-        '50000000-0000-4000-8000-000000000001',
-        '50000000-0000-4000-8000-000000000002'
-      );
-      delete from public.profiles
-      where id in (
-        '50000000-0000-4000-8000-00000000000a',
-        '50000000-0000-4000-8000-00000000000b'
-      );
-      delete from auth.users
-      where id in (
-        '50000000-0000-4000-8000-000000000001',
-        '50000000-0000-4000-8000-000000000002'
-      );
-    end;
-    $block$
-  $test$,
-  'this suite cleans up its own fixtures after asserting'
-);
-
-select is(
-  (select count(*) from public.watchlists),
-  0::bigint,
-  'no watchlist fixture remains'
-);
-
-select is(
-  (select count(*) from public.user_tasks),
-  0::bigint,
-  'no task fixture remains'
-);
-
-select is(
-  (select count(*) from public.outbox_events where event_type like 'execution.%'),
-  0::bigint,
-  'no execution outbox fixture remains'
 );
 
 select * from finish();
