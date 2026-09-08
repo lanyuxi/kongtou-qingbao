@@ -19,6 +19,7 @@ import {
 } from '../../../components/project-score-evidence.js';
 import { ProjectSecurityBanner } from '../../../components/security-elements.js';
 import { TutorialCardList } from '../../../components/tutorial/public-tutorial.js';
+import { ProjectExecutionSection } from '../../../components/execution/project-execution-panel.js';
 import { loadProjectDetail } from '../../../lib/opportunity-queries.js';
 
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,8 @@ export default async function ProjectDetailPage({
       </div>
 
       <ProjectSecurityBanner state={security} />
+
+      <ProjectExecutionSection projectId={project.projectId} />
 
       {hasReferences && !historical ? (
         <section className="card detail-section">

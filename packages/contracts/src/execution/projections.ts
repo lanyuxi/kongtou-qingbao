@@ -53,6 +53,12 @@ export const userProjectParticipationRowSchema = z.strictObject({
   notes: participationNotesSchema,
   startedAt: z.iso.datetime({ offset: true }).nullable(),
   updatedAt: z.string(),
+  /**
+   * The optimistic-lock version of the participation row. The set command
+   * requires it (fresh rows accept 1, existing rows must match), so the
+   * projection has to hand it back or no second update could ever be built.
+   */
+  version: z.number().int().min(1),
 });
 
 export type UserTaskRow = z.infer<typeof userTaskRowSchema>;

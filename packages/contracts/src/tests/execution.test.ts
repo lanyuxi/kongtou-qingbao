@@ -23,6 +23,7 @@ import {
   watchlistNameSchema,
 } from '../execution/enums.js';
 import {
+  userProjectParticipationRowSchema,
   userTaskRowSchema,
   watchlistProjectRowSchema,
   watchlistRowSchema,
@@ -294,6 +295,21 @@ describe('execution projections stay closed', () => {
     };
     expect(watchlistProjectRowSchema.parse(row)).toEqual(row);
     expect(watchlistProjectRowSchema.safeParse({ ...row, notes: 'x' }).success).toBe(false);
+  });
+
+  it('carries the optimistic-lock version on a participation row', () => {
+    const row = {
+      projectId,
+      participationStatus: 'participating',
+      notes: null,
+      startedAt: '2026-09-06T09:00:00.000Z',
+      updatedAt: '2026-09-06T09:00:00.000Z',
+      version: 1,
+    };
+    expect(userProjectParticipationRowSchema.parse(row)).toEqual(row);
+    expect(userProjectParticipationRowSchema.safeParse({ ...row, version: 0 }).success).toBe(false);
+    expect(userProjectParticipationRowSchema.safeParse({ ...row, ownerEmail: 'a@b.test' }).success)
+      .toBe(false);
   });
 });
 

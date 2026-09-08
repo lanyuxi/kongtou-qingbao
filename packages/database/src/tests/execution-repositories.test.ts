@@ -51,6 +51,7 @@ const participationRow = {
   notes: null,
   startedAt: '2026-09-06T09:00:00.000Z',
   updatedAt: '2026-09-06T09:00:00.000Z',
+  version: 1,
 };
 
 const createTaskCommand = {

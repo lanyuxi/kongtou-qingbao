@@ -60,6 +60,15 @@ function apiClient(options: {
         ? { ok: false, code: options.failWith as never }
         : { ok: true, data: { version: 1, commandId: taskId, replayed: false, taskId, taskVersion: 2 } }
     ),
+    listWatchlists: async () => ({ ok: true, data: [] }),
+    listWatchlistProjects: async () => ({ ok: true, data: [] }),
+    createWatchlist: async () => ({ ok: false, code: 'execution_command_invalid' }),
+    renameWatchlist: async () => ({ ok: false, code: 'execution_command_invalid' }),
+    removeWatchlist: async () => ({ ok: false, code: 'execution_command_invalid' }),
+    addWatchlistProject: async () => ({ ok: false, code: 'execution_command_invalid' }),
+    removeWatchlistProject: async () => ({ ok: false, code: 'execution_command_invalid' }),
+    getParticipation: async () => ({ ok: false, code: 'execution_project_not_found' }),
+    setParticipation: async () => ({ ok: false, code: 'execution_command_invalid' }),
   };
 }
 

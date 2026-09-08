@@ -129,6 +129,7 @@ function makeDeps(options: {
         notes: null,
         startedAt: null,
         updatedAt: '2026-09-08T00:00:00.000Z',
+        version: 1,
       };
     },
     set: async (input: unknown) => {

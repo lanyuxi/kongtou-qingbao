@@ -1,5 +1,5 @@
 begin;
-select plan(68);
+select plan(73);
 
 -- Phase 10 Execution command boundary. This test exercises browser roles and
 -- auth.uid() exactly as the Identity domain suite does: every write goes
@@ -590,6 +590,67 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"50000000-0000-4000-8000-000000000001","role":"authenticated"}',
   true
+);
+
+-- ---------------------------------------------------------------------------
+-- Participation keeps its own optimistic lock and the read hands it back.
+-- The seed project row is the fixture the set command's existence check needs.
+-- ---------------------------------------------------------------------------
+
+select lives_ok(
+  $test$
+    select public.submit_set_participation_status(
+      '{"idempotencyKey":"owner-participation-first","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000001","participationStatus":"interested","notes":null}'::jsonb
+    )
+  $test$,
+  'the owner can set participation on a fresh row at version one'
+);
+
+select is(
+  (
+    select p.version
+    from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+  ),
+  1::bigint,
+  'the participation read carries the optimistic-lock version'
+);
+
+select lives_ok(
+  $test$
+    select public.submit_set_participation_status(
+      pg_catalog.jsonb_build_object(
+        'idempotencyKey', 'owner-participation-second',
+        'expectedVersion',
+        (
+          select p.version
+          from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+        ),
+        'projectId', '90000000-0000-4000-8000-000000000001',
+        'participationStatus', 'researching',
+        'notes', '第二轮再看'
+      )
+    )
+  $test$,
+  'a second update can be built from the projected version'
+);
+
+select is(
+  (
+    select p.version
+    from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+  ),
+  2::bigint,
+  'the projected version advances after the second update'
+);
+
+select throws_ok(
+  $test$
+    select public.submit_set_participation_status(
+      '{"idempotencyKey":"owner-participation-stale","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000001","participationStatus":"paused","notes":null}'::jsonb
+    )
+  $test$,
+  'EX209', 'execution_version_conflict',
+  'a stale participation version is rejected'
 );
 
 -- Fill up to the D4 watchlist limit and confirm the next create is rejected.

@@ -54,6 +54,7 @@ type ExecutionFunctionOverrides = {
       notes: string | null;
       startedAt: string | null;
       updatedAt: string;
+      version: number;
     }>;
   };
   submit_create_task: { Args: { p_payload: Json }; Returns: Json };
@@ -350,6 +351,64 @@ describeIntegration('Execution command boundary PostgREST/Auth integration', () 
     await expect(
       otherParticipation.getMine({ accessToken: otherToken, projectId }),
     ).rejects.toMatchObject({ code: 'execution_project_not_found' });
+  });
+
+  it('round-trips a second participation update through the projected version', async () => {
+    const owner = requireClient(authClients[0]);
+    const options = {
+      url: integrationEnvironment?.supabaseUrl ?? '',
+      anonKey: integrationEnvironment?.anonKey ?? '',
+    };
+    const participation = createExecutionParticipationRepository(options);
+    const ownerToken = await requireAccessToken(owner);
+    const secondProjectId = randomUUID();
+
+    // The fresh row is created at version 1, exactly as the command requires.
+    const first = await participation.set({
+      accessToken: ownerToken,
+      command: {
+        idempotencyKey: `exec-part-first-${randomUUID()}`,
+        expectedVersion: 1,
+        projectId: secondProjectId,
+        participationStatus: 'interested',
+        notes: null,
+      },
+    });
+    expect(first.projectId).toBe(secondProjectId);
+
+    // The projection carries the optimistic-lock version, so the browser can
+    // build the next command without guessing.
+    const projected = await participation.getMine({ accessToken: ownerToken, projectId: secondProjectId });
+    expect(projected.version).toBe(1);
+
+    const second = await participation.set({
+      accessToken: ownerToken,
+      command: {
+        idempotencyKey: `exec-part-second-${randomUUID()}`,
+        expectedVersion: projected.version,
+        projectId: secondProjectId,
+        participationStatus: 'researching',
+        notes: '第二轮再看',
+      },
+    });
+    expect(second.projectId).toBe(secondProjectId);
+
+    const afterSecond = await participation.getMine({ accessToken: ownerToken, projectId: secondProjectId });
+    expect(afterSecond).toMatchObject({ participationStatus: 'researching', version: 2 });
+
+    // A stale version built from the first projection is rejected outright.
+    await expect(
+      participation.set({
+        accessToken: ownerToken,
+        command: {
+          idempotencyKey: `exec-part-stale-${randomUUID()}`,
+          expectedVersion: 1,
+          projectId: secondProjectId,
+          participationStatus: 'paused',
+          notes: null,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'execution_version_conflict' });
   });
 
   it('denies direct browser writes to every execution table', async () => {
