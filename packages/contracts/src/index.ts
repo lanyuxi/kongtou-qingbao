@@ -57,6 +57,7 @@ export {
   renameWatchlistCommandSchema,
   setParticipationStatusCommandSchema,
   updateTaskCommandSchema,
+  updateTaskPatchSchema,
   type AddWatchlistProjectCommand,
   type CreateTaskCommand,
   type CreateWatchlistCommand,

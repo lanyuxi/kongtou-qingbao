@@ -49,9 +49,9 @@
 
 **Files:** `/tasks` 页面与组件 + 测试。
 
-- [ ] **Step 1: RED**——越权字段不可提交；版本冲突/上限展示稳定错误码（不按文案分支）；会话过期重定向并保留待办动作
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add task management`
+- [x] **Step 1: RED**——越权字段不可提交；版本冲突/上限展示稳定错误码（不按文案分支）；会话过期重定向并保留待办动作
+- [x] **Step 2: GREEN + 变异**——**8/8 killed**
+- [x] **Step 3: 文档 + 提交** `feat(web): add task management`
 
 ## Task 6: 关注列表与参与状态 UI（`/watchlists` + 项目详情页）
 

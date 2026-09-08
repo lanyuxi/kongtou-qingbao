@@ -33,17 +33,22 @@ export const createTaskCommandSchema = z.strictObject({
  * database enforces — `(status = 'completed') = (completed_at is not null)` —
  * so a client can never write a half-finished completion.
  */
-export const updateTaskCommandSchema = z
-  .strictObject({
-    ...executionCommandEnvelope,
-    taskId: z.uuid(),
-    projectId: z.uuid().nullable(),
-    title: taskTitleSchema.nullable(),
-    status: taskStatusSchema.nullable(),
-    priority: taskPrioritySchema.nullable(),
-    dueAt: z.iso.datetime({ offset: true }).nullable(),
-    completedAt: z.iso.datetime({ offset: true }).nullable(),
-  })
+// The patch shape is exported without the idempotency key so the browser can
+// validate a draft before a key exists, and so the client never has to re-state
+// these fields: one declaration, no drift.
+export const updateTaskPatchSchema = z.strictObject({
+  taskId: z.uuid(),
+  expectedVersion: z.number().int().min(1),
+  projectId: z.uuid().nullable(),
+  title: taskTitleSchema.nullable(),
+  status: taskStatusSchema.nullable(),
+  priority: taskPrioritySchema.nullable(),
+  dueAt: z.iso.datetime({ offset: true }).nullable(),
+  completedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+
+export const updateTaskCommandSchema = updateTaskPatchSchema
+  .extend({ idempotencyKey: z.string().trim().min(8).max(200) })
   .refine(
     (command) =>
       command.status === null

@@ -15,7 +15,7 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 | 2 | 命令边界（迁移 32 + pgTAP 022 + 005/006 同步） | ✅ 完成 | 迁移 32（1,589 行）+ pgTAP 022（**68/68**）+ 005（**230/230**）+ 006（**83/83**）；**干净 reset 从零应用后全套 pgTAP 22 files / 1,725 断言 / 0 失败 / 无 Bad plan**；残留核验零残留、日志已清理。提交 `6ecd82a` + `ce8da3b`。7 个真实缺陷见下方段落 |
 | 3 | 仓储（task / watchlist / participation） | ✅ 完成 | 三个仓储 + 单元测试 **14 PASS**（database 347→**361**，含集成文件共 362/86 skipped）+ **变异 10/10 killed**；集成测试 **5/5 通过**（含 disposable 隧道断言 + paused marker + 命令全链路 replay/版本冲突/跨用户隔离 + 默认列表 bootstrap + 直写拒绝 + 残留核验）；**干净 reset 后全套 pgTAP 1,725/0 + 执行与身份集成 10/10**；隧道与 0600 密钥文件已清理、零残留。提交 `71fcac9` + 本提交 |
 | 4 | BFF 路由与会话边界 | ✅ 完成 | `lib/execution-handlers.ts` + 6 个路由（tasks / tasks[id] / watchlists / watchlists[id] / watchlists[id]/projects[projectId] / projects[projectId]/participation）；22 条测试全过（web 552→574）；**变异 8/8 killed**（去会话校验、去幂等键校验、去路径绑定、404→400、回落码互换、409→200、去 query 守卫、版本冲突 409→404） |
-| 5 | 任务 UI（`/tasks`） | ⬜ 未开始 | — |
+| 5 | 任务 UI（`/tasks`） | ✅ 完成 | `lib/execution-api-client.ts` + `lib/execution-browser-runtime.ts` + `components/execution/task-manager.tsx` + `app/tasks/page.tsx`；11 条测试全过（web 574→585）；**变异 8/8 killed**（去严格草稿校验、冲突态降级、会话态混淆、状态/优先级筛选失效×2、去标题 trim、去空态、去冲突重载入口） |
 | 6 | 关注列表与参与状态 UI | ⬜ 未开始 | — |
 | 7 | 收口（runbook + 矩阵 + 台账） | ⬜ 未开始 | — |
 
@@ -76,6 +76,8 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 ## 日志
 
 | 日期 | 事项 | 备注 |
+| 2026-09-08 | Task 5 任务 UI 完成 | 三条 UI 铁律：①**越权字段在浏览器侧就被拒绝，不发送也不静默丢弃**——草稿先过 strict schema 再建命令（第一版 `buildTaskCreateInput` 只挑已知字段＝静默丢弃，被测试抓出）；②**错误一律按稳定 code 分支，绝不按文案匹配**，渲染时用 `data-code` 暴露码值；③**会话过期 `router.replace(buildSignInPath('/tasks'))` 保留返回路径**，重新登录后回到原页且 reload 描述了待办动作。另按规范：**不做伪分页**（无 page/cursor/下一页，测试断言渲染结果不含 `page=` 与「下一页」）；筛选在已加载行上做（状态 + 优先级）。**一个路径坑**：`app/tasks/page.tsx` 的相对导入是 2 层（`../../lib/`），我按 settings 页的 3 层写，typecheck 报 TS2307。 |
+
 | 2026-09-08 | Task 4 BFF 完成 | 沿用 Phase 9 BFF 三条铁律：①**认证严格先于查询/请求体校验**（401 时仓库零调用，测试断言 `calls` 为空）；②**他人资源一律 404 不 403**（不泄漏存在性）；③**查询回落 `execution_query_failed`、变更回落 `execution_persistence_failed` 不混用**（连认证基础设施故障都按方法分）。另外绑定：幂等键 header 必须与 body 一致；路径 id 必须与 body id 一致。EX202/203/204→404，EX205-210→409，EX211→400，EX201→401。**两个中途修正**：①handler 依赖先用全量 `ExecutionHandlerDependencies`（导致路由里要塞 no-op 仓库 stub），改成 Phase 9 的 `Pick<>` 收窄，每个 handler 只声明自己要的仓储；②`watchlists/[id]` 与 `participation` 的 GET 也要读路径 id，签名漏了 context → typecheck 报 Expected 2 arguments。另需补：database 包入口未导出 execution 模块（web 侧 TS2724）。 |
 
 | 2026-09-08 | Task 3 集成验收（授权后执行）：**集成 5/5 + 全套 pgTAP 1,725/0** | 集成测试暴露 **2 个契约/数据库不一致缺陷**：①**读 RPC 返回裸表行（snake_case），而契约要 camelCase**——Phase 9 的做法是 `returns table ("userId" uuid, ...)` 显式别名，四个读 RPC 已全部改为此约定；②**PostgREST 把 timestamptz 序列化成 `+00:00` 而非 `Z`**，`z.iso.datetime()` 默认只认 `Z` → 改 `{ offset: true }`。③顺带统一 update 语义：契约改为**九键齐全、null 表示不改**（对齐数据库 `security_json_has_exact_keys`），SQL 里 `projectId`/`dueAt` 的 null 原为「清空」、与 `title` 的「不改」不一致 → 统一为「不改」。**一个自己造的坑**：我一度把 completed 的 `completedAt` 写成 `coalesce(completedAt, now())`，导致「completed 却不给 completedAt」被静默接受（契约要求拒绝），且级联让后续 material update 撞 EX209——**最小复现诊断**（create→half-complete→material 三步 do 块）一跑即现形，已去掉默认值。**教训：改 SQL 语义后必须先跑 pgTAP 022 再跑集成测试**（022 直接打函数，比集成测试更快定位）。 |
