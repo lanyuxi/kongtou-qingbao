@@ -600,7 +600,7 @@ select set_config(
 select lives_ok(
   $test$
     select public.submit_set_participation_status(
-      '{"idempotencyKey":"owner-participation-first","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000001","participationStatus":"interested","notes":null}'::jsonb
+      '{"idempotencyKey":"owner-participation-first","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000010","participationStatus":"interested","notes":null}'::jsonb
     )
   $test$,
   'the owner can set participation on a fresh row at version one'
@@ -609,7 +609,7 @@ select lives_ok(
 select is(
   (
     select p.version
-    from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+    from public.get_my_participation('90000000-0000-4000-8000-000000000010') as p
   ),
   1::bigint,
   'the participation read carries the optimistic-lock version'
@@ -623,9 +623,9 @@ select lives_ok(
         'expectedVersion',
         (
           select p.version
-          from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+          from public.get_my_participation('90000000-0000-4000-8000-000000000010') as p
         ),
-        'projectId', '90000000-0000-4000-8000-000000000001',
+        'projectId', '90000000-0000-4000-8000-000000000010',
         'participationStatus', 'researching',
         'notes', '第二轮再看'
       )
@@ -637,7 +637,7 @@ select lives_ok(
 select is(
   (
     select p.version
-    from public.get_my_participation('90000000-0000-4000-8000-000000000001') as p
+    from public.get_my_participation('90000000-0000-4000-8000-000000000010') as p
   ),
   2::bigint,
   'the projected version advances after the second update'
@@ -646,7 +646,7 @@ select is(
 select throws_ok(
   $test$
     select public.submit_set_participation_status(
-      '{"idempotencyKey":"owner-participation-stale","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000001","participationStatus":"paused","notes":null}'::jsonb
+      '{"idempotencyKey":"owner-participation-stale","expectedVersion":1,"projectId":"90000000-0000-4000-8000-000000000010","participationStatus":"paused","notes":null}'::jsonb
     )
   $test$,
   'EX209', 'execution_version_conflict',

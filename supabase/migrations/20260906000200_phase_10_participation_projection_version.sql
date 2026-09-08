@@ -5,10 +5,17 @@
 -- does not match the stored row version (fresh rows must send 1), but the
 -- original `get_my_participation` projection did not return the version, so a
 -- client could never build a second update. Function bodies are replaceable
--- without touching migration history, so this repair is a create-or-replace
--- of the read alone; no table, policy, or command changes.
+-- without touching migration history, so this repair redefines the read alone;
+-- no table, policy, or command changes.
+--
+-- The projection gains a column, which changes its row type. `create or
+-- replace` refuses to change an existing function's return type, so the read
+-- is dropped first; the drop and create run inside one migration transaction,
+-- so the function is never absent for a committed statement.
 
-create or replace function public.get_my_participation(p_project_id uuid)
+drop function if exists public.get_my_participation(uuid);
+
+create function public.get_my_participation(p_project_id uuid)
 returns table (
   "projectId" uuid,
   "participationStatus" public.participation_status,
