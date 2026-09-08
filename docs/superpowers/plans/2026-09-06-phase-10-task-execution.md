@@ -41,9 +41,9 @@
 
 **Files:** `apps/web/src/app/api/v1/execution/*`、`lib/execution-handlers.ts` + 测试。
 
-- [ ] **Step 1: RED**——无会话 → `EX201`/401；他人资源 → 404（不泄漏存在性）；命令类回落 `execution_persistence_failed`、查询类回落 `execution_query_failed`；认证严格先于查询/请求体校验（401 时仓库零调用）
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add execution bff`
+- [x] **Step 1: RED**——无会话 → `EX201`/401；他人资源 → 404（不泄漏存在性）；命令类回落 `execution_persistence_failed`、查询类回落 `execution_query_failed`；认证严格先于查询/请求体校验（401 时仓库零调用）
+- [x] **Step 2: GREEN + 变异**——**8/8 killed**
+- [x] **Step 3: 文档 + 提交** `feat(web): add execution bff`
 
 ## Task 5: 任务 UI（`/tasks`）
 

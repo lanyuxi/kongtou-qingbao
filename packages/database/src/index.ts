@@ -12,6 +12,21 @@ export {
   type IdentityRpcCall,
   type IdentityWalletAddressRepository,
 } from './identity/index.js';
+export {
+  createExecutionParticipationRepository,
+  createExecutionParticipationRepositoryFromRpc,
+  createExecutionTaskRepository,
+  createExecutionTaskRepositoryFromRpc,
+  createExecutionWatchlistRepository,
+  createExecutionWatchlistRepositoryFromRpc,
+  ExecutionRepositoryError,
+  type ExecutionParticipationRepository,
+  type ExecutionRepositoryOptions,
+  type ExecutionRpc,
+  type ExecutionRpcCall,
+  type ExecutionTaskRepository,
+  type ExecutionWatchlistRepository,
+} from './execution/index.js';
 export type {
   DomainAuthorityReviewListResult,
   ReferenceReviewListResult,
