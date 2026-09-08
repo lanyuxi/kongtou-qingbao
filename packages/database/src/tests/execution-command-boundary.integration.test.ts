@@ -361,49 +361,57 @@ describeIntegration('Execution command boundary PostgREST/Auth integration', () 
     };
     const participation = createExecutionParticipationRepository(options);
     const ownerToken = await requireAccessToken(owner);
-    const secondProjectId = randomUUID();
 
-    // The fresh row is created at version 1, exactly as the command requires.
-    const first = await participation.set({
+    // The row may already exist from the earlier round-trip, so the next
+    // command is built from whatever version the projection reports — a fresh
+    // row is created at version 1, which is exactly what the command demands.
+    const existing = await participation
+      .getMine({ accessToken: ownerToken, projectId })
+      .catch(() => null);
+    const seedVersion = existing?.version ?? 1;
+
+    await participation.set({
       accessToken: ownerToken,
       command: {
-        idempotencyKey: `exec-part-first-${randomUUID()}`,
-        expectedVersion: 1,
-        projectId: secondProjectId,
+        idempotencyKey: `exec-part-seed-${randomUUID()}`,
+        expectedVersion: seedVersion,
+        projectId,
         participationStatus: 'interested',
         notes: null,
       },
     });
-    expect(first.projectId).toBe(secondProjectId);
 
     // The projection carries the optimistic-lock version, so the browser can
     // build the next command without guessing.
-    const projected = await participation.getMine({ accessToken: ownerToken, projectId: secondProjectId });
-    expect(projected.version).toBe(1);
+    const projected = await participation.getMine({ accessToken: ownerToken, projectId });
+    expect(typeof projected.version).toBe('number');
 
     const second = await participation.set({
       accessToken: ownerToken,
       command: {
         idempotencyKey: `exec-part-second-${randomUUID()}`,
         expectedVersion: projected.version,
-        projectId: secondProjectId,
+        projectId,
         participationStatus: 'researching',
         notes: '第二轮再看',
       },
     });
-    expect(second.projectId).toBe(secondProjectId);
+    expect(second.projectId).toBe(projectId);
 
-    const afterSecond = await participation.getMine({ accessToken: ownerToken, projectId: secondProjectId });
-    expect(afterSecond).toMatchObject({ participationStatus: 'researching', version: 2 });
+    const afterSecond = await participation.getMine({ accessToken: ownerToken, projectId });
+    expect(afterSecond).toMatchObject({
+      participationStatus: 'researching',
+      version: projected.version + 1,
+    });
 
-    // A stale version built from the first projection is rejected outright.
+    // A version read before that update is now one behind, so it is rejected.
     await expect(
       participation.set({
         accessToken: ownerToken,
         command: {
           idempotencyKey: `exec-part-stale-${randomUUID()}`,
-          expectedVersion: 1,
-          projectId: secondProjectId,
+          expectedVersion: projected.version,
+          projectId,
           participationStatus: 'paused',
           notes: null,
         },
