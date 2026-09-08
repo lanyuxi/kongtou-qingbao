@@ -57,9 +57,9 @@
 
 **Files:** `/watchlists` 页面与组件、项目详情页的关注/参与状态切换 + 测试。
 
-- [ ] **Step 1: RED**——默认列表自动存在；重名/上限/版本冲突按稳定码展示；项目详情页切换只提交允许字段
-- [ ] **Step 2: GREEN + 变异**
-- [ ] **Step 3: 文档 + 提交** `feat(web): add watchlist and participation`
+- [x] **Step 1: RED**——默认列表自动存在；重名/上限/版本冲突按稳定码展示；项目详情页切换只提交允许字段
+- [x] **Step 2: GREEN + 变异**——**24/24 killed**；连带修复浏览器 create 路径的 `expectedVersion` 缺陷与参与投影缺 version 的设计缺口（迁移 33 forward-only，DB 验证待授权）
+- [x] **Step 3: 文档 + 提交** `feat(web): add watchlist and participation`
 
 ## Task 7: 收口
 
