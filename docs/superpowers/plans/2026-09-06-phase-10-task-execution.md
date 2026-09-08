@@ -33,9 +33,9 @@
 
 **Files:** `taskRepository`、`watchlistRepository`、`participationRepository`、集成测试。
 
-- [ ] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、四角色越权被拒
-- [ ] **Step 2: GREEN + 集成测试 + 变异**（他人数据不可达 → 用例失败）
-- [ ] **Step 3: 文档 + 提交** `feat(database): add execution repositories`
+- [x] **Step 1: RED**——受保护命令调用、幂等键、版本冲突、四角色越权被拒
+- [x] **Step 2: GREEN + 变异**（他人数据不可达 → 用例失败）——**10/10 killed**；集成测试已写就，**执行待隧道授权**
+- [x] **Step 3: 文档 + 提交** `feat(database): add execution repositories`
 
 ## Task 4: BFF 路由与会话边界
 

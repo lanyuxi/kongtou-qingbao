@@ -13,7 +13,7 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 |---|---|---|---|
 | 1 | 契约（`packages/contracts/src/execution/`） | ✅ 完成 | 四模块（enums / commands / projections / receipts）+ `src/tests/execution.test.ts` **42 PASS**；contracts 232→**274**；lint/typecheck/build 绿；fresh root verify **1,868 PASS / 84 gated skips**；**变异 9/9 killed**（密钥守卫中和→9 失败、strict 放宽、完成态不变式、标题/名称长度、控制字符、行级完成态不变式、幂等键边界、投影 strict）。**未访问数据库/远端/生产**。 |
 | 2 | 命令边界（迁移 32 + pgTAP 022 + 005/006 同步） | ✅ 完成 | 迁移 32（1,589 行）+ pgTAP 022（**68/68**）+ 005（**230/230**）+ 006（**83/83**）；**干净 reset 从零应用后全套 pgTAP 22 files / 1,725 断言 / 0 失败 / 无 Bad plan**；残留核验零残留、日志已清理。提交 `6ecd82a` + `ce8da3b`。7 个真实缺陷见下方段落 |
-| 3 | 仓储（task / watchlist / participation） | ⬜ 未开始 | — |
+| 3 | 仓储（task / watchlist / participation） | 🟠 单元完成，集成待授权 | 三个仓储 + 单元测试 **14 PASS**（database 347→**361**，含集成文件共 362/86 skipped）+ **变异 10/10 killed**；集成测试 `execution-command-boundary.integration.test.ts` 已写就（含 disposable 隧道断言 + paused marker 校验 + 残留核验），**需隧道与四集成变量授权后执行** |
 | 4 | BFF 路由与会话边界 | ⬜ 未开始 | — |
 | 5 | 任务 UI（`/tasks`） | ⬜ 未开始 | — |
 | 6 | 关注列表与参与状态 UI | ⬜ 未开始 | — |
@@ -76,6 +76,8 @@ fresh `CI=true pnpm verify` 全绿：contracts **232** + domain **428** + databa
 ## 日志
 
 | 日期 | 事项 | 备注 |
+| 2026-09-08 | **docker 开机自启已开启**；Task 3 仓储完成（`dff` 待提交） | ①`systemctl enable docker` 已执行（docker.service `enabled`+`active`），且 8 个 supabase 容器均为 `unless-stopped` 策略——重启后 docker 自启 + 容器自动回来（生产与 disposable 全覆盖）。②Task 3：`packages/database/src/execution/` 四文件（shared / task / watchlist / participation + index），沿用 Phase 9 仓储三件套：bearer-scoped 每请求建客户端、`read`/`mutate` 双回落（查询→`execution_query_failed`、变更→`execution_persistence_failed`）、EX2xx SQLSTATE→契约码映射、命令先过 `parseExecutionCommand` 再发。③单元测试 14 条全过（database 347→361）；**变异 10/10 killed**（丢 bearer、去会话校验、跳过命令校验、双回落互换、删 EX209 映射、跳过投影解析×2、去空行守卫、丢成员读 bearer）。④集成测试已写就但未执行（需隧道授权）。**两个中途修正**：工厂函数先写成重载（吸取 rpc/options 两种形态），typecheck 暴露后改回 Phase 9 的单一形态；`listMine` 一度写了两次 `rpc.invoke`（会重复请求），已改单次。**一个测试期望修正**：投影越权的解析失败按 Phase 9 设计归入 `query_failed` 兜底，不是抛 TypeError——改测试而非改实现（保持与既有域一致）。 |
+
 | 2026-09-08 | Task 2 disposable 验收：RED→GREEN，**全套 pgTAP 22 files / 1,725 断言 / 0 失败** | ①**主机于 9/7 被重启过**（`up 3 min`），重启后 **docker 未自启**（`systemctl is-enabled docker` = disabled）——已 `systemctl start docker` 恢复；**建议对 `systemctl enable docker` 单独授权**（生产容器同机，不自启有停机风险）。②reset 在重启前已完成到迁移 32 并进入 seeding；容器数据卷保留，恢复后 `schema_migrations`=**32**。③**RED 证据**（前一日取得）：当前 schema 跑 022 → 85 个错误全为 `relation "public.user_task_events" does not exist`，plan 已输出。④**迁移 32 先经回滚事务空跑验证**（`begin;…rollback;` exit 0 零错误），再经 reset 真实应用。⑤**GREEN 过程中暴露并修复 7 个真实缺陷**（详见下方「七个缺陷」段落）：自造 hash 用了不存在的 `extensions.encode`、outbox payload 混入域字段违反共享约束、回执表漏 4 个审计列、`user_task_events` 缺 `grant select`、事件类型约束漏 `status_changed`、update 命令缺 completed 自洽校验、测试缺 `reset role` 与清理段多余。⑥**既有套件按新契约收紧而非放宽**：005 plan 228→**230**（新增两列 ACL 断言），17 处列级授权向量 + 4 处表级向量改只读，6 类「owner 可直写/改他人行返回 0 行」断言改为断言权限拒绝，3 处夹具默认列表降级（触发器现拥有默认列表）；006 plan 81→**83**，新增策略进主目录 + 命名例外集 + service_role 名单，2 处读断言改为「读不到他人行」。⑦**plan 计数教训**：往 `values` 清单加行会产生新断言，必须同步 plan（005 +2、006 +2），否则 `Looks like you planned N tests but ran M`。**最后一步：干净 reset 复验修正后的迁移文件能否从零应用**（当前库是旧文件 + 原地补丁达到的）。 |
 
 |---|---|---|
