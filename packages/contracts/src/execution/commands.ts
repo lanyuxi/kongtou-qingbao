@@ -37,23 +37,29 @@ export const updateTaskCommandSchema = z
   .strictObject({
     ...executionCommandEnvelope,
     taskId: z.uuid(),
-    projectId: z.uuid().nullable().optional(),
-    title: taskTitleSchema.optional(),
-    status: taskStatusSchema.optional(),
-    priority: taskPrioritySchema.optional(),
-    dueAt: z.iso.datetime().nullable().optional(),
-    completedAt: z.iso.datetime().nullable().optional(),
+    projectId: z.uuid().nullable(),
+    title: taskTitleSchema.nullable(),
+    status: taskStatusSchema.nullable(),
+    priority: taskPrioritySchema.nullable(),
+    dueAt: z.iso.datetime({ offset: true }).nullable(),
+    completedAt: z.iso.datetime({ offset: true }).nullable(),
   })
   .refine(
     (command) =>
-      command.status === undefined
-      || (command.status === 'completed') === (command.completedAt !== undefined && command.completedAt !== null),
+      command.status === null
+      || (command.status === 'completed') === (command.completedAt !== null),
     {
       message: "completedAt is required when status is completed and forbidden otherwise.",
     },
   )
   .refine(
-    (command) => Object.keys(command).some((key) => key !== 'idempotencyKey' && key !== 'expectedVersion' && key !== 'taskId'),
+    (command) =>
+      command.projectId !== null
+      || command.title !== null
+      || command.status !== null
+      || command.priority !== null
+      || command.dueAt !== null
+      || command.completedAt !== null,
     { message: 'An update must change at least one task field.' },
   );
 

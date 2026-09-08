@@ -21,8 +21,8 @@ export const userTaskRowSchema = z
     title: taskTitleSchema,
     status: taskStatusSchema,
     priority: taskPrioritySchema,
-    dueAt: z.iso.datetime().nullable(),
-    completedAt: z.iso.datetime().nullable(),
+    dueAt: z.iso.datetime({ offset: true }).nullable(),
+    completedAt: z.iso.datetime({ offset: true }).nullable(),
     version: z.number().int().min(1),
     createdAt: z.string(),
     updatedAt: z.string(),
@@ -51,7 +51,7 @@ export const userProjectParticipationRowSchema = z.strictObject({
   projectId: z.uuid(),
   participationStatus: participationStatusSchema,
   notes: participationNotesSchema,
-  startedAt: z.iso.datetime().nullable(),
+  startedAt: z.iso.datetime({ offset: true }).nullable(),
   updatedAt: z.string(),
 });
 

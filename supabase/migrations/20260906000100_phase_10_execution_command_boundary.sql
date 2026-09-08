@@ -397,27 +397,16 @@ begin
   v_next_priority := coalesce(
     (p_payload ->> 'priority')::public.task_priority, v_task.priority
   );
-  v_next_project_id := case
-    when pg_catalog.jsonb_typeof(p_payload -> 'projectId') = 'null'
-      then null
-    when p_payload ->> 'projectId' is not null
-      then (p_payload ->> 'projectId')::uuid
-    else v_task.project_id
-  end;
-  v_next_due_at := case
-    when pg_catalog.jsonb_typeof(p_payload -> 'dueAt') = 'null' then null
-    when p_payload ->> 'dueAt' is not null then (p_payload ->> 'dueAt')::timestamptz
-    else v_task.due_at
-  end;
+  v_next_project_id := coalesce(
+    (p_payload ->> 'projectId')::uuid, v_task.project_id
+  );
+  v_next_due_at := coalesce(
+    (p_payload ->> 'dueAt')::timestamptz, v_task.due_at
+  );
 
   if p_payload ->> 'status' is not null then
     if v_next_status = 'completed' then
-      v_next_completed_at := case
-        when pg_catalog.jsonb_typeof(p_payload -> 'completedAt') = 'null' then null
-        when p_payload ->> 'completedAt' is not null
-          then (p_payload ->> 'completedAt')::timestamptz
-        else coalesce(v_task.completed_at, v_now)
-      end;
+      v_next_completed_at := (p_payload ->> 'completedAt')::timestamptz;
     else
       v_next_completed_at := null;
     end if;
@@ -1366,13 +1355,36 @@ grant execute on function public.submit_set_participation_status(jsonb) to authe
 -- ---------------------------------------------------------------------------
 
 create function public.list_my_execution_tasks()
-returns setof public.user_tasks
+returns table (
+  "taskId" uuid,
+  "userId" uuid,
+  "projectId" uuid,
+  title text,
+  status public.task_status,
+  priority public.task_priority,
+  "dueAt" timestamptz,
+  "completedAt" timestamptz,
+  version bigint,
+  "createdAt" timestamptz,
+  "updatedAt" timestamptz
+)
 language sql
 stable
 security definer
 set search_path = pg_catalog, public
 as $function$
-  select task.*
+  select
+    task.id,
+    task.user_id,
+    task.project_id,
+    task.title,
+    task.status,
+    task.priority,
+    task.due_at,
+    task.completed_at,
+    task.version,
+    task.created_at,
+    task.updated_at
   from public.user_tasks as task
   where task.user_id = auth.uid()
   order by task.created_at desc, task.id desc
@@ -1384,13 +1396,13 @@ grant execute on function public.list_my_execution_tasks() to authenticated;
 
 create function public.list_my_watchlists()
 returns table (
-  watchlist_id uuid,
+  "watchlistId" uuid,
   name text,
-  is_default boolean,
-  project_count bigint,
+  "isDefault" boolean,
+  "projectCount" bigint,
   version bigint,
-  created_at timestamptz,
-  updated_at timestamptz
+  "createdAt" timestamptz,
+  "updatedAt" timestamptz
 )
 language sql
 stable
@@ -1417,13 +1429,20 @@ revoke all on function public.list_my_watchlists() from public, anon;
 grant execute on function public.list_my_watchlists() to authenticated;
 
 create function public.list_my_watchlist_projects(p_watchlist_id uuid)
-returns setof public.watchlist_projects
+returns table (
+  "watchlistId" uuid,
+  "projectId" uuid,
+  "addedAt" timestamptz
+)
 language sql
 stable
 security definer
 set search_path = pg_catalog, public
 as $function$
-  select member.*
+  select
+    member.watchlist_id,
+    member.project_id,
+    member.added_at
   from public.watchlist_projects as member
   where member.watchlist_id = p_watchlist_id
     and exists (
@@ -1439,13 +1458,24 @@ revoke all on function public.list_my_watchlist_projects(uuid) from public, anon
 grant execute on function public.list_my_watchlist_projects(uuid) to authenticated;
 
 create function public.get_my_participation(p_project_id uuid)
-returns public.user_projects
+returns table (
+  "projectId" uuid,
+  "participationStatus" public.participation_status,
+  notes text,
+  "startedAt" timestamptz,
+  "updatedAt" timestamptz
+)
 language sql
 stable
 security definer
 set search_path = pg_catalog, public
 as $function$
-  select participation.*
+  select
+    participation.project_id,
+    participation.participation_status,
+    participation.notes,
+    participation.started_at,
+    participation.updated_at
   from public.user_projects as participation
   where participation.user_id = auth.uid()
     and participation.project_id = p_project_id

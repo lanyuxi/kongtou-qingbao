@@ -50,7 +50,11 @@ const updateTaskPayload = {
   idempotencyKey: 'task-update-1',
   expectedVersion: 2,
   taskId,
+  projectId: null,
+  title: null,
   status: 'completed',
+  priority: null,
+  dueAt: null,
   completedAt: '2026-09-06T10:00:00.000Z',
 };
 
@@ -111,10 +115,11 @@ describe('execution text boundaries', () => {
 });
 
 describe('completion stays self-consistent', () => {
-  it('requires completed_at exactly when status is completed', () => {
-    const { completedAt, ...withoutCompletedAt } = updateTaskPayload;
-    expect(updateTaskCommandSchema.safeParse(withoutCompletedAt).success).toBe(false);
-    expect(completedAt).toBe('2026-09-06T10:00:00.000Z');
+  it('requires completedAt exactly when status is completed', () => {
+    expect(
+      updateTaskCommandSchema.safeParse({ ...updateTaskPayload, completedAt: null }).success,
+    ).toBe(false);
+    expect(updateTaskCommandSchema.safeParse(updateTaskPayload).success).toBe(true);
   });
 
   it('rejects completed_at on a task that is not completed', () => {
@@ -125,12 +130,33 @@ describe('completion stays self-consistent', () => {
     }).success).toBe(false);
   });
 
-  it('accepts a non-completed update that carries no completed_at', () => {
+  it('accepts a non-completed update that leaves completedAt null', () => {
     expect(updateTaskCommandSchema.safeParse({
       ...updateTaskPayload,
       status: 'in_progress',
       completedAt: null,
     }).success).toBe(true);
+  });
+
+  it('accepts an update that leaves the status unchanged', () => {
+    expect(updateTaskCommandSchema.safeParse({
+      ...updateTaskPayload,
+      status: null,
+      completedAt: null,
+      priority: 'urgent',
+    }).success).toBe(true);
+  });
+
+  it('rejects an update where every patch field is null', () => {
+    expect(updateTaskCommandSchema.safeParse({
+      ...updateTaskPayload,
+      projectId: null,
+      title: null,
+      status: null,
+      priority: null,
+      dueAt: null,
+      completedAt: null,
+    }).success).toBe(false);
   });
 });
 

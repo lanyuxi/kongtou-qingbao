@@ -124,7 +124,7 @@ describeIntegration('Execution command boundary PostgREST/Auth integration', () 
     otherUserId = users[1]!.userId;
 
     const rows = await sql`
-      select id from public.projects where slug = 'execution-one'
+      select id from public.projects where slug = 'fixture-active'
     `;
     projectId = rows[0]?.id as string;
     if (typeof projectId !== 'string' || projectId.length === 0) {
@@ -207,7 +207,11 @@ describeIntegration('Execution command boundary PostgREST/Auth integration', () 
           idempotencyKey: `exec-task-stale-${randomUUID()}`,
           expectedVersion: 99,
           taskId: created.taskId,
+          projectId: null,
+          title: null,
           status: 'completed',
+          priority: null,
+          dueAt: null,
           completedAt: '2026-09-08T00:00:00.000Z',
         },
       }),
@@ -219,7 +223,11 @@ describeIntegration('Execution command boundary PostgREST/Auth integration', () 
         idempotencyKey: `exec-task-done-${randomUUID()}`,
         expectedVersion: 1,
         taskId: created.taskId,
+        projectId: null,
+        title: null,
         status: 'completed',
+        priority: null,
+        dueAt: null,
         completedAt: '2026-09-08T00:00:00.000Z',
       },
     });

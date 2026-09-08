@@ -67,7 +67,11 @@ const updateTaskCommand = {
   idempotencyKey: 'repo-task-update',
   expectedVersion: 2,
   taskId,
+  projectId: null,
+  title: null,
   status: 'completed',
+  priority: null,
+  dueAt: null,
   completedAt: '2026-09-06T10:00:00.000Z',
 } as const;
 
