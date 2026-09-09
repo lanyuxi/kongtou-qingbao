@@ -2,10 +2,10 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@airdrop/contracts'],
-  // Deployment ships the standalone server bundle to production instead of
-  // building there: the host has ~650MB of free RAM, far below what a
-  // production `next build` needs.
-  output: 'standalone'
+  // Self-hosting ships the standalone server bundle instead of building on the
+  // host, which has far too little RAM for a production `next build`. Vercel
+  // builds the project itself and must not see this override, so it is opt-in.
+  output: process.env.NEXT_STANDALONE === 'true' ? 'standalone' : undefined
 };
 
 export default nextConfig;
