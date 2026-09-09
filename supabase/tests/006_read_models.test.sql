@@ -1,6 +1,6 @@
 begin;
 
-select plan(81);
+select plan(83);
 
 select has_view('public', 'project_current_state', 'project_current_state view exists');
 select has_view('public', 'opportunity_list', 'opportunity_list view exists');
@@ -113,6 +113,7 @@ select results_eq(
       ('user_projects'::text, 'user_projects_select_authenticated'::text),
       ('user_projects'::text, 'user_projects_update_authenticated'::text),
       ('user_roles'::text, 'user_roles_select_authenticated'::text),
+      ('user_task_events'::text, 'user_task_events_select_owner'::text),
       ('user_tasks'::text, 'user_tasks_delete_authenticated'::text),
       ('user_tasks'::text, 'user_tasks_insert_authenticated'::text),
       ('user_tasks'::text, 'user_tasks_select_authenticated'::text),
@@ -164,6 +165,7 @@ select results_eq(
       ('signals', 'signals_ai_stage_worker_read'),
       ('tutorial_candidates', 'tutorial_candidates_ai_stage_worker_insert'),
       ('tutorial_candidates', 'tutorial_candidates_ai_stage_worker_read'),
+      ('user_task_events', 'user_task_events_select_owner'),
       ('user_wallet_address_events', 'wallet_address_events_owner_read'),
       ('user_wallet_addresses', 'wallet_addresses_owner')
     ) as expected(tablename, policyname)
@@ -429,7 +431,8 @@ select ok(
   pg_catalog.format('service role has no private support read on %s', expected.table_name)
 )
 from (
-  values ('watchlists'), ('watchlist_projects'), ('user_projects'), ('user_tasks')
+  values ('watchlists'), ('watchlist_projects'), ('user_projects'), ('user_tasks'),
+    ('user_task_events'), ('execution_command_receipts')
 ) as expected(table_name);
 
 select ok(
@@ -587,7 +590,7 @@ select is(
 );
 
 insert into public.watchlists (id, user_id, name, is_default)
-values ('40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000003', 'Victim List', true);
+values ('40000000-0000-4000-8000-000000000001', '60000000-0000-4000-8000-000000000003', 'Victim List', false);
 insert into public.watchlist_projects (watchlist_id, project_id)
 values ('40000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000001');
 insert into public.user_projects (user_id, project_id, participation_status, notes)
@@ -692,7 +695,11 @@ select is(
   'an authenticated model-version read requires complete Evidence and public project lifecycle'
 );
 
-select is((select count(*)::integer from public.watchlists), 0, 'an authenticated user cannot broadly read private watchlists');
+select is(
+  (select count(*)::integer from public.watchlists where user_id <> (select auth.uid())),
+  0,
+  'an authenticated user cannot broadly read private watchlists'
+);
 select is((select count(*)::integer from public.watchlist_projects), 0, 'an authenticated user cannot broadly read private watchlist projects');
 select is((select count(*)::integer from public.user_projects), 0, 'an authenticated user cannot broadly read private user projects');
 select is((select count(*)::integer from public.user_tasks), 0, 'an authenticated user cannot broadly read private user tasks');
@@ -707,7 +714,11 @@ select set_config(
   true
 );
 
-select is((select count(*)::integer from public.watchlists), 0, 'a browser admin cannot read another user watchlists');
+select is(
+  (select count(*)::integer from public.watchlists where user_id <> (select auth.uid())),
+  0,
+  'a browser admin cannot read another user watchlists'
+);
 select is((select count(*)::integer from public.watchlist_projects), 0, 'a browser admin cannot read another user watchlist projects');
 select is((select count(*)::integer from public.user_projects), 0, 'a browser admin cannot read another user project notes');
 select is((select count(*)::integer from public.user_tasks), 0, 'a browser admin cannot read another user tasks');

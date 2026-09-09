@@ -911,6 +911,140 @@ Deploying the web application remains a separate, still-outstanding item —
 production currently serves only the static site, so an applied migration alone
 does not put this flow in front of users.
 
+## Execution: tasks, watchlists, and participation (Phase 10)
+
+Execution is where a signed-in user turns a public opportunity into private
+work: tasks, watchlists, and a per-project participation state. It reuses the
+Identity `user_id = auth.uid()` pattern and adds **receipt-first commands** —
+every write goes through a `SECURITY DEFINER` command that checks the caller,
+records a receipt, and emits an outbox event in the same transaction. Browser
+roles can no longer write the four Execution tables directly.
+
+Three rules are absolute and are enforced in more than one layer:
+
+1. **No secret-shaped field ever enters the domain.** The contract rejects
+   key-like fields outright rather than silently dropping them, both at the
+   browser boundary and again inside database command validation.
+2. **Every row belongs to its user.** Reads are owner-scoped, and a resource that
+   is not the caller's reports *not found* rather than *forbidden*, so the API
+   never confirms that it exists.
+3. **History is append-only.** Task events, command receipts, and outbox rows are
+   never updated or deleted in place.
+
+### Decided scope (D1–D9)
+
+| Decision | Value |
+| --- | --- |
+| D1 Command boundary | Hardened, aligned with Phase 9: revoke direct writes, receipt-first commands, exact replay |
+| D2 First-version scope | Tasks + watchlists + participation, all three |
+| D3 Default watchlist | Created automatically (profile insert trigger, with a backfill for existing profiles) |
+| D4 Limits | 20 watchlists · 200 projects per watchlist · 500 tasks |
+| D5 Task history | Append-only `user_task_events` |
+| D6 Tasks without a project | Allowed (`project_id` is nullable) |
+| D7 UI surfaces | `/tasks`, `/watchlists`, and the project detail page toggle |
+| D8 Notification coupling | Outbox events only; no delivery |
+| D9 Error-code range | `EX2xx` |
+
+### Command surface
+
+Nine commands take a single `jsonb` payload and are executable by
+`authenticated` only: `submit_create_task`, `submit_update_task`,
+`submit_delete_task`, `submit_create_watchlist`, `submit_rename_watchlist`,
+`submit_delete_watchlist`, `submit_add_watchlist_project`,
+`submit_remove_watchlist_project`, `submit_set_participation_status`. Four
+owner-scoped reads back them: `list_my_execution_tasks`, `list_my_watchlists`,
+`list_my_watchlist_projects`, `get_my_participation`.
+
+Two boundaries are easy to get wrong:
+
+- **Creation still travels with `expectedVersion: 1`.** The command envelope is
+  always complete: the browser validates the draft against a strict shape that
+  omits the envelope, and the client completes it. Validating a draft against
+  the full envelope rejects every creation before it ever leaves the browser.
+- **Participation is a real optimistic lock.** A fresh row accepts
+  `expectedVersion` 1; an existing row requires the version the projection
+  reported. That is why `get_my_participation` returns `version` (migration
+  `20260906000200`) — without it a second update could never be built.
+
+The default watchlist is named `默认关注`, is created with `is_default = true` at
+version 1 by the `execution_default_watchlist_bootstrap` trigger on `profiles`
+insert, and was backfilled once for every profile that already existed. It has
+no delete affordance anywhere in the UI.
+
+### Error codes (EX2xx)
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `execution_session_required` | 401 | No active session |
+| `execution_task_not_found` | 404 | Task missing, or not the caller's |
+| `execution_watchlist_not_found` | 404 | Watchlist missing, or not the caller's |
+| `execution_project_not_found` | 404 | Project missing — participation commands check this **before** the lock |
+| `execution_task_limit_reached` | 409 | 500 tasks |
+| `execution_watchlist_limit_reached` | 409 | 20 watchlists |
+| `execution_watchlist_project_limit_reached` | 409 | 200 projects in one watchlist |
+| `execution_name_conflict` | 409 | Watchlist name already used by this user |
+| `execution_version_conflict` | 409 | Stale `expectedVersion` |
+| `execution_idempotency_conflict` | 409 | Reused key with different input |
+| `execution_command_invalid` | 400 | Malformed payload, or a secret-shaped field |
+| `execution_query_failed` | 500 | Read fallback — never mixed with the write fallback |
+| `execution_persistence_failed` | 500 | Write fallback |
+
+### Focused tests
+
+```bash
+pnpm --filter @airdrop/database exec vitest run src/tests/execution-repositories.test.ts
+pnpm --filter @airdrop/web exec vitest run src/tests/execution-api-client.test.ts \
+  src/tests/execution-task-ui.test.ts src/tests/execution-watchlist-ui.test.ts \
+  src/tests/execution-project-panel.test.ts
+```
+
+The pgTAP suite `supabase/tests/022_phase_10_execution.test.sql` (plan 73)
+covers the four-role matrix, direct-write denial, exact command replay, the
+limits, default-list protection, and the participation optimistic lock.
+
+Integration tests need the disposable tunnel:
+
+- Pre-flight compares the local and disposable migration, test, and seed hashes
+  and refuses to continue unless the disposable is the target.
+- The tunnel forwards `16432` (database) and `16433` (API). Unset
+  `HTTP_PROXY`/`HTTPS_PROXY` for the run — a local proxy intercepts localhost.
+- Integration variables are derived on the disposable host: the password from the
+  database container, and the anon key from `/home/kong/kong.yml`, selecting the
+  JWT whose payload role is `anon`. Write them to a `0600` file, copy it down,
+  delete the remote copy immediately, and delete the local file when finished.
+
+### Append-only recovery
+
+Task changes append to `user_task_events`, every command writes exactly one
+receipt and one outbox event, and history rows are never edited to make a
+mistake disappear. The participation read was repaired **forward-only** by
+dropping and recreating the function — a `create or replace` cannot change a
+return type — rather than by editing the earlier migration.
+
+### Rollout status and remaining gates
+
+Migrations `20260906000100` (the command boundary) and `20260906000200` (the
+participation projection version) **are applied to production** (2026-09-09),
+each after a rollback dry run and each registered in
+`supabase_migrations.schema_migrations`. Pre-migration backup:
+`/root/backups/prod-pre-phase10-20260909.sql`.
+
+Two facts remain and must be resolved before more of Phase 10 — or Phase 9 — is
+rolled forward:
+
+1. **The production version sequence has a gap.** Phase 9's `20260903000200` and
+   `20260904000100` are still unapplied, so production jumped from 29 straight to
+   32/33. Execution does not depend on them — every object migration 32
+   references comes from an earlier migration — but the gap is real and should be
+   closed deliberately, subject to the Phase 9 gates.
+2. **`GOTRUE_SITE_URL` still points at `http://127.0.0.1:3000`.** That is the
+   standing Phase 9 blocker: magic links would send a user back to their own
+   machine.
+
+Deploying the web application remains a separate, outstanding item — production
+serves only the static site, so an applied migration alone does not put `/tasks`
+or `/watchlists` in front of users.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:

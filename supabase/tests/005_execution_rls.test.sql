@@ -1,6 +1,6 @@
 begin;
 
-select plan(228);
+select plan(230);
 
 select has_table('public', 'watchlists', 'watchlists table exists');
 select has_table('public', 'watchlist_projects', 'watchlist_projects table exists');
@@ -27,7 +27,7 @@ select ok(
 select columns_are(
   'public',
   'watchlists',
-  array['id', 'user_id', 'name', 'is_default', 'created_at', 'updated_at'],
+  array['id', 'user_id', 'name', 'is_default', 'created_at', 'updated_at', 'version'],
   'watchlists exposes the private execution contract columns in order'
 );
 select columns_are(
@@ -39,7 +39,7 @@ select columns_are(
 select columns_are(
   'public',
   'user_projects',
-  array['user_id', 'project_id', 'participation_status', 'notes', 'started_at', 'updated_at'],
+  array['user_id', 'project_id', 'participation_status', 'notes', 'started_at', 'updated_at', 'version'],
   'user_projects exposes the private execution contract columns in order'
 );
 select columns_are(
@@ -405,10 +405,10 @@ select ok(
   'only authenticated browser users can execute the versioned task command'
 );
 select ok(
-  has_table_privilege('authenticated', 'public.watchlists', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.watchlist_projects', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.user_projects', 'SELECT,DELETE')
-    and has_table_privilege('authenticated', 'public.user_tasks', 'SELECT,DELETE')
+  has_table_privilege('authenticated', 'public.watchlists', 'SELECT')
+    and has_table_privilege('authenticated', 'public.watchlist_projects', 'SELECT')
+    and has_table_privilege('authenticated', 'public.user_projects', 'SELECT')
+    and has_table_privilege('authenticated', 'public.user_tasks', 'SELECT')
     and not has_table_privilege('anon', 'public.watchlists', 'SELECT,INSERT,UPDATE,DELETE')
     and not has_table_privilege('anon', 'public.watchlist_projects', 'SELECT,INSERT,UPDATE,DELETE')
     and not has_table_privilege('anon', 'public.user_projects', 'SELECT,INSERT,UPDATE,DELETE')
@@ -420,23 +420,20 @@ select ok(
   'table grants expose private execution records only to authenticated owners subject to RLS'
 );
 select ok(
-  has_column_privilege('authenticated', 'public.watchlists', 'user_id', 'INSERT')
-    and has_column_privilege('authenticated', 'public.watchlists', 'name', 'UPDATE')
-    and not has_column_privilege('authenticated', 'public.watchlists', 'user_id', 'UPDATE')
-    and has_column_privilege('authenticated', 'public.user_projects', 'user_id', 'INSERT')
-    and has_column_privilege('authenticated', 'public.user_projects', 'notes', 'UPDATE')
-    and not has_column_privilege('authenticated', 'public.user_projects', 'user_id', 'UPDATE')
-    and has_column_privilege('authenticated', 'public.user_tasks', 'user_id', 'INSERT')
-    and not has_any_column_privilege('authenticated', 'public.user_tasks', 'UPDATE'),
-  'column grants keep ownership immutable and close direct task updates'
+  has_table_privilege('authenticated', 'public.watchlists', 'SELECT')
+    and not has_any_column_privilege('authenticated', 'public.watchlists', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.user_projects', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.user_tasks', 'INSERT,UPDATE')
+    and not has_any_column_privilege('authenticated', 'public.watchlist_projects', 'INSERT,UPDATE'),
+  'commands own every write, so authenticated holds read-only grants on execution tables'
 );
 
 with expected(table_name, privilege_vector) as (
   values
-    ('watchlists', 't|f|f|t|f|f|f'),
-    ('watchlist_projects', 't|f|f|t|f|f|f'),
-    ('user_projects', 't|f|f|t|f|f|f'),
-    ('user_tasks', 't|f|f|t|f|f|f')
+    ('watchlists', 't|f|f|f|f|f|f'),
+    ('watchlist_projects', 't|f|f|f|f|f|f'),
+    ('user_projects', 't|f|f|f|f|f|f'),
+    ('user_tasks', 't|f|f|f|f|f|f')
 )
 select is(
   pg_catalog.format(
@@ -488,28 +485,30 @@ from expected;
 with expected(table_name, column_name, privilege_vector) as (
   values
     ('watchlists', 'id', 't|f|f|f'),
-    ('watchlists', 'user_id', 't|t|f|f'),
-    ('watchlists', 'name', 't|t|t|f'),
-    ('watchlists', 'is_default', 't|t|t|f'),
+    ('watchlists', 'user_id', 't|f|f|f'),
+    ('watchlists', 'name', 't|f|f|f'),
+    ('watchlists', 'is_default', 't|f|f|f'),
     ('watchlists', 'created_at', 't|f|f|f'),
     ('watchlists', 'updated_at', 't|f|f|f'),
-    ('watchlist_projects', 'watchlist_id', 't|t|f|f'),
-    ('watchlist_projects', 'project_id', 't|t|f|f'),
+    ('watchlists', 'version', 't|f|f|f'),
+    ('watchlist_projects', 'watchlist_id', 't|f|f|f'),
+    ('watchlist_projects', 'project_id', 't|f|f|f'),
     ('watchlist_projects', 'added_at', 't|f|f|f'),
-    ('user_projects', 'user_id', 't|t|f|f'),
-    ('user_projects', 'project_id', 't|t|f|f'),
-    ('user_projects', 'participation_status', 't|t|t|f'),
-    ('user_projects', 'notes', 't|t|t|f'),
-    ('user_projects', 'started_at', 't|t|t|f'),
+    ('user_projects', 'user_id', 't|f|f|f'),
+    ('user_projects', 'project_id', 't|f|f|f'),
+    ('user_projects', 'participation_status', 't|f|f|f'),
+    ('user_projects', 'notes', 't|f|f|f'),
+    ('user_projects', 'started_at', 't|f|f|f'),
     ('user_projects', 'updated_at', 't|f|f|f'),
+    ('user_projects', 'version', 't|f|f|f'),
     ('user_tasks', 'id', 't|f|f|f'),
-    ('user_tasks', 'user_id', 't|t|f|f'),
-    ('user_tasks', 'project_id', 't|t|f|f'),
-    ('user_tasks', 'title', 't|t|f|f'),
-    ('user_tasks', 'status', 't|t|f|f'),
-    ('user_tasks', 'priority', 't|t|f|f'),
-    ('user_tasks', 'due_at', 't|t|f|f'),
-    ('user_tasks', 'completed_at', 't|t|f|f'),
+    ('user_tasks', 'user_id', 't|f|f|f'),
+    ('user_tasks', 'project_id', 't|f|f|f'),
+    ('user_tasks', 'title', 't|f|f|f'),
+    ('user_tasks', 'status', 't|f|f|f'),
+    ('user_tasks', 'priority', 't|f|f|f'),
+    ('user_tasks', 'due_at', 't|f|f|f'),
+    ('user_tasks', 'completed_at', 't|f|f|f'),
     ('user_tasks', 'version', 't|f|f|f'),
     ('user_tasks', 'created_at', 't|f|f|f'),
     ('user_tasks', 'updated_at', 't|f|f|f')
@@ -682,7 +681,7 @@ values
     'aaaaaaaa-1111-4111-8111-111111111111',
     '11111111-1111-4111-8111-111111111111',
     'Owner Default',
-    true,
+    false,
     '2026-08-09 01:00:00+00',
     '2026-08-09 01:00:00+00'
   ),
@@ -690,7 +689,7 @@ values
     'bbbbbbbb-2222-4222-8222-222222222222',
     '22222222-2222-4222-8222-222222222222',
     'Other Default',
-    true,
+    false,
     '2026-08-09 01:00:00+00',
     '2026-08-09 01:00:00+00'
   ),
@@ -698,7 +697,7 @@ values
     'cccccccc-3333-4333-8333-333333333333',
     '33333333-3333-4333-8333-333333333333',
     'Admin Default',
-    true,
+    false,
     '2026-08-09 01:00:00+00',
     '2026-08-09 01:00:00+00'
   );
@@ -825,10 +824,11 @@ select is(
   (
     select pg_catalog.format('%s|%s', is_default, created_at = updated_at)
     from public.watchlists
-    where id = 'aaaaaaaa-1111-4111-8111-111111111111'
+    where user_id = '11111111-1111-4111-8111-111111111111'
+      and is_default
   ),
   't|t',
-  'watchlists retain explicit defaults and timestamps'
+  'the bootstrapped default watchlist retains its default flag and timestamps'
 );
 select is(
   (
@@ -969,25 +969,28 @@ select set_config(
 );
 
 select results_eq(
-  $$select name from public.watchlists order by name$$,
-  $$values ('Not Default'::text), ('Owner Default'::text)$$,
-  'an owner reads only their watchlists'
+  $$select name from public.watchlists order by name collate "C"$$,
+  $$values ('Not Default'::text), ('Owner Default'::text), ('默认关注'::text)$$,
+  'an owner reads only their own watchlists, including the bootstrapped default'
 );
-select lives_ok(
+select throws_like(
   $$insert into public.watchlists (user_id, name) values ('11111111-1111-4111-8111-111111111111', 'Temporary Watchlist')$$,
-  'an owner can create a watchlist'
+  'permission denied for table watchlists',
+  'an owner cannot create a watchlist directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $$update public.watchlists set name = 'Renamed Watchlist' where name = 'Temporary Watchlist'$$,
-  'an owner can update a watchlist'
+  'permission denied for table watchlists',
+  'an owner cannot update a watchlist directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $$delete from public.watchlists where name = 'Renamed Watchlist'$$,
-  'an owner can delete a watchlist'
+  'permission denied for table watchlists',
+  'an owner cannot delete a watchlist directly because the command owns that write'
 );
 select throws_like(
   $$insert into public.watchlists (user_id, name) values ('22222222-2222-4222-8222-222222222222', 'Cross-owner Watchlist')$$,
-  '%new row violates row-level security policy for table "watchlists"%',
+  'permission denied for table watchlists',
   'an owner cannot create a watchlist for another user'
 );
 select throws_like(
@@ -995,17 +998,13 @@ select throws_like(
   'permission denied for table watchlists',
   'watchlist ownership is immutable'
 );
-select results_eq(
+select throws_like(
   $sql$
-    with changed as (
-      update public.watchlists
-      set name = 'Hidden rewrite'
-      where id = 'bbbbbbbb-2222-4222-8222-222222222222'
-      returning 1
-    )
-    select count(*)::bigint from changed
+    update public.watchlists
+    set name = 'Hidden rewrite'
+    where id = 'bbbbbbbb-2222-4222-8222-222222222222'
   $sql$,
-  $$values (0::bigint)$$,
+  'permission denied for table watchlists',
   'an owner cannot update another user watchlist'
 );
 
@@ -1019,7 +1018,7 @@ select results_eq(
   $sql$,
   'an owner reads only projects in their watchlists'
 );
-select lives_ok(
+select throws_like(
   $sql$
     insert into public.watchlist_projects (watchlist_id, project_id)
     values (
@@ -1027,15 +1026,17 @@ select lives_ok(
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
     )
   $sql$,
-  'an owner can attach a project to their watchlist'
+  'permission denied for table watchlist_projects',
+  'an owner cannot attach a project directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $sql$
     delete from public.watchlist_projects
     where watchlist_id = 'aaaaaaaa-1111-4111-8111-111111111111'
       and project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
   $sql$,
-  'an owner can remove a project from their watchlist'
+  'permission denied for table watchlist_projects',
+  'an owner cannot remove a project directly because the command owns that write'
 );
 select throws_like(
   $sql$
@@ -1045,7 +1046,7 @@ select throws_like(
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
     )
   $sql$,
-  '%new row violates row-level security policy for table "watchlist_projects"%',
+  'permission denied for table watchlist_projects',
   'an owner cannot attach a project to another user watchlist'
 );
 select throws_like(
@@ -1053,17 +1054,13 @@ select throws_like(
   'permission denied for table watchlist_projects',
   'watchlist project ownership cannot be moved through a direct update'
 );
-select results_eq(
+select throws_like(
   $sql$
-    with deleted as (
-      delete from public.watchlist_projects
-      where watchlist_id = 'bbbbbbbb-2222-4222-8222-222222222222'
-        and project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
-      returning 1
-    )
-    select count(*)::bigint from deleted
+    delete from public.watchlist_projects
+    where watchlist_id = 'bbbbbbbb-2222-4222-8222-222222222222'
+      and project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'
   $sql$,
-  $$values (0::bigint)$$,
+  'permission denied for table watchlist_projects',
   'an owner cannot delete another user watchlist child'
 );
 
@@ -1072,7 +1069,7 @@ select results_eq(
   $$values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'::uuid, 'Owner private notes'::text)$$,
   'an owner reads only their project tracking and private notes'
 );
-select lives_ok(
+select throws_like(
   $sql$
     insert into public.user_projects (user_id, project_id, participation_status, notes)
     values (
@@ -1082,24 +1079,27 @@ select lives_ok(
       'Temporary notes'
     )
   $sql$,
-  'an owner can create user project tracking'
+  'permission denied for table user_projects',
+  'an owner cannot create project tracking directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $sql$
     update public.user_projects
     set participation_status = 'participating', notes = 'Updated notes'
     where user_id = '11111111-1111-4111-8111-111111111111'
       and project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
   $sql$,
-  'an owner can update user project tracking'
+  'permission denied for table user_projects',
+  'an owner cannot update project tracking directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $sql$
     delete from public.user_projects
     where user_id = '11111111-1111-4111-8111-111111111111'
       and project_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
   $sql$,
-  'an owner can delete user project tracking'
+  'permission denied for table user_projects',
+  'an owner cannot delete project tracking directly because the command owns that write'
 );
 select throws_like(
   $sql$
@@ -1109,7 +1109,7 @@ select throws_like(
       'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2'
     )
   $sql$,
-  '%new row violates row-level security policy for table "user_projects"%',
+  'permission denied for table user_projects',
   'an owner cannot create project tracking for another user'
 );
 select throws_like(
@@ -1122,17 +1122,13 @@ select throws_like(
   'permission denied for table user_projects',
   'user project identity cannot be moved to another project'
 );
-select results_eq(
+select throws_like(
   $sql$
-    with changed as (
-      update public.user_projects
-      set notes = 'Hidden rewrite'
-      where user_id = '22222222-2222-4222-8222-222222222222'
-      returning 1
-    )
-    select count(*)::bigint from changed
+    update public.user_projects
+    set notes = 'Hidden rewrite'
+    where user_id = '22222222-2222-4222-8222-222222222222'
   $sql$,
-  $$values (0::bigint)$$,
+  'permission denied for table user_projects',
   'an owner cannot update another user project or its notes'
 );
 
@@ -1141,17 +1137,19 @@ select results_eq(
   $$values ('Completed correctly'::text), ('Incomplete correctly'::text), ('Owner task'::text)$$,
   'an owner reads only their tasks'
 );
-select lives_ok(
+select throws_like(
   $$insert into public.user_tasks (user_id, title) values ('11111111-1111-4111-8111-111111111111', 'Temporary task')$$,
-  'an owner can create a task'
+  'permission denied for table user_tasks',
+  'an owner cannot create a task directly because the command owns that write'
 );
-select lives_ok(
+select throws_like(
   $$delete from public.user_tasks where title = 'Temporary task'$$,
-  'an owner can delete a task'
+  'permission denied for table user_tasks',
+  'an owner cannot delete a task directly because the command owns that write'
 );
 select throws_like(
   $$insert into public.user_tasks (user_id, title) values ('22222222-2222-4222-8222-222222222222', 'Cross-owner task')$$,
-  '%new row violates row-level security policy for table "user_tasks"%',
+  'permission denied for table user_tasks',
   'an owner cannot create a task for another user'
 );
 select throws_like(
@@ -1744,16 +1742,12 @@ select is(
   'cross-owner and missing tasks return the same non-enumerating detail'
 );
 
-select results_eq(
+select throws_like(
   $sql$
-    with deleted as (
-      delete from public.user_tasks
-      where id = 'dddddddd-2222-4222-8222-222222222222'
-      returning 1
-    )
-    select count(*)::bigint from deleted
+    delete from public.user_tasks
+    where id = 'dddddddd-2222-4222-8222-222222222222'
   $sql$,
-  $$values (0::bigint)$$,
+  'permission denied for table user_tasks',
   'an owner cannot delete another user task'
 );
 
@@ -1769,9 +1763,9 @@ select set_config(
 
 select ok(public.has_active_role('admin'), 'the browser principal has an active admin grant');
 select results_eq(
-  $$select name from public.watchlists order by name$$,
-  $$values ('Admin Default'::text)$$,
-  'a browser admin reads only their own watchlists'
+  $$select name from public.watchlists order by name collate "C"$$,
+  $$values ('Admin Default'::text), ('默认关注'::text)$$,
+  'a browser admin reads only their own watchlists, including the bootstrapped default'
 );
 select results_eq(
   $$select watchlist_id from public.watchlist_projects order by watchlist_id$$,
@@ -1790,7 +1784,7 @@ select results_eq(
 );
 select throws_like(
   $$insert into public.user_projects (user_id, project_id, notes) values ('11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', 'Admin support read is not approved')$$,
-  '%new row violates row-level security policy for table "user_projects"%',
+  'permission denied for table user_projects',
   'a browser admin grant does not permit writing another user private records'
 );
 select throws_ok(
