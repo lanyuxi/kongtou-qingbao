@@ -22,6 +22,7 @@
     "@types/node": "^24.10.0"
   },
   "exports": {
-    "./collection-once": "./src/queue/run-collection-once.ts"
+    "./collection-once": "./src/queue/run-collection-once.ts",
+    "./ai-stage-once": "./src/orchestration/run-ai-stage-once.ts"
   }
 }
