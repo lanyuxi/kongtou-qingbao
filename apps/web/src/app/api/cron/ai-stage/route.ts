@@ -59,13 +59,17 @@ async function handle(request: Request): Promise<Response> {
     });
     return Response.json({ ok: true, data: result });
   } catch (error) {
-    // Secret-guarded and only ever called by the scheduler, so a diagnosable
-    // message is worth more than a generic one.
+    // The repository wraps every driver failure in a generic persistence error
+    // and keeps the real one in `cause`; surface it, or diagnosis stops at
+    // "something failed".
+    const cause =
+      error instanceof Error && error.cause instanceof Error ? error.cause.message : null;
     return Response.json(
       {
         ok: false,
         error: 'ai_stage_failed',
         message: error instanceof Error ? error.message : 'unknown error',
+        cause,
       },
       { status: 500 },
     );
