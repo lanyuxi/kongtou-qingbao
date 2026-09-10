@@ -52,6 +52,54 @@ export const profileTimezoneSchema = z
   .min(1)
   .max(64);
 
+// ---------------------------------------------------------------------------
+// Phase 11: phone + password credentials
+// ---------------------------------------------------------------------------
+
+/**
+ * Mainland China mobile number, which is the login identifier users type.
+ * Stored digits-only: no spaces, dashes, or country code, so the value that
+ * reaches the database is identical to the value the login form collected and
+ * the unique index can do its job.
+ */
+const mainlandPhonePattern = /^1[3-9][0-9]{9}$/;
+
+export const loginPhoneSchema = z
+  .string()
+  .trim()
+  .regex(mainlandPhonePattern, 'Mobile number must be 11 digits starting with 1.');
+
+/**
+ * Password policy for phone accounts.
+ *
+ * The upper bound is 72 because that is where bcrypt — which Supabase Auth
+ * hashes with — stops reading input; accepting longer strings would silently
+ * make two different passwords equivalent. The composition rule exists because
+ * the account's only second factor is the password itself: there is no SMS
+ * step and no magic link to fall back on.
+ */
+export const accountPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters.')
+  .max(72, 'Password must be at most 72 characters.')
+  .refine((value) => /[A-Za-z]/.test(value), {
+    message: 'Password must contain at least one letter.',
+  })
+  .refine((value) => /[0-9]/.test(value), {
+    message: 'Password must contain at least one digit.',
+  })
+  .refine((value) => !hasControlCharacter(value), {
+    message: 'Password must not contain control characters.',
+  });
+
+function hasControlCharacter(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code < 0x20 || code === 0x7f;
+  });
+}
+
+
 const evmAddressPattern = /^0x[0-9a-fA-F]{40}$/;
 
 export const walletAddressSchema = z

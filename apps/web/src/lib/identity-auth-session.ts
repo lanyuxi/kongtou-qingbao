@@ -2,11 +2,20 @@ export const identityDefaultReturnPath = '/settings/profile';
 
 export const identitySignInPath = '/auth/sign-in';
 
+export const identitySignUpPath = '/auth/sign-up';
+
+export const identityForgotPasswordPath = '/auth/forgot-password';
+
 export const identityCallbackPath = '/auth/callback';
 
 export type IdentityAuthFailureCode =
+  | 'identity_auth_phone_invalid'
+  | 'identity_auth_password_invalid'
   | 'identity_auth_email_invalid'
-  | 'identity_auth_link_failed'
+  | 'identity_auth_credentials_rejected'
+  | 'identity_auth_registration_failed'
+  | 'identity_auth_reset_request_failed'
+  | 'identity_auth_lookup_failed'
   | 'identity_auth_callback_invalid'
   | 'identity_auth_sign_out_failed';
 
@@ -15,11 +24,28 @@ export type IdentityAuthOutcome =
   | { readonly ok: false; readonly code: IdentityAuthFailureCode };
 
 /**
- * The browser auth provider. It intentionally exposes no password credential
- * path: end-user sign-in is magic-link only (decision D1).
+ * The browser auth provider, now password-based (Phase 11 replaced the Phase 9
+ * magic-link only decision).
+ *
+ * Accounts are identified by a mainland mobile number, but Supabase
+ * authenticates by email, so the port exposes `resolveLoginEmail` as a separate
+ * step: the login screen collects a number, the API maps it to the address the
+ * account was created with, and only then is a credential presented.
  */
 export interface IdentityAuthPort {
-  sendMagicLink(input: {
+  resolveLoginEmail(input: {
+    readonly phone: string;
+  }): Promise<{ readonly email: string | null; readonly error: unknown | null }>;
+  signInWithPassword(input: {
+    readonly email: string;
+    readonly password: string;
+  }): Promise<{ readonly error: unknown | null }>;
+  signUpWithPassword(input: {
+    readonly email: string;
+    readonly password: string;
+    readonly phone: string;
+  }): Promise<{ readonly error: unknown | null }>;
+  requestPasswordReset(input: {
     readonly email: string;
     readonly redirectTo: string;
   }): Promise<{ readonly error: unknown | null }>;
@@ -31,8 +57,17 @@ export interface IdentityAuthPort {
 }
 
 export interface IdentityAuthController {
-  requestMagicLink(input: {
+  signIn(input: {
+    readonly phone: string;
+    readonly password: string;
+  }): Promise<IdentityAuthOutcome>;
+  register(input: {
+    readonly phone: string;
     readonly email: string;
+    readonly password: string;
+  }): Promise<IdentityAuthOutcome>;
+  requestPasswordReset(input: {
+    readonly phone: string;
     readonly redirectTo: string;
   }): Promise<IdentityAuthOutcome>;
   completeSignIn(params: URLSearchParams): Promise<IdentityAuthOutcome>;
@@ -45,11 +80,41 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u;
 
 const maxEmailLength = 254;
 
+const phonePattern = /^1[3-9][0-9]{9}$/u;
+
+const minPasswordLength = 8;
+
+const maxPasswordLength = 72;
+
+/**
+ * A syntactically valid address that cannot belong to any account. When a
+ * number is not registered we still perform a credential check against this
+ * address, so the failure path costs the same as a wrong password and the
+ * response does not reveal which numbers exist.
+ */
+const decoyEmail = 'unregistered@invalid.airdrop-intelligence-os.local';
+
+export function parseIdentityAuthPhone(value: string): string | null {
+  const trimmed = value.trim();
+  if (hasControlCharacter(trimmed)) return null;
+  return phonePattern.test(trimmed) ? trimmed : null;
+}
+
 export function parseIdentityAuthEmail(value: string): string | null {
   const trimmed = value.trim();
   if (trimmed === '' || trimmed.length > maxEmailLength) return null;
   if (hasControlCharacter(trimmed)) return null;
   return emailPattern.test(trimmed) ? trimmed : null;
+}
+
+export function parseIdentityAuthPassword(value: string): string | null {
+  if (value.length < minPasswordLength || value.length > maxPasswordLength) return null;
+  if (hasControlCharacter(value)) return null;
+  // Mirrors accountPasswordSchema: a phone account's password is the only
+  // factor protecting it, so trivially weak strings are rejected up front
+  // instead of coming back as an opaque provider error.
+  if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value)) return null;
+  return value;
 }
 
 export function sanitizeIdentityReturnPath(value: string | null): string {
@@ -66,21 +131,78 @@ export function buildSignInPath(returnPath: string): string {
   return `${identitySignInPath}?next=${encodeURIComponent(sanitizeIdentityReturnPath(returnPath))}`;
 }
 
-export function buildMagicLinkRedirect(origin: string, returnPath: string): string {
+export function buildSignUpPath(returnPath: string): string {
+  return `${identitySignUpPath}?next=${encodeURIComponent(sanitizeIdentityReturnPath(returnPath))}`;
+}
+
+/**
+ * Where the recovery email should drop the user. Supabase returns them to the
+ * callback route with a session, which then forwards to the password form.
+ */
+export function buildPasswordResetRedirect(origin: string, returnPath: string): string {
   const next = encodeURIComponent(sanitizeIdentityReturnPath(returnPath));
-  return `${origin}${identityCallbackPath}?next=${next}`;
+  return `${origin}${identityCallbackPath}?next=${next}&mode=recovery`;
 }
 
 export function createIdentityAuthController(auth: IdentityAuthPort): IdentityAuthController {
   return {
-    async requestMagicLink(input) {
+    async signIn(input) {
+      const phone = parseIdentityAuthPhone(input.phone);
+      if (phone === null) return failure('identity_auth_phone_invalid');
+      const password = parseIdentityAuthPassword(input.password);
+      if (password === null) return failure('identity_auth_password_invalid');
+
+      let email: string;
+      try {
+        const resolved = await auth.resolveLoginEmail({ phone });
+        if (resolved.error !== null) return failure('identity_auth_lookup_failed');
+        email = resolved.email ?? decoyEmail;
+      } catch {
+        return failure('identity_auth_lookup_failed');
+      }
+
+      try {
+        const result = await auth.signInWithPassword({ email, password });
+        return result.error === null ? success : failure('identity_auth_credentials_rejected');
+      } catch {
+        return failure('identity_auth_credentials_rejected');
+      }
+    },
+
+    async register(input) {
+      const phone = parseIdentityAuthPhone(input.phone);
+      if (phone === null) return failure('identity_auth_phone_invalid');
       const email = parseIdentityAuthEmail(input.email);
       if (email === null) return failure('identity_auth_email_invalid');
+      const password = parseIdentityAuthPassword(input.password);
+      if (password === null) return failure('identity_auth_password_invalid');
+
       try {
-        const result = await auth.sendMagicLink({ email, redirectTo: input.redirectTo });
-        return result.error === null ? success : failure('identity_auth_link_failed');
+        const result = await auth.signUpWithPassword({ email, password, phone });
+        return result.error === null ? success : failure('identity_auth_registration_failed');
       } catch {
-        return failure('identity_auth_link_failed');
+        return failure('identity_auth_registration_failed');
+      }
+    },
+
+    async requestPasswordReset(input) {
+      const phone = parseIdentityAuthPhone(input.phone);
+      if (phone === null) return failure('identity_auth_phone_invalid');
+
+      try {
+        const resolved = await auth.resolveLoginEmail({ phone });
+        if (resolved.error !== null) return failure('identity_auth_lookup_failed');
+        // An unknown number reports success without sending anything: telling
+        // the visitor "no such account" would turn this form into a way to
+        // test which numbers are registered.
+        if (resolved.email === null) return success;
+        const result = await auth.requestPasswordReset({
+          email: resolved.email,
+          redirectTo: input.redirectTo,
+        });
+        return result.error === null ? success : failure('identity_auth_reset_request_failed');
+      } catch {
+        return failure('identity_auth_reset_request_failed');
       }
     },
 

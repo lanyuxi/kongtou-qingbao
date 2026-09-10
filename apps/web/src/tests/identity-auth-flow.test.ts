@@ -4,20 +4,27 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AuthCallbackStatus,
+  ForgotPasswordForm,
   IdentitySessionBar,
-  MagicLinkForm,
+  PasswordSignInForm,
+  PasswordSignUpForm,
   completeSignInOnce,
   identityAuthMessage,
   signOutOnce,
-  submitMagicLinkRequestOnce,
+  submitPasswordResetOnce,
+  submitSignInOnce,
+  submitSignUpOnce,
   type IdentityAuthState,
 } from '../components/identity/identity-auth-elements.js';
 import {
-  buildMagicLinkRedirect,
+  buildPasswordResetRedirect,
   buildSignInPath,
+  buildSignUpPath,
   createIdentityAuthController,
   identityDefaultReturnPath,
   parseIdentityAuthEmail,
+  parseIdentityAuthPassword,
+  parseIdentityAuthPhone,
   sanitizeIdentityReturnPath,
   type IdentityAuthFailureCode,
   type IdentityAuthPort,
@@ -29,14 +36,40 @@ interface AuthCall {
   readonly input?: unknown;
 }
 
-function recordingPort(overrides: Partial<IdentityAuthPort> = {}): {
+const registeredEmail = 'alice@example.com';
+const registeredPhone = '13800138000';
+
+/**
+ * `lookupEmail` defaults to the registered address; pass null to model a number
+ * that has no account. The credential check is modelled faithfully: only the
+ * registered address succeeds, so the decoy-address path behaves like the real
+ * provider and returns a rejection.
+ */
+function recordingPort(
+  overrides: Partial<IdentityAuthPort> = {},
+  lookupEmail: string | null = registeredEmail,
+): {
   readonly port: IdentityAuthPort;
   readonly calls: AuthCall[];
 } {
   const calls: AuthCall[] = [];
   const port: IdentityAuthPort = {
-    async sendMagicLink(input) {
-      calls.push({ method: 'sendMagicLink', input });
+    async resolveLoginEmail(input) {
+      calls.push({ method: 'resolveLoginEmail', input });
+      return { email: lookupEmail, error: null };
+    },
+    async signInWithPassword(input) {
+      calls.push({ method: 'signInWithPassword', input });
+      return input.email === registeredEmail
+        ? { error: null }
+        : { error: new Error('invalid credentials') };
+    },
+    async signUpWithPassword(input) {
+      calls.push({ method: 'signUpWithPassword', input });
+      return { error: null };
+    },
+    async requestPasswordReset(input) {
+      calls.push({ method: 'requestPasswordReset', input });
       return { error: null };
     },
     async getSession() {
@@ -52,24 +85,47 @@ function recordingPort(overrides: Partial<IdentityAuthPort> = {}): {
   return { port, calls };
 }
 
-function failedPort(method: 'sendMagicLink' | 'getSession' | 'signOut'): IdentityAuthPort {
-  return recordingPort(
-    method === 'sendMagicLink'
-      ? { sendMagicLink: async () => ({ error: new Error('smtp down') }) }
-      : method === 'getSession'
-        ? { getSession: async () => ({ hasSession: false, error: new Error('exchange failed') }) }
-        : { signOut: async () => ({ error: new Error('sign out failed') }) },
-  ).port;
+type FailMethod = 'resolveLoginEmail' | 'signInWithPassword' | 'signUpWithPassword'
+  | 'requestPasswordReset' | 'getSession' | 'signOut';
+
+function failedPort(method: FailMethod): IdentityAuthPort {
+  const overrides: Partial<IdentityAuthPort> = {};
+  const message = 'provider rejected the request';
+  switch (method) {
+    case 'resolveLoginEmail':
+      overrides.resolveLoginEmail = async () => ({ email: null, error: new Error(message) });
+      break;
+    case 'signInWithPassword':
+      overrides.signInWithPassword = async () => ({ error: new Error(message) });
+      break;
+    case 'signUpWithPassword':
+      overrides.signUpWithPassword = async () => ({ error: new Error(message) });
+      break;
+    case 'requestPasswordReset':
+      overrides.requestPasswordReset = async () => ({ error: new Error(message) });
+      break;
+    case 'getSession':
+      overrides.getSession = async () => ({ hasSession: false, error: new Error(message) });
+      break;
+    case 'signOut':
+      overrides.signOut = async () => ({ error: new Error(message) });
+      break;
+  }
+  return recordingPort(overrides).port;
 }
 
-function throwingPort(method: 'sendMagicLink' | 'getSession' | 'signOut'): IdentityAuthPort {
-  return recordingPort(
-    method === 'sendMagicLink'
-      ? { sendMagicLink: async () => { throw new Error('network'); } }
-      : method === 'getSession'
-        ? { getSession: async () => { throw new Error('network'); } }
-        : { signOut: async () => { throw new Error('network'); } },
-  ).port;
+function throwingPort(method: FailMethod): IdentityAuthPort {
+  const boom = async () => { throw new Error('network'); };
+  const overrides: Partial<IdentityAuthPort> = {};
+  switch (method) {
+    case 'resolveLoginEmail': overrides.resolveLoginEmail = boom as never; break;
+    case 'signInWithPassword': overrides.signInWithPassword = boom as never; break;
+    case 'signUpWithPassword': overrides.signUpWithPassword = boom as never; break;
+    case 'requestPasswordReset': overrides.requestPasswordReset = boom as never; break;
+    case 'getSession': overrides.getSession = boom as never; break;
+    case 'signOut': overrides.signOut = boom as never; break;
+  }
+  return recordingPort(overrides).port;
 }
 
 function params(query: string): URLSearchParams {
@@ -79,6 +135,58 @@ function params(query: string): URLSearchParams {
 function html(element: Parameters<typeof renderToStaticMarkup>[0]): string {
   return renderToStaticMarkup(element);
 }
+
+const idle: IdentityAuthState = { status: 'idle' };
+
+describe('identity auth phone parsing', () => {
+  it.each([
+    ['13800138000'],
+    [' 13800138000 '],
+    ['19912345678'],
+  ])('accepts %s', (value) => {
+    expect(parseIdentityAuthPhone(value)).toBe(value.trim());
+  });
+
+  it.each([
+    ['', 'empty'],
+    ['1380013800', 'ten digits'],
+    ['138001380001', 'twelve digits'],
+    ['12800138000', 'second digit out of range'],
+    ['008613800138000', 'country code prefix'],
+    ['138 0013 8000', 'spaces inside'],
+    ['+8613800138000', 'plus prefix'],
+    ['1380013800a', 'letter suffix'],
+  ])('rejects %s (%s)', (value) => {
+    expect(parseIdentityAuthPhone(value)).toBeNull();
+  });
+
+  it('rejects control characters inside an otherwise valid number', () => {
+    expect(parseIdentityAuthPhone('1380013800\u0000')).toBeNull();
+  });
+});
+
+describe('identity auth password parsing', () => {
+  it('accepts a password with a letter and a digit of adequate length', () => {
+    expect(parseIdentityAuthPassword('airdrop2026')).toBe('airdrop2026');
+  });
+
+  it.each([
+    ['short1', 'too short'],
+    ['12345678', 'digits only'],
+    ['abcdefgh', 'letters only'],
+    ['a1'.repeat(40), 'longer than 72'],
+  ])('rejects %s (%s)', (value) => {
+    expect(parseIdentityAuthPassword(value)).toBeNull();
+  });
+
+  it('rejects control characters without trimming them away', () => {
+    expect(parseIdentityAuthPassword('airdrop2026\u0007')).toBeNull();
+  });
+
+  it('accepts a password padded with spaces because spaces are legal characters', () => {
+    expect(parseIdentityAuthPassword(' pass word 1 ')).toBe(' pass word 1 ');
+  });
+});
 
 describe('identity auth email parsing', () => {
   it.each([
@@ -118,120 +226,239 @@ describe('identity auth return path sanitisation', () => {
   });
 
   it('keeps same-origin absolute paths', () => {
-    expect(sanitizeIdentityReturnPath('/settings/wallets')).toBe('/settings/wallets');
-    expect(sanitizeIdentityReturnPath('/opportunities')).toBe('/opportunities');
+    expect(sanitizeIdentityReturnPath('/tasks')).toBe('/tasks');
+    expect(sanitizeIdentityReturnPath('/watchlists?tab=all')).toBe('/watchlists?tab=all');
   });
 
   it.each([
-    ['//evil.example.com/settings/profile', 'protocol-relative'],
-    ['/\\evil.example.com', 'backslash protocol-relative'],
-    ['https://evil.example.com/settings/profile', 'absolute url'],
-    ['javascript:alert(1)', 'javascript scheme'],
-    ['settings/profile', 'relative path'],
-    ['/settings/profile\n', 'trailing newline'],
-    ['/settings\twallets', 'inner tab'],
-  ])('rejects %s (%s)', (value) => {
+    ['https://evil.example.com/x'],
+    ['//evil.example.com'],
+    ['/\\evil.example.com'],
+    ['/auth/sign-in'],
+    ['/auth'],
+    ['tasks'],
+  ])('refuses %s', (value) => {
     expect(sanitizeIdentityReturnPath(value)).toBe(identityDefaultReturnPath);
   });
 
-  it('never returns to the auth flow itself', () => {
-    expect(sanitizeIdentityReturnPath('/auth/sign-in')).toBe(identityDefaultReturnPath);
-    expect(sanitizeIdentityReturnPath('/auth/callback')).toBe(identityDefaultReturnPath);
-    expect(sanitizeIdentityReturnPath('/auth')).toBe(identityDefaultReturnPath);
+  it('builds sign-in and sign-up paths that carry a sanitised return path', () => {
+    expect(buildSignInPath('/tasks')).toBe('/auth/sign-in?next=%2Ftasks');
+    expect(buildSignUpPath('/watchlists')).toBe('/auth/sign-up?next=%2Fwatchlists');
+    expect(buildSignInPath('https://evil.example.com')).toBe(
+      '/auth/sign-in?next=%2Fsettings%2Fprofile',
+    );
   });
 
-  it('round-trips the pending action through the sign-in path', () => {
-    const signInPath = buildSignInPath('/settings/wallets');
-    const next = new URL(`https://app.example.test${signInPath}`).searchParams.get('next');
+  it('sends the reset link back through our own callback route', () => {
+    const redirect = buildPasswordResetRedirect('https://app.example.test', '/settings/profile');
 
-    expect(signInPath.startsWith('/auth/sign-in?next=')).toBe(true);
-    expect(next).toBe('/settings/wallets');
-    expect(sanitizeIdentityReturnPath(next)).toBe('/settings/wallets');
-  });
-
-  it('drops an attacker supplied next value instead of propagating it', () => {
-    const signInPath = buildSignInPath('//evil.example.com');
-
-    expect(signInPath).toBe('/auth/sign-in?next=%2Fsettings%2Fprofile');
-  });
-
-  it('carries the pending action into the absolute magic-link redirect', () => {
-    const redirect = buildMagicLinkRedirect('https://app.example.test', '/settings/wallets');
-
-    expect(redirect).toBe('https://app.example.test/auth/callback?next=%2Fsettings%2Fwallets');
+    expect(redirect).toBe(
+      'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile&mode=recovery',
+    );
     expect(sanitizeIdentityReturnPath(
       new URL(redirect).searchParams.get('next'),
-    )).toBe('/settings/wallets');
+    )).toBe('/settings/profile');
   });
 
-  it('never lets the magic link redirect to a foreign origin', () => {
-    const redirect = buildMagicLinkRedirect('https://app.example.test', 'https://evil.example.com/x');
+  it('never lets the reset redirect point at a foreign origin', () => {
+    const redirect = buildPasswordResetRedirect(
+      'https://app.example.test',
+      'https://evil.example.com/x',
+    );
 
-    expect(redirect).toBe('https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile');
+    expect(redirect).toBe(
+      'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile&mode=recovery',
+    );
   });
 });
 
 describe('identity auth controller surface', () => {
-  it('exposes only the magic-link, completion and sign-out entry points', () => {
+  it('exposes password sign-in, registration, recovery, completion and sign-out', () => {
     const controller = createIdentityAuthController(recordingPort().port);
 
     expect(Object.keys(controller).sort()).toEqual([
       'completeSignIn',
-      'requestMagicLink',
+      'register',
+      'requestPasswordReset',
+      'signIn',
       'signOut',
     ]);
   });
 });
 
-describe('identity magic link requests', () => {
-  it('sends a magic link for a valid email and reports success', async () => {
+describe('identity password sign-in', () => {
+  it('resolves the number to an address and presents the credential', async () => {
     const { port, calls } = recordingPort();
     const controller = createIdentityAuthController(port);
 
-    const outcome = await controller.requestMagicLink({
+    const outcome = await controller.signIn({
+      phone: ' 13800138000 ',
+      password: 'airdrop2026',
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(calls).toEqual([
+      { method: 'resolveLoginEmail', input: { phone: registeredPhone } },
+      {
+        method: 'signInWithPassword',
+        input: { email: registeredEmail, password: 'airdrop2026' },
+      },
+    ]);
+  });
+
+  it('rejects a malformed number without touching the provider', async () => {
+    const { port, calls } = recordingPort();
+    const controller = createIdentityAuthController(port);
+
+    expect(await controller.signIn({ phone: '12345', password: 'airdrop2026' }))
+      .toEqual({ ok: false, code: 'identity_auth_phone_invalid' });
+    expect(calls).toEqual([]);
+  });
+
+  it('rejects a weak password without touching the provider', async () => {
+    const { port, calls } = recordingPort();
+    const controller = createIdentityAuthController(port);
+
+    expect(await controller.signIn({ phone: registeredPhone, password: 'short' }))
+      .toEqual({ ok: false, code: 'identity_auth_password_invalid' });
+    expect(calls).toEqual([]);
+  });
+
+  it('reports the provider rejection as rejected credentials', async () => {
+    const controller = createIdentityAuthController(failedPort('signInWithPassword'));
+
+    expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
+      .toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
+  });
+
+  it('maps a thrown provider error to the same rejected-credentials code', async () => {
+    const controller = createIdentityAuthController(throwingPort('signInWithPassword'));
+
+    expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
+      .toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
+  });
+
+  it('still presents a credential when the number is unknown, so the answer cannot be used to probe accounts', async () => {
+    const { port, calls } = recordingPort({}, null);
+    const controller = createIdentityAuthController(port);
+
+    const outcome = await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' });
+
+    expect(outcome).toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
+    const signIn = calls.find((call) => call.method === 'signInWithPassword');
+    expect(signIn).toBeDefined();
+    expect((signIn?.input as { email: string }).email).not.toBe(registeredEmail);
+    expect((signIn?.input as { email: string }).email).toContain('invalid');
+  });
+
+  it('fails fast when the lookup itself is unavailable', async () => {
+    const controller = createIdentityAuthController(failedPort('resolveLoginEmail'));
+
+    expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
+      .toEqual({ ok: false, code: 'identity_auth_lookup_failed' });
+  });
+});
+
+describe('identity registration', () => {
+  it('creates the account with both the number and the recovery address', async () => {
+    const { port, calls } = recordingPort();
+    const controller = createIdentityAuthController(port);
+
+    const outcome = await controller.register({
+      phone: '13800138000',
       email: ' Alice@Example.com ',
-      redirectTo: 'https://app.example.test/auth/callback?next=/settings/wallets',
+      password: 'airdrop2026',
     });
 
     expect(outcome).toEqual({ ok: true });
     expect(calls).toEqual([{
-      method: 'sendMagicLink',
+      method: 'signUpWithPassword',
       input: {
+        phone: registeredPhone,
         email: 'Alice@Example.com',
-        redirectTo: 'https://app.example.test/auth/callback?next=/settings/wallets',
+        password: 'airdrop2026',
       },
     }]);
   });
 
-  it('rejects an invalid email without contacting the auth provider', async () => {
+  it.each([
+    ['12345', 'alice@example.com', 'airdrop2026', 'identity_auth_phone_invalid'],
+    ['13800138000', 'not-an-email', 'airdrop2026', 'identity_auth_email_invalid'],
+    ['13800138000', 'alice@example.com', 'short', 'identity_auth_password_invalid'],
+  ])('rejects %s / %s / %s', async (phone, email, password, code) => {
     const { port, calls } = recordingPort();
     const controller = createIdentityAuthController(port);
 
-    const outcome = await controller.requestMagicLink({
-      email: 'not-an-email',
-      redirectTo: 'https://app.example.test/auth/callback',
-    });
-
-    expect(outcome).toEqual({ ok: false, code: 'identity_auth_email_invalid' });
+    expect(await controller.register({ phone, email, password }))
+      .toEqual({ ok: false, code: code as IdentityAuthFailureCode });
     expect(calls).toEqual([]);
   });
 
-  it('maps a provider failure to the magic-link failure code', async () => {
-    const controller = createIdentityAuthController(failedPort('sendMagicLink'));
+  it('reports a provider rejection as a registration failure', async () => {
+    const controller = createIdentityAuthController(failedPort('signUpWithPassword'));
 
-    expect(await controller.requestMagicLink({
-      email: 'alice@example.com',
-      redirectTo: 'https://app.example.test/auth/callback',
-    })).toEqual({ ok: false, code: 'identity_auth_link_failed' });
+    expect(await controller.register({
+      phone: registeredPhone,
+      email: registeredEmail,
+      password: 'airdrop2026',
+    })).toEqual({ ok: false, code: 'identity_auth_registration_failed' });
+  });
+});
+
+describe('identity password recovery', () => {
+  it('mails a reset link to the address bound to the number', async () => {
+    const { port, calls } = recordingPort();
+    const controller = createIdentityAuthController(port);
+
+    const outcome = await controller.requestPasswordReset({
+      phone: registeredPhone,
+      redirectTo: 'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile&mode=recovery',
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(calls).toEqual([
+      { method: 'resolveLoginEmail', input: { phone: registeredPhone } },
+      {
+        method: 'requestPasswordReset',
+        input: {
+          email: registeredEmail,
+          redirectTo: 'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile&mode=recovery',
+        },
+      },
+    ]);
   });
 
-  it('maps a thrown provider error to the magic-link failure code', async () => {
-    const controller = createIdentityAuthController(throwingPort('sendMagicLink'));
+  it('reports success for an unknown number without sending anything', async () => {
+    const { port, calls } = recordingPort({}, null);
+    const controller = createIdentityAuthController(port);
 
-    expect(await controller.requestMagicLink({
-      email: 'alice@example.com',
+    const outcome = await controller.requestPasswordReset({
+      phone: registeredPhone,
       redirectTo: 'https://app.example.test/auth/callback',
-    })).toEqual({ ok: false, code: 'identity_auth_link_failed' });
+    });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(calls.map((call) => call.method)).toEqual(['resolveLoginEmail']);
+  });
+
+  it('rejects a malformed number without touching the provider', async () => {
+    const { port, calls } = recordingPort();
+    const controller = createIdentityAuthController(port);
+
+    expect(await controller.requestPasswordReset({
+      phone: 'nope',
+      redirectTo: 'https://app.example.test/auth/callback',
+    })).toEqual({ ok: false, code: 'identity_auth_phone_invalid' });
+    expect(calls).toEqual([]);
+  });
+
+  it('reports a provider rejection as a reset failure', async () => {
+    const controller = createIdentityAuthController(failedPort('requestPasswordReset'));
+
+    expect(await controller.requestPasswordReset({
+      phone: registeredPhone,
+      redirectTo: 'https://app.example.test/auth/callback',
+    })).toEqual({ ok: false, code: 'identity_auth_reset_request_failed' });
   });
 });
 
@@ -294,158 +521,147 @@ describe('identity sign out', () => {
   });
 });
 
-describe('identity auth single-flight gates', () => {
-  it('sends one magic link when the same request is submitted twice in one tick', async () => {
-    const gate = createPendingActionGate();
-    const { port, calls } = recordingPort();
-    const controller = createIdentityAuthController(port);
-    const input = {
-      email: 'alice@example.com',
-      redirectTo: 'https://app.example.test/auth/callback',
-    };
-
-    const [first, second] = await Promise.all([
-      submitMagicLinkRequestOnce(gate, controller, input),
-      submitMagicLinkRequestOnce(gate, controller, input),
-    ]);
-
-    expect([first, second]).toEqual([{ status: 'link_sent' }, { status: 'pending' }]);
-    expect(calls).toHaveLength(1);
-  });
-
-  it('completes sign-in once when the callback effect fires twice', async () => {
-    const gate = createPendingActionGate();
-    const { port, calls } = recordingPort();
-    const controller = createIdentityAuthController(port);
-
-    const [first, second] = await Promise.all([
-      completeSignInOnce(gate, controller, params('code=pkce-code')),
-      completeSignInOnce(gate, controller, params('code=pkce-code')),
-    ]);
-
-    expect([first, second]).toEqual([{ status: 'signed_in' }, { status: 'pending' }]);
-    expect(calls).toHaveLength(1);
-  });
-
-  it('signs out once when the button is activated twice', async () => {
-    const gate = createPendingActionGate();
-    const { port, calls } = recordingPort();
-    const controller = createIdentityAuthController(port);
-
-    const [first, second] = await Promise.all([
-      signOutOnce(gate, controller),
-      signOutOnce(gate, controller),
-    ]);
-
-    expect([first, second]).toEqual([{ status: 'signed_out' }, { status: 'pending' }]);
-    expect(calls).toHaveLength(1);
-  });
-
-  it('releases the gate so a later submission can proceed', async () => {
-    const gate = createPendingActionGate();
-    const controller = createIdentityAuthController(failedPort('sendMagicLink'));
-    const input = {
-      email: 'alice@example.com',
-      redirectTo: 'https://app.example.test/auth/callback',
-    };
-
-    const first = await submitMagicLinkRequestOnce(gate, controller, input);
-    const second = await submitMagicLinkRequestOnce(gate, controller, input);
-
-    expect(first).toEqual({ status: 'failed', code: 'identity_auth_link_failed' });
-    expect(second).toEqual({ status: 'failed', code: 'identity_auth_link_failed' });
-  });
-});
-
-describe('identity auth surfaces', () => {
-  const idle: IdentityAuthState = { status: 'idle' };
-
-  it('asks only for an email and offers no field for a password or a wallet secret', () => {
-    const rendered = html(createElement(MagicLinkForm, {
-      state: idle,
-      onSubmit: async () => {},
-    }));
-
-    expect(rendered).toContain('type="email"');
-    expect(rendered).not.toMatch(/type="password"/i);
-    expect(rendered).not.toMatch(/autocomplete="current-password"/i);
-    expect(rendered).not.toMatch(/<input[^>]*name="(?:password|private|seed|mnemonic|secret|recovery)/i);
-    expect((rendered.match(/<input/g) ?? []).length).toBe(1);
-  });
-
-  it('states that sign-in is magic-link only and never asks for credentials', () => {
-    const rendered = html(createElement(MagicLinkForm, {
-      state: idle,
-      onSubmit: async () => {},
-    }));
-
-    expect(rendered).toContain('我们只会向你的邮箱发送一次性登录链接');
-    expect(rendered).toContain('不会要求密码');
-    expect(rendered).toContain('永远不会索取私钥、助记词、钱包密码或签名密钥');
-    expect(rendered).not.toContain('/review/sign-in');
-  });
-
-  it('renders the pending link-sent state without offering a password fallback', () => {
-    const rendered = html(createElement(MagicLinkForm, {
-      state: { status: 'link_sent' },
-      onSubmit: async () => {},
-    }));
-
-    expect(rendered).toContain('登录链接已发送');
-    expect(rendered).not.toMatch(/type="password"/i);
-    expect(rendered).toContain('href="/auth/sign-in"');
-  });
-
-  it('renders every auth failure with bounded copy', () => {
+describe('identity auth messages', () => {
+  it('maps every failure code to a non-empty message', () => {
     const codes: readonly IdentityAuthFailureCode[] = [
+      'identity_auth_phone_invalid',
+      'identity_auth_password_invalid',
       'identity_auth_email_invalid',
-      'identity_auth_link_failed',
+      'identity_auth_credentials_rejected',
+      'identity_auth_registration_failed',
+      'identity_auth_reset_request_failed',
+      'identity_auth_lookup_failed',
       'identity_auth_callback_invalid',
       'identity_auth_sign_out_failed',
     ];
 
     for (const code of codes) {
-      const message = identityAuthMessage(code);
-      expect(message.length).toBeGreaterThan(0);
-      expect(message).not.toMatch(/undefined|NaN|[A-Za-z_]{4,}_[a-z_]+/);
+      expect(identityAuthMessage(code).length).toBeGreaterThan(0);
     }
-    expect(identityAuthMessage('identity_auth_email_invalid')).toBe('邮箱格式无效，请检查后重试。');
-    expect(identityAuthMessage('identity_auth_callback_invalid')).toBe('登录链接无效或已过期，请重新申请。');
+  });
+});
+
+describe('identity auth screens', () => {
+  it('renders the sign-in form with a phone field and a masked password field', () => {
+    const markup = html(createElement(PasswordSignInForm, { state: idle, onSubmit: async () => {} }));
+
+    expect(markup).toContain('type="password"');
+    expect(markup).toContain('type="tel"');
+    expect(markup).toContain('手机号');
+    expect(markup).not.toContain('邮箱一次性链接');
+    expect(markup).not.toContain('不使用密码');
   });
 
-  it('renders the callback outcome states', () => {
-    const pending = html(createElement(AuthCallbackStatus, { state: { status: 'pending' } }));
-    const completed = html(createElement(AuthCallbackStatus, { state: { status: 'signed_in' } }));
-    const failed = html(createElement(AuthCallbackStatus, {
-      state: { status: 'failed', code: 'identity_auth_callback_invalid' },
-    }));
+  it('renders the sign-up form with a recovery email and a confirmation field', () => {
+    const markup = html(createElement(PasswordSignUpForm, { state: idle, onSubmit: async () => {} }));
 
-    expect(pending).toContain('正在完成登录');
-    expect(completed).toContain('登录成功');
-    expect(failed).toContain('登录链接无效或已过期，请重新申请。');
-    expect(failed).toContain('href="/auth/sign-in"');
-    expect(`${pending}${completed}${failed}`).not.toContain('/review/sign-in');
+    expect(markup).toContain('type="email"');
+    expect(markup.match(/type="password"/gu)?.length).toBe(2);
+    expect(markup).toContain('确认密码');
   });
 
-  it('offers sign out from the settings session bar and nothing else', () => {
-    const rendered = html(createElement(IdentitySessionBar, {
-      state: idle,
-      onSignOut: async () => {},
-    }));
+  it('renders the recovery form with only the phone field', () => {
+    const markup = html(createElement(ForgotPasswordForm, { state: idle, onSubmit: async () => {} }));
 
-    expect(rendered).toContain('已登录');
-    expect(rendered).toContain('登出');
-    expect(rendered).not.toMatch(/type="password"/i);
-    expect(rendered).not.toContain('/review/sign-in');
+    expect(markup).toContain('type="tel"');
+    expect(markup).not.toContain('type="password"');
+    expect(markup).not.toContain('type="email"');
   });
 
-  it('keeps the sign-out failure visible on the session bar', () => {
-    const rendered = html(createElement(IdentitySessionBar, {
-      state: { status: 'failed', code: 'identity_auth_sign_out_failed' },
-      onSignOut: async () => {},
+  it('confirms registration without exposing whether the address exists', () => {
+    const markup = html(createElement(PasswordSignUpForm, {
+      state: { status: 'registered' },
+      onSubmit: async () => {},
     }));
 
-    expect(rendered).toContain('登出失败，请重试。');
-    expect(rendered).toContain('登出');
+    expect(markup).toContain('注册成功');
+  });
+
+  it('confirms a reset request with wording that does not confirm the account exists', () => {
+    const markup = html(createElement(ForgotPasswordForm, {
+      state: { status: 'reset_requested' },
+      onSubmit: async () => {},
+    }));
+
+    expect(markup).toContain('如果该手机号已注册');
+  });
+
+  it('renders the callback status and the session bar', () => {
+    const callback = html(createElement(AuthCallbackStatus, { state: { status: 'pending' } }));
+    const bar = html(createElement(IdentitySessionBar, { state: idle, onSignOut: async () => {} }));
+
+    expect(callback).toContain('正在完成登录');
+    expect(bar).toContain('登出');
+  });
+
+  it('escapes hostile content instead of rendering markup from a failure code', () => {
+    const markup = html(createElement(PasswordSignInForm, {
+      state: { status: 'failed', code: 'identity_auth_credentials_rejected' },
+      onSubmit: async () => {},
+    }));
+
+    expect(markup).toContain('手机号或密码不正确');
+    expect(markup).not.toContain('&lt;');
+  });
+});
+
+describe('identity auth pending gate', () => {
+  it('only lets one sign-in request through while the first is in flight', async () => {
+    const gate = createPendingActionGate();
+    let resolveFirst: ((value: { ok: true }) => void) | undefined;
+    const controller = createIdentityAuthController(recordingPort({
+      signInWithPassword: async () => {
+        await new Promise<void>((resolve) => { resolveFirst = () => resolve(); });
+        return { error: null };
+      },
+    }).port);
+
+    const first = submitSignInOnce(gate, controller, {
+      phone: registeredPhone,
+      password: 'airdrop2026',
+    });
+    const second = await submitSignInOnce(gate, controller, {
+      phone: registeredPhone,
+      password: 'airdrop2026',
+    });
+
+    expect(second).toEqual({ status: 'pending' });
+    resolveFirst?.({ ok: true });
+    await first;
+  });
+
+  it('surfaces a failed sign-in as a failed state carrying the code', async () => {
+    const gate = createPendingActionGate();
+    const controller = createIdentityAuthController(failedPort('signInWithPassword'));
+
+    expect(await submitSignInOnce(gate, controller, {
+      phone: registeredPhone,
+      password: 'airdrop2026',
+    })).toEqual({ status: 'failed', code: 'identity_auth_credentials_rejected' });
+  });
+
+  it('surfaces registration and recovery successes as their own states', async () => {
+    const gate = createPendingActionGate();
+    const controller = createIdentityAuthController(recordingPort().port);
+
+    expect(await submitSignUpOnce(gate, controller, {
+      phone: registeredPhone,
+      email: registeredEmail,
+      password: 'airdrop2026',
+    })).toEqual({ status: 'registered' });
+
+    expect(await submitPasswordResetOnce(gate, controller, {
+      phone: registeredPhone,
+      redirectTo: 'https://app.example.test/auth/callback',
+    })).toEqual({ status: 'reset_requested' });
+  });
+
+  it('reports completion and sign-out outcomes', async () => {
+    const gate = createPendingActionGate();
+    const controller = createIdentityAuthController(recordingPort().port);
+
+    expect(await completeSignInOnce(gate, controller, params('code=abc')))
+      .toEqual({ status: 'signed_in' });
+    expect(await signOutOnce(gate, controller)).toEqual({ status: 'signed_out' });
   });
 });

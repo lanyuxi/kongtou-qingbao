@@ -5378,6 +5378,12 @@ export type Database = {
           lease_expires_at: string
         }[]
       }
+      resolve_login_email: {
+        Args: {
+          p_phone: string
+        }
+        Returns: string
+      }
       retry_collection_job: {
         Args: {
           available_at: string

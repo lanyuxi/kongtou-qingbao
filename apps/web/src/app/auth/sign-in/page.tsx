@@ -5,11 +5,11 @@ import { SignInScreen } from '../../../components/identity/sign-in-screen.js';
 export default function IdentitySignInPage() {
   return (
     <Suspense
-      fallback={(
+      fallback={
         <main className="settings-page identity-auth-page">
-          <p className="identity-message">正在准备邮箱登录…</p>
+          <p className="identity-message">正在准备登录…</p>
         </main>
-      )}
+      }
     >
       <SignInScreen />
     </Suspense>

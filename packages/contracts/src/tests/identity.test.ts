@@ -9,8 +9,10 @@ import {
   updateProfileCommandSchema,
 } from '../identity/commands.js';
 import {
+  accountPasswordSchema,
   findForbiddenIdentityKeys,
   identityErrorCodeSchema,
+  loginPhoneSchema,
   walletAddressSchema,
   walletVisibilitySchema,
 } from '../identity/enums.js';
@@ -279,5 +281,55 @@ describe('identity repository receipts and errors', () => {
       'identity_query_failed',
       'identity_persistence_failed',
     ]);
+  });
+});
+
+describe('phone login credentials', () => {
+  it.each([
+    '13800138000',
+    '19912345678',
+    '  13800138000  ',
+  ])('accepts the mobile number %s', (value) => {
+    expect(loginPhoneSchema.parse(value)).toBe(value.trim());
+  });
+
+  it.each([
+    ['1380013800', 'ten digits'],
+    ['138001380001', 'twelve digits'],
+    ['12800138000', 'second digit out of range'],
+    ['+8613800138000', 'country code prefix'],
+    ['138 0013 8000', 'spaces inside'],
+  ])('rejects %s (%s)', (value) => {
+    expect(loginPhoneSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('account password contract', () => {
+  it('accepts a password that carries both a letter and a digit', () => {
+    expect(accountPasswordSchema.parse('airdrop2026')).toBe('airdrop2026');
+  });
+
+  it.each([
+    ['short1', 'fewer than 8 characters'],
+    ['12345678', 'digits only'],
+    ['abcdefgh', 'letters only'],
+    [`a1${'x'.repeat(71)}`, 'longer than bcrypt reads'],
+    ['airdrop2026\u0000', 'control character'],
+  ])('rejects %s (%s)', (value) => {
+    expect(accountPasswordSchema.safeParse(value).success).toBe(false);
+  });
+
+  it('does not trim spaces, because they are legal password characters', () => {
+    expect(accountPasswordSchema.parse(' pass word 1 ')).toBe(' pass word 1 ');
+  });
+
+  it('treats a password field as an allowed payload key', () => {
+    expect(findForbiddenIdentityKeys({ phone: '13800138000', password: 'airdrop2026' }))
+      .toEqual([]);
+  });
+
+  it('still rejects secret-shaped keys so the platform rule stays enforced', () => {
+    expect(findForbiddenIdentityKeys({ recoveryPhrase: 'x' })).toEqual(['recoveryPhrase']);
+    expect(findForbiddenIdentityKeys({ privateKey: 'x' })).toEqual(['privateKey']);
   });
 });

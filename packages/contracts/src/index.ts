@@ -11,7 +11,9 @@ export {
   type UpdateProfileCommand
 } from './identity/commands.js';
 export {
+  accountPasswordSchema,
   findForbiddenIdentityKeys,
+  loginPhoneSchema,
   profileAvatarUrlSchema,
   profileDisplayNameSchema,
   profileTimezoneSchema,
