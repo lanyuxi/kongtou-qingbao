@@ -48,22 +48,27 @@ const signUpRedirect = 'https://app.example.test/auth/callback?next=%2Fsettings%
  */
 function recordingPort(
   overrides: Partial<IdentityAuthPort> = {},
-  lookupEmail: string | null = registeredEmail,
+  signInSucceeds = true,
 ): {
   readonly port: IdentityAuthPort;
   readonly calls: AuthCall[];
 } {
   const calls: AuthCall[] = [];
   const port: IdentityAuthPort = {
-    async resolveLoginEmail(input) {
-      calls.push({ method: 'resolveLoginEmail', input });
-      return { email: lookupEmail, error: null };
+    async signInWithPhone(input) {
+      calls.push({ method: 'signInWithPhone', input });
+      // The endpoint returns no session for BOTH an unknown number and a wrong
+      // password; the client cannot tell them apart, by design.
+      return signInSucceeds
+        ? {
+            error: null,
+            session: { accessToken: 'access-token', refreshToken: 'refresh-token' },
+          }
+        : { error: null, session: null };
     },
-    async signInWithPassword(input) {
-      calls.push({ method: 'signInWithPassword', input });
-      return input.email === registeredEmail
-        ? { error: null }
-        : { error: new Error('invalid credentials') };
+    async adoptSession(input) {
+      calls.push({ method: 'adoptSession', input });
+      return { error: null };
     },
     async signUpWithPassword(input) {
       calls.push({ method: 'signUpWithPassword', input });
@@ -86,18 +91,18 @@ function recordingPort(
   return { port, calls };
 }
 
-type FailMethod = 'resolveLoginEmail' | 'signInWithPassword' | 'signUpWithPassword'
+type FailMethod = 'signInWithPhone' | 'adoptSession' | 'signUpWithPassword'
   | 'requestPasswordReset' | 'getSession' | 'signOut';
 
 function failedPort(method: FailMethod): IdentityAuthPort {
   const overrides: Partial<IdentityAuthPort> = {};
   const message = 'provider rejected the request';
   switch (method) {
-    case 'resolveLoginEmail':
-      overrides.resolveLoginEmail = async () => ({ email: null, error: new Error(message) });
+    case 'signInWithPhone':
+      overrides.signInWithPhone = async () => ({ error: new Error(message), session: null });
       break;
-    case 'signInWithPassword':
-      overrides.signInWithPassword = async () => ({ error: new Error(message) });
+    case 'adoptSession':
+      overrides.adoptSession = async () => ({ error: new Error(message) });
       break;
     case 'signUpWithPassword':
       overrides.signUpWithPassword = async () => ({ error: new Error(message) });
@@ -119,8 +124,8 @@ function throwingPort(method: FailMethod): IdentityAuthPort {
   const boom = async () => { throw new Error('network'); };
   const overrides: Partial<IdentityAuthPort> = {};
   switch (method) {
-    case 'resolveLoginEmail': overrides.resolveLoginEmail = boom as never; break;
-    case 'signInWithPassword': overrides.signInWithPassword = boom as never; break;
+    case 'signInWithPhone': overrides.signInWithPhone = boom as never; break;
+    case 'adoptSession': overrides.adoptSession = boom as never; break;
     case 'signUpWithPassword': overrides.signUpWithPassword = boom as never; break;
     case 'requestPasswordReset': overrides.requestPasswordReset = boom as never; break;
     case 'getSession': overrides.getSession = boom as never; break;
@@ -288,7 +293,7 @@ describe('identity auth controller surface', () => {
 });
 
 describe('identity password sign-in', () => {
-  it('resolves the number to an address and presents the credential', async () => {
+  it('sends the number and password to our endpoint and adopts the session it returns', async () => {
     const { port, calls } = recordingPort();
     const controller = createIdentityAuthController(port);
 
@@ -298,11 +303,16 @@ describe('identity password sign-in', () => {
     });
 
     expect(outcome).toEqual({ ok: true });
+    // No address anywhere in the call log: the phone→email join happens on the
+    // server, and the browser only ever sees tokens.
     expect(calls).toEqual([
-      { method: 'resolveLoginEmail', input: { phone: registeredPhone } },
       {
-        method: 'signInWithPassword',
-        input: { email: registeredEmail, password: 'airdrop2026' },
+        method: 'signInWithPhone',
+        input: { phone: registeredPhone, password: 'airdrop2026' },
+      },
+      {
+        method: 'adoptSession',
+        input: { accessToken: 'access-token', refreshToken: 'refresh-token' },
       },
     ]);
   });
@@ -325,38 +335,33 @@ describe('identity password sign-in', () => {
     expect(calls).toEqual([]);
   });
 
-  it('reports the provider rejection as rejected credentials', async () => {
-    const controller = createIdentityAuthController(failedPort('signInWithPassword'));
+  it('reports a provider failure as a lookup failure, not a credential problem', async () => {
+    const controller = createIdentityAuthController(failedPort('signInWithPhone'));
 
     expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
-      .toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
+      .toEqual({ ok: false, code: 'identity_auth_lookup_failed' });
   });
 
-  it('maps a thrown provider error to the same rejected-credentials code', async () => {
-    const controller = createIdentityAuthController(throwingPort('signInWithPassword'));
+  it('maps a thrown provider error to the same lookup-failure code', async () => {
+    const controller = createIdentityAuthController(throwingPort('signInWithPhone'));
 
     expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
-      .toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
+      .toEqual({ ok: false, code: 'identity_auth_lookup_failed' });
   });
 
-  it('still presents a credential when the number is unknown, so the answer cannot be used to probe accounts', async () => {
-    const { port, calls } = recordingPort({}, null);
+  it('reports a rejected credential without saying whether the number exists', async () => {
+    const { port, calls } = recordingPort({}, false);
     const controller = createIdentityAuthController(port);
 
     const outcome = await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' });
 
     expect(outcome).toEqual({ ok: false, code: 'identity_auth_credentials_rejected' });
-    const signIn = calls.find((call) => call.method === 'signInWithPassword');
+    // The port receives ONLY the number and the password. The address behind
+    // the number is joined server-side and never reaches the browser, so a
+    // caller cannot harvest recovery addresses by guessing numbers.
+    const signIn = calls.find((call) => call.method === 'signInWithPhone');
     expect(signIn).toBeDefined();
-    expect((signIn?.input as { email: string }).email).not.toBe(registeredEmail);
-    expect((signIn?.input as { email: string }).email).toContain('invalid');
-  });
-
-  it('fails fast when the lookup itself is unavailable', async () => {
-    const controller = createIdentityAuthController(failedPort('resolveLoginEmail'));
-
-    expect(await controller.signIn({ phone: registeredPhone, password: 'airdrop2026' }))
-      .toEqual({ ok: false, code: 'identity_auth_lookup_failed' });
+    expect(Object.keys(signIn?.input as object).sort()).toEqual(['password', 'phone']);
   });
 });
 
@@ -410,7 +415,7 @@ describe('identity registration', () => {
 });
 
 describe('identity password recovery', () => {
-  it('mails a reset link to the address bound to the number', async () => {
+  it('asks our endpoint to mail a reset link, without naming an address', async () => {
     const { port, calls } = recordingPort();
     const controller = createIdentityAuthController(port);
 
@@ -420,20 +425,21 @@ describe('identity password recovery', () => {
     });
 
     expect(outcome).toEqual({ ok: true });
+    // Same reasoning as sign-in: the bound address stays server-side, so the
+    // browser never learns it.
     expect(calls).toEqual([
-      { method: 'resolveLoginEmail', input: { phone: registeredPhone } },
       {
         method: 'requestPasswordReset',
         input: {
-          email: registeredEmail,
+          phone: registeredPhone,
           redirectTo: 'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile&mode=recovery',
         },
       },
     ]);
   });
 
-  it('reports success for an unknown number without sending anything', async () => {
-    const { port, calls } = recordingPort({}, null);
+  it('reports success for an unknown number without revealing that it is unknown', async () => {
+    const { port, calls } = recordingPort({}, false);
     const controller = createIdentityAuthController(port);
 
     const outcome = await controller.requestPasswordReset({
@@ -442,7 +448,9 @@ describe('identity password recovery', () => {
     });
 
     expect(outcome).toEqual({ ok: true });
-    expect(calls.map((call) => call.method)).toEqual(['resolveLoginEmail']);
+    // The request is always made; whether a mail is actually sent is decided
+    // on the server, so the client cannot tell the two cases apart.
+    expect(calls.map((call) => call.method)).toEqual(['requestPasswordReset']);
   });
 
   it('rejects a malformed number without touching the provider', async () => {
@@ -614,9 +622,12 @@ describe('identity auth pending gate', () => {
     const gate = createPendingActionGate();
     let resolveFirst: ((value: { ok: true }) => void) | undefined;
     const controller = createIdentityAuthController(recordingPort({
-      signInWithPassword: async () => {
+      signInWithPhone: async () => {
         await new Promise<void>((resolve) => { resolveFirst = () => resolve(); });
-        return { error: null };
+        return {
+          error: null,
+          session: { accessToken: 'access-token', refreshToken: 'refresh-token' },
+        };
       },
     }).port);
 
@@ -636,12 +647,12 @@ describe('identity auth pending gate', () => {
 
   it('surfaces a failed sign-in as a failed state carrying the code', async () => {
     const gate = createPendingActionGate();
-    const controller = createIdentityAuthController(failedPort('signInWithPassword'));
+    const controller = createIdentityAuthController(failedPort('signInWithPhone'));
 
     expect(await submitSignInOnce(gate, controller, {
       phone: registeredPhone,
       password: 'airdrop2026',
-    })).toEqual({ status: 'failed', code: 'identity_auth_credentials_rejected' });
+    })).toEqual({ status: 'failed', code: 'identity_auth_lookup_failed' });
   });
 
   it('surfaces registration and recovery successes as their own states', async () => {

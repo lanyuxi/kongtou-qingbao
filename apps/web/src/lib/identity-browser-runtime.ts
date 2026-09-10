@@ -15,19 +15,15 @@ import {
 } from './identity-auth-session.js';
 
 interface IdentityBrowserAuth {
-  signInWithPassword(input: {
-    email: string;
-    password: string;
+  setSession(input: {
+    access_token: string;
+    refresh_token: string;
   }): Promise<{ error: unknown | null }>;
   signUp(input: {
     email: string;
     password: string;
     options: { data: { phone: string }; emailRedirectTo: string };
   }): Promise<{ error: unknown | null }>;
-  resetPasswordForEmail(
-    email: string,
-    options: { redirectTo: string },
-  ): Promise<{ error: unknown | null }>;
   getSession(): Promise<{
     data: { session: { access_token: string } | null };
     error: unknown | null;
@@ -53,54 +49,67 @@ export function createIdentityBrowserSession(auth: IdentityBrowserAuth): Identit
   };
 }
 
-/**
- * Asks the BFF which address a mobile number belongs to. The endpoint answers
- * uniformly for unknown numbers (returning null) so this step cannot be used
- * to probe which numbers are registered.
- */
-export function createResolveLoginEmail(
+type EndpointCall = (
+  path: string,
+  body: Record<string, unknown>,
+) => Promise<{ readonly status: number; readonly payload: unknown }>;
+
+/** Posts JSON to one of our own identity endpoints and returns the envelope. */
+export function createIdentityEndpointCall(
   fetchImpl: typeof globalThis.fetch,
-): (phone: string) => Promise<{ email: string | null; error: unknown | null }> {
-  return async function resolveLoginEmail(phone) {
+): EndpointCall {
+  return async function call(path, body) {
+    const response = await fetchImpl(path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    let payload: unknown;
     try {
-      const response = await fetchImpl('/api/v1/identity/resolve-login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
-      const payload: unknown = await response.json();
-      if (!isRecord(payload) || payload.ok !== true) {
-        return { email: null, error: new Error('Identity lookup failed.') };
-      }
-      const data = payload.data;
-      if (!isRecord(data) || typeof data.email !== 'string') {
-        return { email: null, error: null };
-      }
-      return { email: data.email, error: null };
+      payload = await response.json();
     } catch {
-      return { email: null, error: new Error('Identity lookup failed.') };
+      payload = null;
     }
+    return { status: response.status, payload };
   };
 }
 
 /**
- * Password-based end-user auth (Phase 11). Accounts are created with an email
- * address — that is what password recovery is mailed to — while the mobile
- * number travels in user metadata and becomes the login identifier.
+ * Password-based end-user auth (Phase 11).
+ *
+ * Sign-in and recovery both go through our own endpoints rather than calling
+ * Supabase directly, because those endpoints are what hold the phone→email
+ * mapping. The browser only ever receives tokens, never the address.
  */
 export function createIdentityBrowserAuthPort(
   auth: IdentityBrowserAuth,
-  lookupLoginEmail: (phone: string) => Promise<{ email: string | null; error: unknown | null }>,
+  call: EndpointCall,
 ): IdentityAuthPort {
   return {
-    async resolveLoginEmail(input) {
-      return lookupLoginEmail(input.phone);
+    async signInWithPhone({ phone, password }) {
+      const { status, payload } = await call('/api/v1/identity/sign-in', { phone, password });
+      if (status === 401) return { error: null, session: null };
+      if (!isRecord(payload) || payload.ok !== true) {
+        return { error: new Error('Sign-in failed.'), session: null };
+      }
+      const data = payload.data;
+      if (
+        !isRecord(data) ||
+        typeof data.accessToken !== 'string' ||
+        typeof data.refreshToken !== 'string'
+      ) {
+        return { error: new Error('Sign-in returned no session.'), session: null };
+      }
+      return {
+        error: null,
+        session: { accessToken: data.accessToken, refreshToken: data.refreshToken },
+      };
     },
 
-    async signInWithPassword(input) {
-      const result = await auth.signInWithPassword({
-        email: input.email,
-        password: input.password,
+    async adoptSession({ accessToken, refreshToken }) {
+      const result = await auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
       });
       return { error: result.error };
     },
@@ -121,11 +130,14 @@ export function createIdentityBrowserAuthPort(
       return { error: result.error };
     },
 
-    async requestPasswordReset(input) {
-      const result = await auth.resetPasswordForEmail(input.email, {
-        redirectTo: input.redirectTo,
+    async requestPasswordReset({ phone, redirectTo }) {
+      const { status } = await call('/api/v1/identity/request-password-reset', {
+        phone,
+        redirectTo,
       });
-      return { error: result.error };
+      // The endpoint answers 200 for unknown numbers too, so anything other
+      // than a transport/server failure counts as "request accepted".
+      return { error: status < 500 ? null : new Error('Reset request failed.') };
     },
 
     async getSession() {
@@ -144,10 +156,10 @@ export function createIdentityBrowserAuthPort(
 }
 
 const unavailableAuthPort: IdentityAuthPort = {
-  async resolveLoginEmail() {
-    return { email: null, error: new Error('Identity auth is unavailable.') };
+  async signInWithPhone() {
+    return { error: new Error('Identity auth is unavailable.'), session: null };
   },
-  async signInWithPassword() {
+  async adoptSession() {
     return { error: new Error('Identity auth is unavailable.') };
   },
   async signUpWithPassword() {
@@ -177,7 +189,10 @@ export function createIdentityBrowserRuntime(): IdentityBrowserRuntime {
         session: createIdentityBrowserSession(supabase.auth),
       }),
       auth: createIdentityAuthController(
-        createIdentityBrowserAuthPort(supabase.auth, createResolveLoginEmail(dependencies.fetch)),
+        createIdentityBrowserAuthPort(
+          supabase.auth,
+          createIdentityEndpointCall(dependencies.fetch),
+        ),
       ),
     };
   } catch {

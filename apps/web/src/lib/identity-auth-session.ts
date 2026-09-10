@@ -24,21 +24,25 @@ export type IdentityAuthOutcome =
   | { readonly ok: false; readonly code: IdentityAuthFailureCode };
 
 /**
- * The browser auth provider, now password-based (Phase 11 replaced the Phase 9
- * magic-link only decision).
+ * The browser auth provider (Phase 11).
  *
  * Accounts are identified by a mainland mobile number, but Supabase
- * authenticates by email, so the port exposes `resolveLoginEmail` as a separate
- * step: the login screen collects a number, the API maps it to the address the
- * account was created with, and only then is a credential presented.
+ * authenticates by email. Crucially the *server* performs that join: the email
+ * behind a number is the account's recovery address and must never reach the
+ * browser, so sign-in posts the number and password to our own endpoint and
+ * receives tokens back. The client learns nothing but whether it worked.
  */
 export interface IdentityAuthPort {
-  resolveLoginEmail(input: {
+  signInWithPhone(input: {
     readonly phone: string;
-  }): Promise<{ readonly email: string | null; readonly error: unknown | null }>;
-  signInWithPassword(input: {
-    readonly email: string;
     readonly password: string;
+  }): Promise<{
+    readonly error: unknown | null;
+    readonly session: { readonly accessToken: string; readonly refreshToken: string } | null;
+  }>;
+  adoptSession(input: {
+    readonly accessToken: string;
+    readonly refreshToken: string;
   }): Promise<{ readonly error: unknown | null }>;
   signUpWithPassword(input: {
     readonly email: string;
@@ -47,7 +51,7 @@ export interface IdentityAuthPort {
     readonly redirectTo: string;
   }): Promise<{ readonly error: unknown | null }>;
   requestPasswordReset(input: {
-    readonly email: string;
+    readonly phone: string;
     readonly redirectTo: string;
   }): Promise<{ readonly error: unknown | null }>;
   getSession(): Promise<{
@@ -87,14 +91,6 @@ const phonePattern = /^1[3-9][0-9]{9}$/u;
 const minPasswordLength = 8;
 
 const maxPasswordLength = 72;
-
-/**
- * A syntactically valid address that cannot belong to any account. When a
- * number is not registered we still perform a credential check against this
- * address, so the failure path costs the same as a wrong password and the
- * response does not reveal which numbers exist.
- */
-const decoyEmail = 'unregistered@invalid.airdrop-intelligence-os.local';
 
 export function parseIdentityAuthPhone(value: string): string | null {
   const trimmed = value.trim();
@@ -164,20 +160,16 @@ export function createIdentityAuthController(auth: IdentityAuthPort): IdentityAu
       const password = parseIdentityAuthPassword(input.password);
       if (password === null) return failure('identity_auth_password_invalid');
 
-      let email: string;
       try {
-        const resolved = await auth.resolveLoginEmail({ phone });
-        if (resolved.error !== null) return failure('identity_auth_lookup_failed');
-        email = resolved.email ?? decoyEmail;
+        const result = await auth.signInWithPhone({ phone, password });
+        if (result.error !== null) return failure('identity_auth_lookup_failed');
+        if (result.session === null) return failure('identity_auth_credentials_rejected');
+        // The session is minted server-side; adopt it so the rest of the app,
+        // which reads the Supabase client session, sees a signed-in user.
+        const adopted = await auth.adoptSession(result.session);
+        return adopted.error === null ? success : failure('identity_auth_callback_invalid');
       } catch {
         return failure('identity_auth_lookup_failed');
-      }
-
-      try {
-        const result = await auth.signInWithPassword({ email, password });
-        return result.error === null ? success : failure('identity_auth_credentials_rejected');
-      } catch {
-        return failure('identity_auth_credentials_rejected');
       }
     },
 
@@ -207,14 +199,10 @@ export function createIdentityAuthController(auth: IdentityAuthPort): IdentityAu
       if (phone === null) return failure('identity_auth_phone_invalid');
 
       try {
-        const resolved = await auth.resolveLoginEmail({ phone });
-        if (resolved.error !== null) return failure('identity_auth_lookup_failed');
-        // An unknown number reports success without sending anything: telling
-        // the visitor "no such account" would turn this form into a way to
-        // test which numbers are registered.
-        if (resolved.email === null) return success;
+        // Also server-side: an unknown number reports success without sending
+        // anything, so this form cannot be used to test which numbers exist.
         const result = await auth.requestPasswordReset({
-          email: resolved.email,
+          phone,
           redirectTo: input.redirectTo,
         });
         return result.error === null ? success : failure('identity_auth_reset_request_failed');
