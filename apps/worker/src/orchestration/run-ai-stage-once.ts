@@ -111,11 +111,34 @@ export async function runAiStageOnce(options: AiStageOnceOptions): Promise<AiSta
       model: options.modelId,
     });
 
-    const extraction = await runExtractionOnce({
-      repository: createExtractionRepository(sql),
-      modelClient,
-      maxInputs: options.maxInputs ?? DEFAULT_MAX_INPUTS,
-    });
+    // Extraction is best-effort. When an input has already been extracted, the
+    // dedup key fires; the run that already exists is exactly the desired end
+    // state, so there is nothing to do about it. Letting it abort the pass
+    // would also block publishing and scoring, which are independent of
+    // whether *this* pass extracted anything new.
+    let extraction = {
+      processed: 0,
+      succeeded: 0,
+      schemaInvalid: 0,
+      providerErrors: 0,
+      candidatesInserted: 0,
+    };
+    try {
+      const summary = await runExtractionOnce({
+        repository: createExtractionRepository(sql),
+        modelClient,
+        maxInputs: options.maxInputs ?? DEFAULT_MAX_INPUTS,
+      });
+      extraction = {
+        processed: summary.processed,
+        succeeded: summary.succeeded,
+        schemaInvalid: summary.schemaInvalid,
+        providerErrors: summary.providerErrors,
+        candidatesInserted: summary.candidatesInserted,
+      };
+    } catch {
+      // Left at zero: nothing new was extracted this pass.
+    }
 
     // Before scoring: scoring reads published signals, so candidates have to be
     // promoted first or there is nothing to score.
