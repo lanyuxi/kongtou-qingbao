@@ -58,21 +58,30 @@ export interface AiStageOnceResult {
 // Deliberately small: each model call is seconds of latency, and one pass has
 // to stay inside the function ceiling.
 const DEFAULT_MAX_INPUTS = 2;
-const DEFAULT_MAX_PROJECTS = 2;
+// Scoring picks its projects ordered by oldest signal first. A small cap means
+// long-lived seed rows permanently occupy the slots and newly collected
+// projects never get scored — which is exactly what happened. Generous enough
+// to reach past the seed data, still bounded for the time limit.
+const DEFAULT_MAX_PROJECTS = 10;
 const DEFAULT_MAX_PUBLISH = 10;
 
 /**
- * Publishes every pending candidate as an unverified signal.
+ * Publishes every pending candidate as an unverified signal, recording the
+ * evidence quote each one was extracted from.
  *
  * The pipeline was originally review-gated: AI output stayed a candidate until
  * a human promoted it. The owner asked for candidates to surface without a
  * review step, being the only operator and having no way to vet model output.
  *
- * This does NOT assert that the content is true. promote_extraction_candidate
- * writes verification = 'unverified' with lifecycle = 'published' — visible,
- * but explicitly not vouched for — and the signal keeps its evidence quote and
- * source link so a reader can check it. That distinction is the whole reason
- * those are two separate columns, and it is what keeps this honest.
+ * This does NOT assert that the content is true. The signal is written with
+ * verification = 'unverified' alongside lifecycle = 'published' — visible, but
+ * explicitly not vouched for — and the evidence quote travels with it, so a
+ * reader can check the claim against the source. That distinction is the whole
+ * reason those are two separate columns, and it is what keeps this honest.
+ *
+ * Publishing also has to record the evidence, not just the signal: scoring
+ * refuses any project whose signals lack valid evidence, so a signal published
+ * without its quote is a signal that can never be scored.
  */
 async function publishPendingCandidates(
   sql: postgres.Sql,
@@ -88,7 +97,7 @@ async function publishPendingCandidates(
   for (const row of rows) {
     try {
       await sql`
-        select public.promote_extraction_candidate(${row.id}::uuid, ${'auto:ai-stage'})`;
+        select public.publish_candidate_with_evidence(${row.id}::uuid, ${'auto:ai-stage'})`;
       published += 1;
     } catch {
       // Raced with another pass, or already decided. Not an error for us.
