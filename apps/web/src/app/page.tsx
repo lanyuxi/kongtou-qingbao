@@ -52,15 +52,23 @@ export default async function OverviewPage() {
                 {/* No logo column exists on the project record yet, so the mark
                     is derived from the name: stable, offline, and it reads as a
                     monogram rather than pretending to be a brand asset. */}
-                <span
-                  className="opportunity-tile-mark"
-                  style={{ background: markGradient(item.name) }}
-                  aria-hidden="true"
-                >
-                  {monogram(item.name)}
+                {/* Mark and identity share a row: the mark anchors the card's
+                    left edge and the name reads immediately beside it. */}
+                <span className="opportunity-tile-head">
+                  <span
+                    className="opportunity-tile-mark"
+                    style={{ background: markGradient(item.name) }}
+                    aria-hidden="true"
+                  >
+                    {monogram(item.name)}
+                  </span>
+                  <span className="opportunity-tile-ident">
+                    <span className="opportunity-tile-name">{item.name}</span>
+                    <span className="opportunity-tile-chain">
+                      {item.primaryChain ?? '未知公链'}
+                    </span>
+                  </span>
                 </span>
-                <span className="opportunity-tile-name">{item.name}</span>
-                <span className="opportunity-tile-chain">{item.primaryChain ?? '未知公链'}</span>
                 <span className="opportunity-tile-score">{Math.round(item.opportunityScore)}</span>
                 <span className="opportunity-tile-caption">机会分</span>
                 <span className="opportunity-tile-badges">
@@ -81,9 +89,11 @@ export default async function OverviewPage() {
       </section>
 
       <p className="fixture-note">
-        当前 MVP 中的评分来自手工构造的样例数据（模型版本 <code>seed-fixture-v1</code>
-        ），仅用于演示界面，后续将由情报管线产出的结果替换。被安全封锁的项目不计入以上统计与推荐，
-        可在 <Link href="/opportunities?tab=blocked">安全封锁视图</Link> 查看。
+        这些机会由公开来源自动采集、经 AI 提取后直接呈现，<strong>未经人工逐条核验</strong>
+        （信号标记为「未验证」）。每条机会都能追溯到原始出处，参与前请自行确认关键信息。
+        标注为 <code>seed-fixture-v1</code> 的样例数据仅用于演示界面，会被真实结果逐步替换。
+        被安全封锁的项目不计入以上统计与推荐，可在{' '}
+        <Link href="/opportunities?tab=blocked">安全封锁视图</Link> 查看。
       </p>
     </main>
   );

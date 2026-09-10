@@ -706,13 +706,29 @@ a {
   transform: translateY(-1px);
 }
 
+/* Mark on the left, name and chain stacked immediately to its right. */
+.opportunity-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.opportunity-tile-ident {
+  display: grid;
+  gap: 2px;
+  /* Without min-width:0 the flex child refuses to shrink and the ellipsis on
+     the name never kicks in. */
+  min-width: 0;
+}
+
 .opportunity-tile-mark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   width: 34px;
   height: 34px;
-  margin-bottom: 3px;
   border-radius: 9px;
   color: #ffffff;
   font-size: 13px;

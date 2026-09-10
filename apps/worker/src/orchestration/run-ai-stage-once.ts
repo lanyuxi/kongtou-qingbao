@@ -31,6 +31,7 @@ export interface AiStageOnceOptions {
   readonly modelId: string;
   readonly maxInputs?: number;
   readonly maxProjects?: number;
+  readonly maxPublish?: number;
 }
 
 export interface AiStageOnceResult {
@@ -41,6 +42,7 @@ export interface AiStageOnceResult {
     readonly providerErrors: number;
     readonly candidatesInserted: number;
   };
+  readonly published: number;
   readonly scoring: {
     readonly projectsScored: number;
     readonly projectsSkipped: number;
@@ -57,6 +59,43 @@ export interface AiStageOnceResult {
 // to stay inside the function ceiling.
 const DEFAULT_MAX_INPUTS = 2;
 const DEFAULT_MAX_PROJECTS = 2;
+const DEFAULT_MAX_PUBLISH = 10;
+
+/**
+ * Publishes every pending candidate as an unverified signal.
+ *
+ * The pipeline was originally review-gated: AI output stayed a candidate until
+ * a human promoted it. The owner asked for candidates to surface without a
+ * review step, being the only operator and having no way to vet model output.
+ *
+ * This does NOT assert that the content is true. promote_extraction_candidate
+ * writes verification = 'unverified' with lifecycle = 'published' — visible,
+ * but explicitly not vouched for — and the signal keeps its evidence quote and
+ * source link so a reader can check it. That distinction is the whole reason
+ * those are two separate columns, and it is what keeps this honest.
+ */
+async function publishPendingCandidates(
+  sql: postgres.Sql,
+  limit: number,
+): Promise<number> {
+  const rows = await sql<readonly { id: string }[]>`
+    select id from public.extraction_candidates
+    where status = 'pending'
+    order by created_at
+    limit ${limit}`;
+
+  let published = 0;
+  for (const row of rows) {
+    try {
+      await sql`
+        select public.promote_extraction_candidate(${row.id}::uuid, ${'auto:ai-stage'})`;
+      published += 1;
+    } catch {
+      // Raced with another pass, or already decided. Not an error for us.
+    }
+  }
+  return published;
+}
 
 export async function runAiStageOnce(options: AiStageOnceOptions): Promise<AiStageOnceResult> {
   const sql = postgres(options.databaseUrl, {
@@ -78,6 +117,13 @@ export async function runAiStageOnce(options: AiStageOnceOptions): Promise<AiSta
       maxInputs: options.maxInputs ?? DEFAULT_MAX_INPUTS,
     });
 
+    // Before scoring: scoring reads published signals, so candidates have to be
+    // promoted first or there is nothing to score.
+    const published = await publishPendingCandidates(
+      sql,
+      options.maxPublish ?? DEFAULT_MAX_PUBLISH,
+    );
+
     const scoring = await runScoringOnce({
       repository: createScoringRepository(sql),
       maxProjects: options.maxProjects ?? DEFAULT_MAX_PROJECTS,
@@ -97,6 +143,7 @@ export async function runAiStageOnce(options: AiStageOnceOptions): Promise<AiSta
         providerErrors: extraction.providerErrors,
         candidatesInserted: extraction.candidatesInserted,
       },
+      published,
       scoring: {
         projectsScored: scoring.projectsScored,
         projectsSkipped: scoring.projectsSkipped,
