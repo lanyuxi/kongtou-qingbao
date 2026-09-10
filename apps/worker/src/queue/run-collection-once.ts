@@ -29,6 +29,12 @@ export interface CollectionOnceOptions {
   readonly collectionUserAgent: string;
   readonly workerId: string;
   readonly maxJobs?: number;
+  /**
+   * Stop *starting* new jobs once this many milliseconds have elapsed. A job
+   * already in flight is allowed to finish, because abandoning it mid-lease
+   * would just hand the same work to the next pass.
+   */
+  readonly budgetMs?: number;
 }
 
 export interface CollectionOnceResult {
@@ -41,7 +47,11 @@ export interface CollectionOnceResult {
   readonly failures: readonly string[];
 }
 
-const DEFAULT_MAX_JOBS = 5;
+// Deliberately small: a serverless invocation has a hard wall-clock ceiling,
+// and one job (fetch a feed, fetch each new article, write the rows) is
+// already seconds of work. The next scheduled pass picks up the rest.
+const DEFAULT_MAX_JOBS = 2;
+const DEFAULT_BUDGET_MS = 40_000;
 
 export async function runCollectionOnce(
   options: CollectionOnceOptions,
@@ -82,7 +92,9 @@ export async function runCollectionOnce(
 
   const failures: string[] = [];
   let processedCount = 0;
-  let reconcile: ReconcileResult | null = null;
+  // Left undefined rather than null-initialised: it is assigned on the first
+  // statement of the try block, and the reads below use optional chaining.
+  let reconcile: ReconcileResult | undefined;
 
   try {
     const scheduler = createScheduler({
@@ -103,7 +115,11 @@ export async function runCollectionOnce(
     });
 
     const maxJobs = options.maxJobs ?? DEFAULT_MAX_JOBS;
+    const budgetMs = options.budgetMs ?? DEFAULT_BUDGET_MS;
+    const startedAt = Date.now();
+
     for (let index = 0; index < maxJobs; index += 1) {
+      if (Date.now() - startedAt >= budgetMs) break;
       const jobs = await repository.claim(options.workerId, clock.now(), 1);
       if (jobs.length === 0) break;
       for (const job of jobs) {
