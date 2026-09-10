@@ -47,6 +47,9 @@ importers:
       '@airdrop/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@airdrop/worker':
+        specifier: workspace:*
+        version: link:../worker
       '@supabase/supabase-js':
         specifier: ^2.112.2
         version: 2.112.2
