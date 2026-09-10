@@ -48,10 +48,12 @@ export interface CollectionOnceResult {
 }
 
 // Deliberately small: a serverless invocation has a hard wall-clock ceiling,
-// and one job (fetch a feed, fetch each new article, write the rows) is
-// already seconds of work. The next scheduled pass picks up the rest.
-const DEFAULT_MAX_JOBS = 2;
-const DEFAULT_BUDGET_MS = 40_000;
+// and one job (fetch a feed, then fetch each new article and write the rows) is
+// already seconds of work. These bounds are about leaving headroom for the job
+// that is already running, not about throughput — the next scheduled pass picks
+// up whatever is left.
+const DEFAULT_MAX_JOBS = 1;
+const DEFAULT_BUDGET_MS = 20_000;
 
 export async function runCollectionOnce(
   options: CollectionOnceOptions,
