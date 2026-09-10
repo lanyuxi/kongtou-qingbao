@@ -12,10 +12,10 @@ interface NavItem {
 const primaryNav: readonly NavItem[] = [
   { label: '总览', href: '/' },
   { label: '机会列表', href: '/opportunities' },
-  { label: '项目库', href: null },
-  { label: '情报', href: null },
-  { label: '任务', href: null },
-  { label: '关注列表', href: null },
+  { label: '项目库', href: '/projects' },
+  { label: '情报', href: '/intelligence' },
+  { label: '任务', href: '/tasks' },
+  { label: '关注列表', href: '/watchlists' },
   { label: '设置', href: '/settings/profile' },
 ];
 
