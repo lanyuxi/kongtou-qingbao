@@ -55,11 +55,16 @@ export interface AiStageOnceResult {
   };
 }
 
-// Deliberately small: each model call is seconds of latency, and one pass has
-// to stay inside the function ceiling. Raised from 2 once the rest of the pass
-// stopped being able to fail — with a backlog of un-extracted raw_items, two
-// per run meant the queue could never catch up.
-const DEFAULT_MAX_INPUTS = 5;
+// How many raw items one pass extracts.
+//
+// This is the pipeline's throughput limit, and it was the real reason the
+// opportunity list stayed at two rows: with a backlog of ~260 un-extracted
+// items and five per pass, whole sources (Ethereum's 111 items among them) had
+// never been looked at, so they had no signals and therefore no scores.
+//
+// Each item is a model round-trip of a few seconds, so this still has to stay
+// inside the invocation ceiling together with publishing and scoring.
+const DEFAULT_MAX_INPUTS = 12;
 // Scoring picks its projects ordered by oldest signal first. A small cap means
 // long-lived seed rows permanently occupy the slots and newly collected
 // projects never get scored — which is exactly what happened. Generous enough
