@@ -44,6 +44,7 @@ export interface IdentityAuthPort {
     readonly email: string;
     readonly password: string;
     readonly phone: string;
+    readonly redirectTo: string;
   }): Promise<{ readonly error: unknown | null }>;
   requestPasswordReset(input: {
     readonly email: string;
@@ -65,6 +66,7 @@ export interface IdentityAuthController {
     readonly phone: string;
     readonly email: string;
     readonly password: string;
+    readonly redirectTo: string;
   }): Promise<IdentityAuthOutcome>;
   requestPasswordReset(input: {
     readonly phone: string;
@@ -136,6 +138,16 @@ export function buildSignUpPath(returnPath: string): string {
 }
 
 /**
+ * Where the sign-up confirmation email should drop the user. Passing this
+ * explicitly matters: without it Supabase falls back to the project's Site URL,
+ * which during setup is still http://localhost:3000.
+ */
+export function buildSignUpRedirect(origin: string, returnPath: string): string {
+  const next = encodeURIComponent(sanitizeIdentityReturnPath(returnPath));
+  return `${origin}${identityCallbackPath}?next=${next}`;
+}
+
+/**
  * Where the recovery email should drop the user. Supabase returns them to the
  * callback route with a session, which then forwards to the password form.
  */
@@ -178,7 +190,12 @@ export function createIdentityAuthController(auth: IdentityAuthPort): IdentityAu
       if (password === null) return failure('identity_auth_password_invalid');
 
       try {
-        const result = await auth.signUpWithPassword({ email, password, phone });
+        const result = await auth.signUpWithPassword({
+          email,
+          password,
+          phone,
+          redirectTo: input.redirectTo,
+        });
         return result.error === null ? success : failure('identity_auth_registration_failed');
       } catch {
         return failure('identity_auth_registration_failed');

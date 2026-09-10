@@ -368,7 +368,12 @@ export async function submitSignInOnce(
 export async function submitSignUpOnce(
   gate: PendingActionGate,
   controller: IdentityAuthController,
-  input: { readonly phone: string; readonly email: string; readonly password: string },
+  input: {
+    readonly phone: string;
+    readonly email: string;
+    readonly password: string;
+    readonly redirectTo: string;
+  },
 ): Promise<IdentityAuthState> {
   if (!gate.begin()) return { status: 'pending' };
   try {

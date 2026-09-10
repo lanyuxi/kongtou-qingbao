@@ -22,7 +22,7 @@ interface IdentityBrowserAuth {
   signUp(input: {
     email: string;
     password: string;
-    options: { data: { phone: string } };
+    options: { data: { phone: string }; emailRedirectTo: string };
   }): Promise<{ error: unknown | null }>;
   resetPasswordForEmail(
     email: string,
@@ -109,10 +109,14 @@ export function createIdentityBrowserAuthPort(
       const result = await auth.signUp({
         email: input.email,
         password: input.password,
-        // Lands in auth.users.raw_user_meta_data; the database trigger copies
-        // it onto the profile where the unique index enforces one number per
-        // account.
-        options: { data: { phone: input.phone } },
+        options: {
+          // Lands in auth.users.raw_user_meta_data; the database trigger copies
+          // it onto the profile where the unique index enforces one number per
+          // account.
+          data: { phone: input.phone },
+          // Without this the confirmation link points at the project Site URL.
+          emailRedirectTo: input.redirectTo,
+        },
       });
       return { error: result.error };
     },

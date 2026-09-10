@@ -38,6 +38,7 @@ interface AuthCall {
 
 const registeredEmail = 'alice@example.com';
 const registeredPhone = '13800138000';
+const signUpRedirect = 'https://app.example.test/auth/callback?next=%2Fsettings%2Fprofile';
 
 /**
  * `lookupEmail` defaults to the registered address; pass null to model a number
@@ -368,6 +369,7 @@ describe('identity registration', () => {
       phone: '13800138000',
       email: ' Alice@Example.com ',
       password: 'airdrop2026',
+      redirectTo: signUpRedirect,
     });
 
     expect(outcome).toEqual({ ok: true });
@@ -377,6 +379,7 @@ describe('identity registration', () => {
         phone: registeredPhone,
         email: 'Alice@Example.com',
         password: 'airdrop2026',
+        redirectTo: signUpRedirect,
       },
     }]);
   });
@@ -389,7 +392,7 @@ describe('identity registration', () => {
     const { port, calls } = recordingPort();
     const controller = createIdentityAuthController(port);
 
-    expect(await controller.register({ phone, email, password }))
+    expect(await controller.register({ phone, email, password, redirectTo: signUpRedirect }))
       .toEqual({ ok: false, code: code as IdentityAuthFailureCode });
     expect(calls).toEqual([]);
   });
@@ -401,6 +404,7 @@ describe('identity registration', () => {
       phone: registeredPhone,
       email: registeredEmail,
       password: 'airdrop2026',
+      redirectTo: signUpRedirect,
     })).toEqual({ ok: false, code: 'identity_auth_registration_failed' });
   });
 });
@@ -648,6 +652,7 @@ describe('identity auth pending gate', () => {
       phone: registeredPhone,
       email: registeredEmail,
       password: 'airdrop2026',
+      redirectTo: signUpRedirect,
     })).toEqual({ status: 'registered' });
 
     expect(await submitPasswordResetOnce(gate, controller, {
