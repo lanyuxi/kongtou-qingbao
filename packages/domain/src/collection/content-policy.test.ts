@@ -251,15 +251,15 @@ describe('feed entry identity and fetch disposition', () => {
 });
 
 describe('feed budgets', () => {
-  it('limits deterministic document-order discovery to 100 and body fetches to 20', () => {
+  it('limits deterministic document-order discovery to 100 and body fetches to 35', () => {
     const entries = Array.from({ length: 125 }, (_, index) => ({ index, eligible: true }));
     const discoveries = selectFeedEntries(entries);
     const fetches = selectArticleFetches(discoveries);
 
     expect(discoveries).toHaveLength(100);
     expect(discoveries.map(({ index }) => index)).toEqual(Array.from({ length: 100 }, (_, i) => i));
-    expect(fetches).toHaveLength(20);
-    expect(fetches.map(({ index }) => index)).toEqual(Array.from({ length: 20 }, (_, i) => i));
+    expect(fetches).toHaveLength(35);
+    expect(fetches.map(({ index }) => index)).toEqual(Array.from({ length: 35 }, (_, i) => i));
     expect(discoveries).not.toBe(entries);
     expect(fetches).not.toBe(discoveries);
   });
@@ -270,8 +270,9 @@ describe('feed budgets', () => {
       eligible: index % 2 === 0,
     }));
 
+    // 23 eligible entries, under the 35 budget, so all of them are selected.
     expect(selectArticleFetches(entries).map(({ index }) => index)).toEqual([
-      0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38,
+      0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44,
     ]);
   });
 });

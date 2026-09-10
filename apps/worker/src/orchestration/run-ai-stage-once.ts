@@ -56,8 +56,10 @@ export interface AiStageOnceResult {
 }
 
 // Deliberately small: each model call is seconds of latency, and one pass has
-// to stay inside the function ceiling.
-const DEFAULT_MAX_INPUTS = 2;
+// to stay inside the function ceiling. Raised from 2 once the rest of the pass
+// stopped being able to fail — with a backlog of un-extracted raw_items, two
+// per run meant the queue could never catch up.
+const DEFAULT_MAX_INPUTS = 5;
 // Scoring picks its projects ordered by oldest signal first. A small cap means
 // long-lived seed rows permanently occupy the slots and newly collected
 // projects never get scored — which is exactly what happened. Generous enough

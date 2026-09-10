@@ -51,7 +51,16 @@ const MAX_LAST_MODIFIED_LENGTH = 128;
 const MAX_STABLE_ENTRY_ID_LENGTH = 2_048;
 const MAX_STABLE_ENTRY_KEY_LENGTH = 4_096;
 const MAX_FEED_ENTRIES = 100;
-const MAX_ARTICLE_FETCHES = 20;
+// How many article bodies one collection pass may fetch per source.
+//
+// This is a wall-clock budget in disguise: each fetch is a separate HTTPS
+// request, and the pass runs inside a serverless invocation. At 20, a source
+// publishing more than 20 items per cycle leaves the remainder as
+// body_fetch_budget_exhausted — and because a pass only fetches when the feed
+// actually changed, those leftovers are not revisited until the next change,
+// so a busy feed can stay permanently behind. 35 clears a typical cycle's
+// worth of items while keeping the pass comfortably inside its time limit.
+const MAX_ARTICLE_FETCHES = 35;
 const TOKEN = "[!#$%&'*+.^_`|~0-9A-Za-z-]+";
 const QUOTED_STRING = '"(?:[\\t !#-\\[\\]-~\\x80-\\xff]|\\\\[\\t -~\\x80-\\xff])*"';
 const HTTP_FIELD_VALUE = /^[\t\x20-\x7e\x80-\xff]+$/;
