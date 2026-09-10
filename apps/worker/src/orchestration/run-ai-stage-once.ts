@@ -152,11 +152,24 @@ export async function runAiStageOnce(options: AiStageOnceOptions): Promise<AiSta
       maxProjects: options.maxProjects ?? DEFAULT_MAX_PROJECTS,
     });
 
-    const tutorials = await runTutorialGenerationOnce({
-      repository: createTutorialCandidateRepository(sql),
-      modelClient,
-      maxProjects: options.maxProjects ?? DEFAULT_MAX_PROJECTS,
-    });
+    // Tutorial generation writes its own ai_runs rows and can trip the same
+    // dedup key on a repeat pass. It is the least important stage of the three,
+    // so it must not be able to fail the pass either.
+    let tutorials = { processed: 0, skippedNoMaterial: 0, candidatesInserted: 0 };
+    try {
+      const summary = await runTutorialGenerationOnce({
+        repository: createTutorialCandidateRepository(sql),
+        modelClient,
+        maxProjects: options.maxProjects ?? DEFAULT_MAX_PROJECTS,
+      });
+      tutorials = {
+        processed: summary.processed,
+        skippedNoMaterial: summary.skippedNoMaterial,
+        candidatesInserted: summary.candidatesInserted,
+      };
+    } catch {
+      // Left at zero.
+    }
 
     return {
       extraction: {
