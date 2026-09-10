@@ -104,10 +104,12 @@
 - **实测**：首页 HTML 里该元素为 `<div class="topbar-search">`，内部**没有 `<input>`**，全站也没有任何搜索接口。
 - 影响：用户会以为能搜索，点击/输入毫无反应——比"没有搜索"更糟，因为它先建立预期再落空。
 
-#### 2. `/tutorials` 列表页 404
+#### 2. `/tutorials` 列表页 404 —— 更正：这是设计如此，真正的问题是「没有入口」
 
 - **实测**：`https://airdrop-intelligence-os.vercel.app/tutorials` → **404**。
-- 根因：只有 `app/tutorials/[id]/page.tsx` 详情页，**没有列表页**；侧栏也无入口。教程是产品四大价值之一（"照着做"），只能从项目详情页的卡片偶然进入。
+- **复核后更正**：这不是缺陷。`packages/contracts/src/tutorials/projections.ts:52-56` 的 `publicTutorialListQuerySchema` 把 `projectId` 定为**必填**——教程在设计上就挂在项目之下，不存在「跨项目的教程列表」这个实体。因此没有列表页是正确的，侧栏不放「教程」项也合理。
+- **真正的问题**：教程**没有任何可发现的入口**。它只能在项目详情页里以卡片形式出现（`components/tutorial/public-tutorial.tsx`），而当前 `tutorials` 表是空的，所以整条链路对用户完全不可见。
+- 结论：需要补的不是页面，而是**「哪里能找到教程」的可见性**——等有教程数据后，在项目详情页与机会列表中体现。
 
 #### 3. 「已连接远程数据源」是硬编码，不是真实状态
 

@@ -64,7 +64,20 @@ export function PublicShellBoundary({
       </aside>
       <div className="main">
         <header className="topbar">
-          <div className="topbar-search">搜索项目、公链、代币…</div>
+          {/* A plain GET form: search works without JavaScript, the query lands
+              in the URL (so results are linkable), and the server component at
+              /search does the filtering. */}
+          <form className="topbar-search" action="/search" method="get" role="search">
+            <input
+              className="topbar-search-input"
+              type="search"
+              name="q"
+              placeholder="搜索项目、情报…"
+              aria-label="搜索项目与情报"
+              maxLength={80}
+              autoComplete="off"
+            />
+          </form>
           <div className="topbar-status">
             <span>
               <span className="topbar-dot" />
