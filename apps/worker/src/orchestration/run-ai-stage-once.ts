@@ -55,6 +55,78 @@ export interface AiStageOnceResult {
   };
 }
 
+/**
+ * Extraction plus publishing, without scoring or tutorials.
+ *
+ * Carved out because extraction is the throughput bottleneck: it is the only
+ * stage that spends a model round-trip per item, and sharing one invocation
+ * with scoring and tutorial generation capped how many items a pass could
+ * clear. On its own it can use the whole time budget on the backlog.
+ *
+ * Publishing stays attached: a candidate that is extracted but never published
+ * has no signal, no score, and no way to appear — leaving it out would produce
+ * exactly the "extracted but invisible" state this is meant to fix.
+ *
+ * The Vercel Hobby plan allows only two cron jobs, both already used, so this
+ * endpoint is for manual or external triggering rather than a schedule.
+ */
+export interface ExtractionPassResult {
+  readonly extraction: AiStageOnceResult['extraction'];
+  readonly published: number;
+}
+
+export async function runExtractionPassOnce(
+  options: AiStageOnceOptions,
+): Promise<ExtractionPassResult> {
+  const sql = postgres(options.databaseUrl, {
+    max: 2,
+    idle_timeout: 20,
+    connect_timeout: 8,
+  });
+
+  try {
+    const modelClient = createOpenAiCompatibleModelClient({
+      baseUrl: options.modelBaseUrl,
+      apiKey: options.modelApiKey,
+      model: options.modelId,
+    });
+
+    let extraction = {
+      processed: 0,
+      succeeded: 0,
+      schemaInvalid: 0,
+      providerErrors: 0,
+      candidatesInserted: 0,
+    };
+    try {
+      const summary = await runExtractionOnce({
+        repository: createExtractionRepository(sql),
+        modelClient,
+        maxInputs: options.maxInputs ?? DEFAULT_MAX_INPUTS,
+      });
+      extraction = {
+        processed: summary.processed,
+        succeeded: summary.succeeded,
+        schemaInvalid: summary.schemaInvalid,
+        providerErrors: summary.providerErrors,
+        candidatesInserted: summary.candidatesInserted,
+      };
+    } catch {
+      // Best-effort, same reasoning as the full pass: an already-extracted
+      // input is the desired end state, not a failure worth aborting for.
+    }
+
+    const published = await publishPendingCandidates(
+      sql,
+      options.maxPublish ?? DEFAULT_MAX_PUBLISH,
+    );
+
+    return { extraction, published };
+  } finally {
+    await sql.end();
+  }
+}
+
 // How many raw items one pass extracts.
 //
 // This is the pipeline's throughput limit, and it was the real reason the

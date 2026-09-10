@@ -23,6 +23,7 @@
   },
   "exports": {
     "./collection-once": "./src/queue/run-collection-once.ts",
-    "./ai-stage-once": "./src/orchestration/run-ai-stage-once.ts"
+    "./ai-stage-once": "./src/orchestration/run-ai-stage-once.ts",
+    "./extraction-pass-once": "./src/orchestration/run-ai-stage-once.ts"
   }
 }
