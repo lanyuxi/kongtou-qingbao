@@ -132,15 +132,20 @@ curl -X POST https://api.vercel.com/v13/deployments \
 
 ### 登录功能需要在 Supabase 后台配置跳转地址
 
-「任务」和「关注列表」是登录后功能，采用**邮箱魔法链接**登录（Supabase 内置邮件服务，
-不需要自备 SMTP）。上线前必须在 Supabase 控制台完成：
+「任务」和「关注列表」是登录后功能。账号以**手机号**作为登录标识、**密码**作为凭据；
+注册时绑定的真实邮箱只用于**找回密码**。全程不需要短信服务商，也不需要自备 SMTP。
+
+上线前必须在 Supabase 控制台完成：
 
 1. **Authentication → URL Configuration → Site URL** 设为
    `https://airdrop-intelligence-os.vercel.app`；
 2. **Redirect URLs** 加入 `https://airdrop-intelligence-os.vercel.app/auth/callback`。
 
-漏配这两项时，魔法链接会回落到默认的 `http://localhost:3000`，点击后无法完成登录。
-免费层内置邮件服务有速率限制，仅供测试与个人使用。
+漏配这两项时，注册确认邮件与密码重置邮件都会回落到默认的 `http://localhost:3000`，
+用户点击后无法完成流程。免费层内置邮件服务有速率限制，仅供测试与个人使用。
+
+注册默认需要邮箱确认（`mailer_autoconfirm` 关闭）。若希望注册后即可登录，
+在 **Authentication → Sign In / Providers → Email** 关闭 “Confirm email”。
 
 ### 免费层的两个注意事项
 
