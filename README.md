@@ -109,9 +109,38 @@ pnpm test:db         # 重置本地库 → 应用迁移与种子 → 跑 pgTAP
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 项目的 URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 的 anon public key |
 
-Vercel 部署时请将 **Root Directory 设为 `apps/web`**。
+Vercel 部署时请将 **Root Directory 设为 `apps/web`**。这一项不能省：`next` 依赖声明在 `apps/web/package.json` 里，仓库根目录没有它；Root Directory 留空时构建会以
+`No Next.js version detected` 失败。同时 **不要**再设 Output Directory，否则会得到
+`apps/web/apps/web/.next` 这种重复路径。
+
+**当前 Vercel 项目没有连接 Git 集成**，所以 `git push` 不会自动触发部署，需要手动发起：
+
+```bash
+curl -X POST https://api.vercel.com/v13/deployments \
+  -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"airdrop-intelligence-os","target":"production",
+       "gitSource":{"type":"github","org":"lanyuxi","repo":"kongtou-qingbao","ref":"main"},
+       "projectSettings":{"framework":"nextjs","rootDirectory":"apps/web",
+         "outputDirectory":null,"installCommand":"pnpm install --frozen-lockfile",
+         "buildCommand":"pnpm --filter @airdrop/web build"}}'
+```
+
+响应里的 `id` 即部署 ID，轮询 `GET /v13/deployments/{id}` 直到 `readyState` 变为
+`READY`。成功后生产域名 `airdrop-intelligence-os.vercel.app` 会自动指向新部署。
 
 完整迁移步骤见 [`docs/runbooks/cloud-hosted-migration.md`](docs/runbooks/cloud-hosted-migration.md)。
+
+### 登录功能需要在 Supabase 后台配置跳转地址
+
+「任务」和「关注列表」是登录后功能，采用**邮箱魔法链接**登录（Supabase 内置邮件服务，
+不需要自备 SMTP）。上线前必须在 Supabase 控制台完成：
+
+1. **Authentication → URL Configuration → Site URL** 设为
+   `https://airdrop-intelligence-os.vercel.app`；
+2. **Redirect URLs** 加入 `https://airdrop-intelligence-os.vercel.app/auth/callback`。
+
+漏配这两项时，魔法链接会回落到默认的 `http://localhost:3000`，点击后无法完成登录。
+免费层内置邮件服务有速率限制，仅供测试与个人使用。
 
 ### 免费层的两个注意事项
 
