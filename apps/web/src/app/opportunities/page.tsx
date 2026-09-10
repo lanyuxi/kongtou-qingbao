@@ -95,15 +95,33 @@ async function loadOpportunityTab(
   const afterProjectId = params.afterProjectId ?? null;
   const hasCursor = afterScore !== null && Number.isFinite(afterScore) && afterProjectId !== null;
 
-  const items = await listOpportunities({
-    limit: batchLimit,
-    afterScore: hasCursor ? afterScore : null,
-    afterProjectId: hasCursor ? afterProjectId : null,
-  });
+  // The repository validates the cursor (score within 0–100, project id must be
+  // a UUID) and throws a RangeError when it is unusable. The cursor comes
+  // straight from the query string, so a hand-edited or stale URL would
+  // otherwise surface as a 500. Treat an unusable cursor as "start from the
+  // beginning" instead: the visitor gets a working first page, not an error.
+  type OpportunityBatch = Awaited<ReturnType<typeof listOpportunities>>;
+  let items: OpportunityBatch;
+  try {
+    items = await listOpportunities({
+      limit: batchLimit,
+      afterScore: hasCursor ? afterScore : null,
+      afterProjectId: hasCursor ? afterProjectId : null,
+    });
+  } catch {
+    items = await listOpportunities({ limit: batchLimit, afterScore: null, afterProjectId: null });
+  }
 
   const filtered = items.filter((item) => (tab === 'all' ? true : item.recommendation === tab));
   const visible = filtered.slice(0, pageSize);
-  const nextItem = filtered[pageSize];
+
+  // The next-page cursor must be the last row this batch actually consumed,
+  // not the first row of the following page: the repository selects rows
+  // strictly greater than the cursor, so passing the next row would silently
+  // drop it from the follow-up query. A batch shorter than the limit means the
+  // scan already reached the end, so there is nothing more to page through.
+  const lastScanned = items[items.length - 1];
+  const batchWasFull = items.length === batchLimit;
 
   return {
     content:
@@ -129,9 +147,9 @@ async function loadOpportunityTab(
         </table>
       ),
     nextHref:
-      nextItem === undefined
+      lastScanned === undefined || !batchWasFull
         ? null
-        : `?tab=${tab}&afterScore=${nextItem.opportunityScore}&afterProjectId=${nextItem.projectId}`,
+        : `?tab=${tab}&afterScore=${lastScanned.opportunityScore}&afterProjectId=${lastScanned.projectId}`,
   };
 }
 
