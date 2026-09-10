@@ -26,11 +26,15 @@ export interface OpportunityOverview {
 
 const overviewLimit = 100;
 
+// The overview shows a fixed grid of cards (five per row, four rows), so it
+// asks for exactly that many rather than "whatever is left".
+const overviewCardCount = 20;
+
 export async function loadOpportunityOverview(): Promise<OpportunityOverview> {
   const items = await listOpportunities({ limit: overviewLimit });
   const highRiskThreshold = 70;
   return {
-    top: items.slice(0, 5),
+    top: items.slice(0, overviewCardCount),
     actNowCount: countBy(items, (item) => item.recommendation === 'act_now'),
     highRiskCount: countBy(items, (item) => item.riskScore >= highRiskThreshold),
     rumoredCount: countBy(items, (item) => item.lifecycle === 'rumored'),
