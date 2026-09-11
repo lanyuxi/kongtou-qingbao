@@ -4,6 +4,8 @@
 **Runbook:** `docs/runbooks/local-development.md` → `## JSON API collection (Phase 16)`
 **Status legend:** `READY` · `IN_PROGRESS` · `REVIEW` · `DONE` · `BLOCKED`
 
+**Commits:** `f804079 feat(collection): collect JSON APIs and repair the fetch budget`（22 files / +935 −52）；`2f7e488 docs: plan and record phase 16 JSON API sources`（4 files / +470）。提交后在 HEAD 重跑 fresh `pnpm verify` **exit 0**，工作树 clean。**未 push、未部署。**
+
 | Task | Status | Scope | Evidence |
 | --- | --- | --- | --- |
 | 0a | DONE | 移除被提交的临时脚本 | 缺陷：`packages/database/.tmp-test-roles.cjs` 由 `53704f3` 提交进 git，ESLint 6 error → `pnpm verify` 第一步 lint 即失败。删除该文件；`.gitignore` 增补 `.tmp-*` 与 `*.tmp.*`。GREEN：`pnpm -r lint` 5/5 包通过。该文件不含硬编码凭据（从 `/tmp/worker_role_passwords.json` 读取）。 |
@@ -14,7 +16,7 @@
 | 4 | DONE | 门禁与文档 | fresh `CI=true pnpm verify` **exit 0**：lint 5/5、typecheck 5/5、build（Next 成功）、placeholders 通过。测试：contracts **299** / domain **495** / database **362**（+87 gated skips）/ worker **271**（+2 skips）/ web **651**，合计 **2,078 通过、0 失败**（改动前基线为 2,001 通过 + 1 失败 + lint 红）。新增 runbook `## JSON API collection (Phase 16)` 章节与本 workbook。 |
 | 5 | DONE | 独立代码审查 | fresh 只读 reviewer（独立子代理）结论 **APPROVE / 0 Critical / 0 Important / 5 Minor**。独立复核：`collectArticle` 对 JSON 不可达（只在 `parsedFeed !== null` 分支内）；JSON 每轮恰 1 次请求（测试断言 `requests` 长度 1、`articleCommits` 为空）；`selectJsonApiAdapter` 对大小写主机/近邻主机/查询串/路径穿越/空链全部返回 null；预算 20 在源码/测试/生成类型中已无残留（仅旧迁移 `20260812000800:136` 保留历史值，已被前向迁移覆盖）；`json_api` 五处一致；迁移号大于当前最大值且 `ADD VALUE` 仅追加；四项变异均可被 kill；无 `any`、无 ICU 依赖、lockfile 未变。独立复跑 `pnpm verify` **exit 0**，计数与上表一致。 |
 | 5b | DONE | 审查 Minor 修复 | ①失败详情不再一律泛化：新增 `failureDetail()` 优先采用抛出方的有界 `detail`，JSON 路径可区分"未注册适配器"与"非法 JSON"（并补断言）；②`chain-json-adapter` 增加 TVL 合理上限 `1e15`，保证 `formatUsd` 的确定性分组在任意载荷下都成立，并删掉已不可达的负数分支（补边界用例）。其余 Minor（`entryUrl` 暂未落到 DB、SQL 中 35 为字面量、提交时须显式 stage 删除）已记入备注，未改代码。**修复后最终门禁 exit 0**：contracts **299** / domain **497** / database **362**（+87 skips）/ worker **271**（+2 skips）/ web **651** = **2,080 通过 / 0 失败 / 89 skipped**。 |
-| 6 | BLOCKED | disposable 验收 | 需所有者精确授权。迁移 43/44 应用后跑 full pgTAP（含 023）与 JSON 源端到端（`content_kind='json_api'`、`disposition='discovered_only'`、零 article attempts、typegen 零漂移）。**未授权前不做。** |
+| 6 | BLOCKED | disposable 验收 | 需所有者精确授权。迁移 43/44 应用后跑 full pgTAP（含 023）与 JSON 源端到端（`content_kind='json_api'`、`disposition='discovered_only'`、零 article attempts、typegen 零漂移）。**本机无 Docker、无 supabase CLI，pgTAP 无法在本地运行**；自托管 disposable 栈已弃用，云 Supabase 即生产，故这一步必须由所有者授权后在云端执行。**未授权前不做。** |
 | 7 | BLOCKED | 生产 | 迁移 43/44 未应用、未注册任何 JSON 源。各自需独立显式授权。 |
 
 ## 审查遗留（不阻塞，已记录）
