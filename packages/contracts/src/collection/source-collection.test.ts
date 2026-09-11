@@ -3,6 +3,8 @@ import {
   collectSourceJobSchema,
   collectSourceResultSchema,
   collectionOutcomeSchema,
+  MAX_COLLECTION_BODY_FETCHES,
+  MAX_COLLECTION_DISCOVERIES,
 } from '../index.js';
 
 const baseJob = {
@@ -65,5 +67,32 @@ describe('collect source contracts', () => {
     expect(collectSourceResultSchema.safeParse({ ...result, rawText: '<html />' }).success).toBe(
       false,
     );
+  });
+
+  it('bounds the collection budgets at the exported constants', () => {
+    // The collector imports these same constants for its own budgets, so a
+    // mismatch here would mean a busy pass fails strict parsing *after* it has
+    // already committed its rows. Lock the numbers, not just the relationship.
+    expect(MAX_COLLECTION_DISCOVERIES).toBe(100);
+    expect(MAX_COLLECTION_BODY_FETCHES).toBe(35);
+  });
+
+  it.each([
+    ['discoveredCount', MAX_COLLECTION_DISCOVERIES, true],
+    ['discoveredCount', MAX_COLLECTION_DISCOVERIES + 1, false],
+    ['bodyFetchCount', MAX_COLLECTION_BODY_FETCHES, true],
+    ['bodyFetchCount', MAX_COLLECTION_BODY_FETCHES + 1, false],
+  ] as const)('validates %s = %i as %s', (field, value, accepted) => {
+    const result = {
+      attemptId: '10000000-0000-4000-8000-000000000005',
+      projectId: baseJob.payload.projectId,
+      sourceId: baseJob.payload.sourceId,
+      outcome: 'stored_new_content',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+      [field]: value,
+    };
+    expect(collectSourceResultSchema.safeParse(result).success).toBe(accepted);
   });
 });

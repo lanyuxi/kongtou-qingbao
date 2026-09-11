@@ -67,6 +67,11 @@ export type {
   FeedArticleDispositionInput,
   StableFeedEntryKeyInput,
 } from './collection/content-policy.js';
+export { DEFILLAMA_CHAIN_TVL_URL_PREFIX, isDefiLlamaChainSlug, parseDefiLlamaChainTvl } from './collection/chain-json-adapter.js';
+export { selectJsonApiAdapter } from './collection/json-api-adapter.js';
+export type { JsonApiAdapter } from './collection/json-api-adapter.js';
+export { toJsonApiEntry } from './collection/json-api-entry.js';
+export type { JsonApiEntry } from './collection/json-api-entry.js';
 export {
   CollectionIntervalError,
   DEFAULT_COLLECTION_INTERVAL_SECONDS,

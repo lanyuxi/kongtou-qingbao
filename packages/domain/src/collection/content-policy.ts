@@ -1,4 +1,9 @@
 import {
+  MAX_COLLECTION_BODY_FETCHES,
+  MAX_COLLECTION_DISCOVERIES,
+} from '@airdrop/contracts';
+
+import {
   isWithinAuthorityDomains,
   MAX_DECOMPRESSED_BYTES,
   type ValidatedCollectionUrl,
@@ -10,7 +15,7 @@ export type ContentPolicyErrorCode =
   | 'response_too_large';
 
 export interface CollectionMediaType {
-  readonly family: 'html' | 'xml';
+  readonly family: 'html' | 'xml' | 'json';
   readonly mediaType: string;
 }
 
@@ -50,7 +55,12 @@ const MAX_ETAG_LENGTH = 1_024;
 const MAX_LAST_MODIFIED_LENGTH = 128;
 const MAX_STABLE_ENTRY_ID_LENGTH = 2_048;
 const MAX_STABLE_ENTRY_KEY_LENGTH = 4_096;
-const MAX_FEED_ENTRIES = 100;
+// Both budgets are contract constants, not local choices: the collector result
+// schema bounds `discoveredCount` / `bodyFetchCount` by the very same numbers,
+// and the database check constraint mirrors the body-fetch one. Raising a budget
+// here alone would make a busy pass fail strict result parsing *after* it had
+// already committed its rows — which is exactly the bug this replaced.
+const MAX_FEED_ENTRIES = MAX_COLLECTION_DISCOVERIES;
 // How many article bodies one collection pass may fetch per source.
 //
 // This is a wall-clock budget in disguise: each fetch is a separate HTTPS
@@ -60,7 +70,7 @@ const MAX_FEED_ENTRIES = 100;
 // actually changed, those leftovers are not revisited until the next change,
 // so a busy feed can stay permanently behind. 35 clears a typical cycle's
 // worth of items while keeping the pass comfortably inside its time limit.
-const MAX_ARTICLE_FETCHES = 35;
+const MAX_ARTICLE_FETCHES = MAX_COLLECTION_BODY_FETCHES;
 const TOKEN = "[!#$%&'*+.^_`|~0-9A-Za-z-]+";
 const QUOTED_STRING = '"(?:[\\t !#-\\[\\]-~\\x80-\\xff]|\\\\[\\t -~\\x80-\\xff])*"';
 const HTTP_FIELD_VALUE = /^[\t\x20-\x7e\x80-\xff]+$/;
@@ -73,6 +83,10 @@ const ACCEPTED_MEDIA_TYPES = new Map<string, CollectionMediaType['family']>([
   ['application/atom+xml', 'xml'],
   ['application/xml', 'xml'],
   ['text/xml', 'xml'],
+  // A JSON API response. Deliberately narrow: `application/ld+json`,
+  // `text/json` and vendor `+json` types are not accepted, so a source can only
+  // opt in by serving the exact type the collector is willing to parse.
+  ['application/json', 'json'],
 ]);
 
 export function parseCollectionMediaType(header: string | null): CollectionMediaType {

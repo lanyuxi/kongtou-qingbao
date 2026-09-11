@@ -10,6 +10,11 @@ coverage/
 !.env.example
 supabase/.temp/
 
+# Temporary local scripts: read credentials from the environment, delete after
+# use, and never commit. A committed `.tmp-*.cjs` once broke `pnpm verify` lint.
+.tmp-*
+*.tmp.*
+
 # WorkBuddy session data
 .workbuddy/
 .DS_Store

@@ -48,6 +48,7 @@ select results_eq(
       ('collection_content_kind', 'rss_feed'),
       ('collection_content_kind', 'atom_feed'),
       ('collection_content_kind', 'feed_article_html'),
+      ('collection_content_kind', 'json_api'),
       ('collection_outcome', 'stored_new_content'),
       ('collection_outcome', 'not_modified'),
       ('collection_outcome', 'unchanged_content'),

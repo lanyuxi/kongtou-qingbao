@@ -49,11 +49,21 @@ describe('parseCollectionMediaType', () => {
     ['application/atom+xml; charset=UTF-8', 'xml'],
     ['application/xml', 'xml'],
     ['text/xml', 'xml'],
+    ['application/json', 'json'],
+    ['APPLICATION/JSON; charset=utf-8', 'json'],
   ] as const)('accepts %s as %s', (header, expected) => {
     expect(parseCollectionMediaType(header).family).toBe(expected);
   });
 
-  it.each(['application/json', 'text/plain', 'image/svg+xml', '', null])(
+  it.each([
+    'application/ld+json',
+    'text/json',
+    'application/vnd.api+json',
+    'text/plain',
+    'image/svg+xml',
+    '',
+    null,
+  ])(
     'rejects unsupported content type %s',
     (header) => {
       expectPolicyError(() => parseCollectionMediaType(header), 'unsupported_content_type');

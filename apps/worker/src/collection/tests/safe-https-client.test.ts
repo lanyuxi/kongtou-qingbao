@@ -140,7 +140,7 @@ describe('createSafeHttpsClient', () => {
       const harness = createHarness([{ status: 200 }]);
       await harness.client.get(BASE_INPUT);
       expect(harness.options[0]!.headers).toEqual({
-        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html',
+        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html, application/json',
         'Accept-Encoding': 'gzip, deflate, br',
         'User-Agent': 'AirdropIntelligenceOS-Collector/1.0',
         'If-None-Match': 'W/"feed-v1"',

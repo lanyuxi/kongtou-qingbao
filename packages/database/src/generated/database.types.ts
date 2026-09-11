@@ -5665,6 +5665,7 @@ export type Database = {
         | "rss_feed"
         | "atom_feed"
         | "feed_article_html"
+        | "json_api"
       collection_job_trigger: "scheduled" | "manual"
       collection_outcome:
         | "stored_new_content"
@@ -5900,6 +5901,7 @@ export const Constants = {
         "rss_feed",
         "atom_feed",
         "feed_article_html",
+        "json_api",
       ],
       collection_job_trigger: ["scheduled", "manual"],
       collection_outcome: [

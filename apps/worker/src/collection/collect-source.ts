@@ -27,7 +27,9 @@ import {
   parseCollectionMediaType,
   selectArticleFetches,
   selectFeedEntries,
+  selectJsonApiAdapter,
   validateConfiguredCollectionUrl,
+  type JsonApiEntry,
   type ValidatedCollectionUrl,
 } from '@airdrop/domain';
 
@@ -202,6 +204,7 @@ export function createCollectSource(
       let mediaType: string;
       let contentKind: CollectionContentKind;
       let parsedFeed: ParsedFeed | null = null;
+      let parsedJsonEntries: readonly JsonApiEntry[] | null = null;
       let storageOutcome: 'stored_new_content' | 'unchanged_content';
       try {
         const parsedMediaType = parseCollectionMediaType(response.mediaTypeHeader);
@@ -221,6 +224,25 @@ export function createCollectSource(
         });
         if (parsedMediaType.family === 'html') {
           contentKind = 'official_html';
+        } else if (parsedMediaType.family === 'json') {
+          // The adapter is chosen from the *configured* URL before the body is
+          // interpreted, and an unregistered JSON source is rejected outright:
+          // an unknown payload must never be mapped onto project facts on a
+          // guess. See selectJsonApiAdapter.
+          const adapter = selectJsonApiAdapter(context.canonicalUrl);
+          if (adapter === null) {
+            throw Object.assign(
+              new CollectionContentPolicyError(
+                'unsupported_content_type',
+                'Collection JSON source has no registered adapter.',
+              ),
+              { detail: 'Collection JSON source has no registered adapter.' },
+            );
+          }
+          contentKind = 'json_api';
+          if (storageOutcome === 'stored_new_content') {
+            parsedJsonEntries = adapter.parse(parseJsonBody(rawText));
+          }
         } else if (storageOutcome === 'stored_new_content') {
           parsedFeed = dependencies.feedParser.parse(rawText);
           contentKind = parsedFeed.kind;
@@ -242,7 +264,7 @@ export function createCollectSource(
             response,
             outcome: failure,
             errorCode: failure,
-            errorDetail: FAILURE_DETAILS[failure],
+            errorDetail: failureDetail(error, failure),
           }),
           null,
           null,
@@ -265,6 +287,39 @@ export function createCollectSource(
               collectedAt: completedAt,
             })
           : null;
+      if (parsedJsonEntries !== null && rawItem !== null) {
+        // JSON entries carry no article body: the summary the adapter derived is
+        // the whole content, so there is nothing to fetch and every discovery is
+        // `discovered_only`. Committing reuses the Feed path's atomic commit, so
+        // the raw body, the discoveries and the attempt stay in one transaction.
+        const discoveries = buildJsonDiscoveries({
+          job,
+          context,
+          feedRawItemId: rawItem.id,
+          entries: parsedJsonEntries,
+          ids: dependencies.ids,
+        });
+        const committedJson = await dependencies.repository.commitFeed({
+          attempt: {
+            ...buildEndpointInput({
+              job,
+              context,
+              attemptId,
+              startedAt,
+              completedAt,
+              response,
+              outcome: storageOutcome,
+              errorCode: null,
+              errorDetail: null,
+            }),
+            discoveredCount: discoveries.length,
+            bodyFetchCount: 0,
+          },
+          rawItem,
+          discoveries,
+        });
+        return collectSourceResultSchema.parse(committedJson.result);
+      }
       if (parsedFeed !== null && rawItem !== null) {
         const discoveryCandidates = buildFeedDiscoveries({
           job,
@@ -392,6 +447,78 @@ function buildFeedDiscoveries(input: {
     });
   }
   return discoveries;
+}
+
+function buildJsonDiscoveries(input: {
+  readonly job: CollectSourceJob;
+  readonly context: SourceCollectionContext;
+  readonly feedRawItemId: string;
+  readonly entries: readonly JsonApiEntry[];
+  readonly ids: IdGenerator;
+}): DiscoveredItemInput[] {
+  const discoveries: DiscoveredItemInput[] = [];
+  for (const entry of selectFeedEntries(input.entries)) {
+    // The identity comes from the adapter, which derived it from the payload.
+    // Without one there is no stable key, so the entry is dropped rather than
+    // being given a synthetic identity that would duplicate on every pass.
+    const stableEntryKey = createStableFeedEntryKey({
+      id: entry.externalEntryId,
+      validatedUrl: null,
+    });
+    if (stableEntryKey === null) continue;
+    discoveries.push({
+      id: input.ids.generate(),
+      projectId: input.job.payload.projectId,
+      sourceId: input.job.payload.sourceId,
+      feedRawItemId: input.feedRawItemId,
+      stableEntryKey,
+      version: 1,
+      supersedesDiscoveredItemId: null,
+      entryUrl: null,
+      title: entry.title,
+      summary: entry.summary,
+      author: null,
+      externalEntryId: entry.externalEntryId,
+      publishedAt: entry.publishedAt,
+      updatedAt: null,
+      // A JSON entry has no fetchable page of its own, so it is never eligible
+      // for a body fetch. The raw JSON body is the source of the quote.
+      isAuthorityDomain: false,
+      disposition: 'discovered_only',
+      articleCollectionAttemptId: null,
+      articleRawItemId: null,
+    });
+  }
+  return discoveries;
+}
+
+/**
+ * Prefers the thrower's own bounded reason over the outcome's generic text.
+ *
+ * The outcome code stays coarse (the enum is a contract), but the operator
+ * diagnosing a newly registered JSON source needs to tell "no adapter is
+ * registered for this URL" apart from "the body is not JSON" — both of which are
+ * `unsupported_content_type` / `invalid_feed` respectively.
+ */
+function failureDetail(error: unknown, outcome: EndpointFailureOutcome): string {
+  if (typeof error === 'object' && error !== null && 'detail' in error) {
+    const detail = (error as { readonly detail?: unknown }).detail;
+    if (typeof detail === 'string' && detail.length > 0 && detail.length <= 500) {
+      return detail;
+    }
+  }
+  return FAILURE_DETAILS[outcome];
+}
+
+function parseJsonBody(rawText: string): unknown {
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch {
+    throw Object.assign(new Error('Collection JSON body is not valid JSON.'), {
+      code: 'invalid_feed' as const,
+      detail: 'Collection JSON body is not valid JSON.',
+    });
+  }
 }
 
 function normalizeStableEntryUrl(value: string): ValidatedCollectionUrl | null {

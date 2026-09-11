@@ -130,6 +130,8 @@ export {
   collectSourceResultSchema,
   collectionContentKindSchema,
   collectionOutcomeSchema,
+  MAX_COLLECTION_BODY_FETCHES,
+  MAX_COLLECTION_DISCOVERIES,
 } from './collection/source-collection.js';
 export type {
   CollectSourceJob,

@@ -442,7 +442,7 @@ describe('collect source', () => {
 
     const result = await fixture.collect(validJob);
 
-    expect(result).toMatchObject({ discoveredCount: 99, bodyFetchCount: 20 });
+    expect(result).toMatchObject({ discoveredCount: 99, bodyFetchCount: 35 });
     const discoveries = fixture.repository.feedCommits[0]?.discoveries ?? [];
     expect(discoveries).toHaveLength(99);
     expect(discoveries.slice(0, 5).map(({ stableEntryKey }) => stableEntryKey)).toEqual([
@@ -458,14 +458,14 @@ describe('collect source', () => {
       'discovered_only',
       'discovered_only',
     ]);
-    expect(discoveries.filter(({ disposition }) => disposition === 'eligible')).toHaveLength(20);
+    expect(discoveries.filter(({ disposition }) => disposition === 'eligible')).toHaveLength(35);
     expect(
       discoveries.filter(({ disposition }) => disposition === 'body_fetch_budget_exhausted'),
-    ).toHaveLength(77);
+    ).toHaveLength(62);
     expect(fixture.http.requests.slice(1).map(({ url }) => url)).toEqual([
       'https://official.example/id-first-url',
       'https://news.official.example/url-fallback',
-      ...Array.from({ length: 18 }, (_, index) => `https://official.example/${index + 6}`),
+      ...Array.from({ length: 33 }, (_, index) => `https://official.example/${index + 6}`),
     ]);
     expect(fixture.http.requests.some(({ url }) => url.includes('external.example'))).toBe(false);
     expect(fixture.http.requests.some(({ url }) => url.includes('attacker.test'))).toBe(false);
@@ -950,3 +950,128 @@ function priorResult(): StrictResult {
     bodyFetchCount: 0,
   };
 }
+
+const DEFILLAMA_ETHEREUM_URL = 'https://api.llama.fi/v2/historicalChainTvl/ethereum';
+
+const CHAIN_TVL_SERIES = [
+  { date: 1_784_000_000, tvl: 48_000_000_000 },
+  { date: 1_789_084_800, tvl: 49_287_487_551 },
+];
+
+function jsonFixture(canonicalUrl: string = DEFILLAMA_ETHEREUM_URL) {
+  const fixture = createFixture();
+  fixture.repository.context = {
+    projectId: PROJECT_ID,
+    sourceId: SOURCE_ID,
+    canonicalUrl,
+    authorityDomains: ['api.llama.fi'],
+  };
+  return fixture;
+}
+
+function jsonResponse(canonicalUrl: string, payload: unknown): SafeHttpResponse {
+  const bytes = new TextEncoder().encode(JSON.stringify(payload));
+  return httpResponse({
+    requestedUrl: canonicalUrl,
+    finalUrl: canonicalUrl,
+    mediaTypeHeader: 'application/json',
+    body: bytes,
+    decompressedBytes: bytes.byteLength,
+  });
+}
+
+describe('collect source — JSON API sources', () => {
+  it('stores the JSON body and its adapter entries without fetching any article', async () => {
+    const fixture = jsonFixture();
+    fixture.http.response = jsonResponse(DEFILLAMA_ETHEREUM_URL, CHAIN_TVL_SERIES);
+
+    const result = await fixture.collect(validJob);
+
+    expect(result).toMatchObject({
+      outcome: 'stored_new_content',
+      discoveredCount: 1,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits[0]?.rawItem).toMatchObject({
+      contentKind: 'json_api',
+      mediaType: 'application/json',
+    });
+    const discoveries = fixture.repository.feedCommits[0]?.discoveries ?? [];
+    expect(discoveries).toHaveLength(1);
+    expect(discoveries[0]).toMatchObject({
+      stableEntryKey: 'id:defillama:chain-tvl:ethereum',
+      disposition: 'discovered_only',
+      entryUrl: null,
+      isAuthorityDomain: false,
+      articleRawItemId: null,
+      publishedAt: '2026-09-11T00:00:00.000Z',
+    });
+    expect(discoveries[0]?.summary).toContain('49,287,487,551 USD');
+    // Exactly one request — the API itself. An entry is never fetched.
+    expect(fixture.http.requests).toHaveLength(1);
+    expect(fixture.repository.articleCommits).toEqual([]);
+  });
+
+  it('rejects a JSON source that has no registered adapter', async () => {
+    const fixture = jsonFixture('https://api.llama.fi/v2/chains');
+    fixture.http.response = jsonResponse('https://api.llama.fi/v2/chains', [
+      { gecko_id: 'ethereum', tvl: 49_379_808_950 },
+    ]);
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'unsupported_content_type',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits).toEqual([]);
+    expect(fixture.repository.commits[0]?.attempt).toMatchObject({
+      outcome: 'unsupported_content_type',
+      errorCode: 'unsupported_content_type',
+      errorDetail: 'Collection JSON source has no registered adapter.',
+    });
+    expect(fixture.http.requests).toHaveLength(1);
+  });
+
+  it('records a body that is not JSON as invalid_feed without discoveries', async () => {
+    const fixture = jsonFixture();
+    const bytes = new TextEncoder().encode('<rss version="2.0"><channel></channel></rss>');
+    fixture.http.response = httpResponse({
+      requestedUrl: DEFILLAMA_ETHEREUM_URL,
+      finalUrl: DEFILLAMA_ETHEREUM_URL,
+      mediaTypeHeader: 'application/json',
+      body: bytes,
+      decompressedBytes: bytes.byteLength,
+    });
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'invalid_feed',
+      rawItemId: null,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits).toEqual([]);
+    expect(fixture.repository.commits[0]?.attempt.errorDetail).toBe(
+      'Collection JSON body is not valid JSON.',
+    );
+  });
+
+  it('does not re-derive entries from unchanged JSON content', async () => {
+    const fixture = jsonFixture();
+    fixture.http.response = jsonResponse(DEFILLAMA_ETHEREUM_URL, CHAIN_TVL_SERIES);
+    fixture.repository.latest = latestRawItem({
+      logicalUrl: DEFILLAMA_ETHEREUM_URL,
+      finalUrl: DEFILLAMA_ETHEREUM_URL,
+      sha256: HTML_SHA256,
+    });
+
+    await expect(fixture.collect(validJob)).resolves.toMatchObject({
+      outcome: 'unchanged_content',
+      rawItemId: PREVIOUS_RAW_ITEM_ID,
+      discoveredCount: 0,
+      bodyFetchCount: 0,
+    });
+    expect(fixture.repository.feedCommits).toEqual([]);
+    expect(fixture.http.requests).toHaveLength(1);
+  });
+});

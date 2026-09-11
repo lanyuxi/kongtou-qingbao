@@ -96,7 +96,7 @@ const MAX_LOCATION_LENGTH = 4_096;
 const MAX_MEDIA_TYPE_HEADER_LENGTH = 1_024;
 const MAX_CONTENT_ENCODING_LENGTH = 32;
 const ACCEPT_HEADER =
-  'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html';
+  'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html, application/json';
 const USER_AGENT = 'AirdropIntelligenceOS-Collector/1.0';
 
 const productionRequestFactory: HttpsRequestFactory = (options, onResponse) =>
