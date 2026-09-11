@@ -510,3 +510,28 @@ export type {
 } from './tutorials/projections.js';
 export { tutorialOutboxEventV1Schema } from './tutorials/events.js';
 export type { TutorialOutboxEventV1 } from './tutorials/events.js';
+
+export {
+  curatedSignalCommandV1Schema,
+  curatedSignalTargetProjectSchema,
+  prepareSourceCommandV1Schema,
+  type CuratedSignalCommandV1,
+  type CuratedSignalTargetProject,
+  type PrepareSourceCommandV1,
+} from './curation/commands.js';
+export {
+  curatedSignalErrorCodeSchema,
+  curatedSignalOutcomeSchema,
+  curatedSignalVerificationSchema,
+  participableSignalTypeSchema,
+  type CuratedSignalErrorCode,
+  type CuratedSignalOutcome,
+  type CuratedSignalVerification,
+  type ParticipableSignalType,
+} from './curation/enums.js';
+export {
+  curatedSignalReceiptV1Schema,
+  preparedSourceV1Schema,
+  type CuratedSignalReceiptV1,
+  type PreparedSourceV1,
+} from './curation/receipts.js';

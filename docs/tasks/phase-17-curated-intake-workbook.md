@@ -8,7 +8,7 @@
 
 | Task | Status | Scope | Evidence / 备注 |
 | --- | --- | --- | --- |
-| 1 | BLOCKED | contracts：命令与回执契约 | 待确认后开工。`curatedSignalCommandSchema` / `curatedSignalReceiptSchema` / 六类可参与信号类型 / CU2xx 错误码。 |
+| 1 | DONE | contracts：命令与回执契约 | 新增 `packages/contracts/src/curation/{commands,enums,receipts,*.test}.ts` 与 `index.ts` 导出。`curatedSignalCommandV1Schema`（项目 existing\|new、sourceId/rawItemId、六类可参与信号、quote 10–500、verified\|corroborated 需 attestation、expectedVersion、idempotencyKey）；`prepareSourceCommandV1Schema`（canonical https URL + 项目 existing\|new，无 IP 字面量、无默认端口外的显式端口、无凭据）；`preparedSourceV1Schema` / `curatedSignalReceiptV1Schema` 含 idempotency-replayed 字段。错误码 `CU2xx`（CU201..CU210）。**GREEN**：contracts 全量 **332/332**（原 299 + 新 33）。**变异校验**：`corroborated-requires-attestation` 守卫被改成 `() => true` → "rejects corroborated when the attestation is empty" 用例精确 kill（已还原）。 |
 | 2 | BLOCKED | domain：引文定位与核验策略 | `deterministic_exact_quote_v1` 的纯函数实现必须与 SQL `evidence_quote_sha256_v1` 产出一致（双向锁定）；`verified` / `corroborated` / 拒绝 三态判定。 |
 | 3 | BLOCKED | 迁移 + pgTAP + 生成类型 | `curated_signal_commands` + 幂等唯一键 + 受保护命令函数 + **先 revoke 再 grant** + RLS；新增 pgTAP `024`。 |
 | 4 | BLOCKED | database：仓储与命令边界 | 受保护函数的 TypeScript 封装、参数化模板、错误码映射。 |
