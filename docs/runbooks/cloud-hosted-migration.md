@@ -66,7 +66,27 @@ psql "<SUPABASE_DB_URL>" -c "select count(*) from supabase_migrations.schema_mig
 psql "<SUPABASE_DB_URL>" -c "select version from supabase_migrations.schema_migrations order by version desc limit 3;"
 ```
 
-预期 33 条（含 Phase 9 的 30/31 与 Phase 10 的 32/33）。
+预期 33 条（含 Phase 9 的 30/31 与 Phase 10 的 32/33）。**当前实际已应用 42 条**；Phase 16 的
+`20260911000100_phase_16_collection_body_fetch_budget` 与
+`20260911000200_phase_16_json_api_collection` **尚未应用**，应用后应为 44 条。
+
+### 逐条应用的可用方法（本机无 `psql`、无 Supabase CLI 时）
+
+`db push` 与 `psql` 在本机都走不通（没有 CLI、没有 `psql`）。实际可用的是在
+`packages/database` 下用仓库自带的 `postgres` 驱动写一个临时脚本，逐文件应用：
+
+- **凭据只从环境变量读**（`SUPABASE_DB_PASSWORD`），绝不写进脚本或命令行，也绝不回显；
+- 连接串 `postgresql://postgres.<ref>:<password>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres`
+  —— 区域必须是 `ap-northeast-2`；直连主机 `db.<ref>.supabase.co` 只有 IPv6 记录，本机不可用；
+- 每个文件先 `set statement_timeout = 0`，再 `sql.unsafe(content)`；
+- **先回滚空跑**：在同一事务内执行完再 `rollback`，确认无语法/约束错误，然后才真实应用；
+- 成功后把**完整文件名**登记进 `supabase_migrations.schema_migrations`
+  （`version` 写完整文件名如 `20260911000100_phase_16_collection_body_fetch_budget`，
+  **不是**裸时间戳；`statements='{}'`，与既有惯例一致）；
+- **用完立即删除临时脚本**（`.gitignore` 已覆盖 `.tmp-*` / `*.tmp.*`）。
+
+`alter type ... add value` 的注意点：PG 12+ 允许在事务内执行，但新值在该事务提交前不可用。
+Phase 16 的迁移 44 只新增该值、不在同一文件里使用它，所以可以安全应用。
 
 ## 4. 步骤二：导入现有数据（能拿到备份时）
 
