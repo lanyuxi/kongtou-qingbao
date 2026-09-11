@@ -1045,6 +1045,136 @@ Deploying the web application remains a separate, outstanding item — productio
 serves only the static site, so an applied migration alone does not put `/tasks`
 or `/watchlists` in front of users.
 
+## JSON API collection (Phase 16)
+
+The collector understands one more content shape: a structured JSON API response.
+It exists because Feed sources ran out — every publicly reachable airdrop RSS
+feed is already registered, and the remaining backlog carries no opportunities —
+so the next way to widen the intake is a different data shape, not another feed.
+
+A JSON source is collected exactly like a Feed: the raw body is stored verbatim
+in `raw_items` (`content_kind = 'json_api'`) as the evidence base, and the entries
+an adapter derives from it become `discovered_items`. Because a JSON entry has no
+article body of its own, every one of them is `discovered_only` — the collector
+never fetches a URL for a JSON entry, so one source costs exactly one request per
+pass. Downstream nothing changes: extraction reads the discovery summary, and
+publication writes evidence with `source_field = 'discovered_summary'` against
+`discovered_items.feed_raw_item_id`.
+
+### Adapters are an allowlist, and they fail closed
+
+`selectJsonApiAdapter(canonicalUrl)` in `packages/domain/src/collection/json-api-adapter.ts`
+maps a source's **configured** URL to a pure parsing function. An unregistered
+JSON source is rejected with `unsupported_content_type`; it is never interpreted
+on a guess. Adding a JSON source is therefore a code change plus a deployment —
+deliberate, because every API has its own field names and an unknown payload must
+never be mapped onto a project fact.
+
+Registered today:
+
+| Adapter id | Source URL | Entry |
+|---|---|---|
+| `defillama-chain-tvl:<chain>` | `https://api.llama.fi/v2/historicalChainTvl/<chain>` | Latest chain TVL, quoted in the summary |
+
+One source **per chain**, not one global `/v2/chains` source. The chain lives in
+the URL, so the adapter needs no project context and the collector's
+per-(project, source) model is preserved without widening
+`load_source_collection_context()`.
+
+### The body-fetch budget is one number in three places
+
+`MAX_COLLECTION_BODY_FETCHES` in `packages/contracts/src/collection/source-collection.ts`
+is the single source of truth. It bounds the collector's own `MAX_ARTICLE_FETCHES`
+(which imports it), the result schema's `bodyFetchCount`, and — through
+`collection_attempts_body_fetch_count_valid` — the database. Keep them equal.
+
+This is not bookkeeping. When the collector's budget was raised to 35 and the
+other two stayed at 20, any feed publishing more than 20 new entries in one cycle
+produced a result that failed strict parsing and a row the constraint rejected, so
+`commitFeed` rolled back and the entire batch was lost with the attempt recorded
+as `persistence_failed`.
+
+### Registering a JSON source
+
+There is no source-registration UI; sources are inserted directly. `sources.canonical_url`
+is unique, so each chain gets its own row.
+
+```sql
+-- 1. The source itself. `collectable` is the operational gate; it is separate
+--    from project_sources.is_official, which is an authority judgement.
+insert into public.sources (source_type, name, canonical_url, status, collectable)
+values
+  ('chain_explorer', 'DeFiLlama — Ethereum chain TVL',
+   'https://api.llama.fi/v2/historicalChainTvl/ethereum', 'active', true)
+on conflict (canonical_url) do nothing;
+
+-- 2. The (project, source) pairing. authority_domains is the collector's
+--    allowlist, and verified_at/verified_by are NOT relaxed: a human vouched
+--    for this pairing. This is what is_source_collection_eligible() checks.
+insert into public.project_sources (
+  project_id, source_id, authority_domains, is_official, verified_at, verified_by
+)
+select project.id, source.id, array['api.llama.fi'], false, now(), profile.id
+from public.projects as project
+join public.sources as source
+  on source.canonical_url = 'https://api.llama.fi/v2/historicalChainTvl/ethereum'
+cross join lateral (
+  select id from public.profiles order by created_at limit 1
+) as profile
+where project.slug = 'ethereum'
+on conflict (project_id, source_id) do nothing;
+
+-- 3. A schedule. Automatic schedule creation still only covers a project's own
+--    official channels, so a curated source is enrolled explicitly.
+insert into public.source_collection_schedules (project_id, source_id, interval_seconds, enabled)
+select project_source.project_id, project_source.source_id, 43200, true
+from public.project_sources as project_source
+join public.sources as source on source.id = project_source.source_id
+where source.canonical_url = 'https://api.llama.fi/v2/historicalChainTvl/ethereum'
+on conflict (project_id, source_id) do nothing;
+```
+
+Adjust the `slug` and the chain in the URL per project. Verify the enrolment with
+`select public.is_source_collection_eligible(project_id, source_id)` — it must be
+true before the scheduler will enqueue anything.
+
+### What the phase deliberately does not do
+
+`DeFiLlama /hacks` and `/protocols` are **not** registered. Hacks are a security
+signal and belong in the Phase 7A security ledger, not the generic extraction
+pipeline; protocols need a reliable name-to-project match that does not exist yet.
+DeFiLlama also has no airdrop listing endpoint (`/airdrops` and friends are 404),
+so chain TVL is ecosystem context and freshness, not a source of new opportunities.
+
+### Focused tests
+
+```bash
+pnpm --filter @airdrop/domain exec vitest run src/collection
+pnpm --filter @airdrop/contracts exec vitest run src/collection
+pnpm --filter @airdrop/worker exec vitest run src/collection/tests/collect-source.test.ts
+```
+
+### Disposable acceptance commands
+
+Migrations 43 (`20260911000100_phase_16_collection_body_fetch_budget`) and 44
+(`20260911000200_phase_16_json_api_collection`) must be applied to the disposable
+stack before pgTAP can pass, then:
+
+```bash
+pnpm --filter @airdrop/database exec supabase test db   # includes 023
+```
+
+The JSON path's end-to-end behaviour is only proven against a real database: the
+in-memory suite covers parsing, fail-closed selection and zero article fetches,
+but not the `json_api` enum value, the widened check constraint, or the
+`discovered_summary` evidence path.
+
+### Rollout status and remaining gates
+
+Neither migration is applied to production, and no source is registered there.
+Applying them needs an explicit owner authorization, as does any source insert.
+The enum value is purely additive, so a code-only rollback leaves it inert.
+
 ## Shutdown
 
 Stop the web and worker processes with `Ctrl-C`. The worker treats SIGTERM and SIGINT as a bounded graceful stop: the scheduler stops scanning, the consumer finishes or fences its in-flight job, and every pool closes within 30 seconds. Then stop the local Supabase stack:
