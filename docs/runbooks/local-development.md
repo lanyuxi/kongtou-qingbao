@@ -1177,23 +1177,46 @@ constraint reads `body_fetch_count between 0 and 35`. Verified with rolled-back
 transactional probes — `raw_items` accepts `json_api`, the budget accepts 35 and
 rejects 36 — with zero probe residue and an unchanged data baseline.
 
-`pgTAP` is **not installed** on the cloud project (only available, 1.3.3).
-Installing the extension is a schema change that needs its own authorization, so
-the suite has not been run there; the 023 assertions were covered by the probes
-above instead.
+**The three sources are registered and eligible** (owner-authorized): one per
+chain, 12-hour schedule, `enablement_origin = 'manual'`, `verified_by` set to the
+owner's real profile. `is_source_collection_eligible` returns true for all three.
 
-**Still outstanding, each needing its own explicit authorization:**
+**`pgtap` is installed** on the cloud project (owner-authorized), so the suite can
+be executed there. Read the result carefully: **the suite is written for a fresh
+disposable stack and cannot pass against live production.** `023` (this phase)
+passes 3/3 and `022` passes 73/73, but 12 files fail and 3 abort, all for
+pre-existing environmental reasons:
 
-1. **Registering the sources.** No JSON source exists yet; the SQL above has not
-   been run.
-2. **Pushing and deploying.** The commits are local only.
-3. **End-to-end check.** A real collection pass against DeFiLlama (content kind,
-   zero article fetches, and the `discovered_summary` evidence path) can only be
-   observed after a source is registered and the cron runs.
+- the four worker roles are `rolcanlogin = true` (Phase 12, so they can reach the
+  pooler) while remaining least-privilege — `rolsuper`, `rolbypassrls`,
+  `rolcreatedb`, `rolcreaterole` are all false — so 008's "non-login" assertion
+  fails while its security intent holds;
+- Phase 14 deliberately granted EXECUTE schema-wide to `ai_stage_worker`, so the
+  "executable only by X" assertions in 010, 011 and 021 fail;
+- production holds real data, not the seed fixtures, so 006, 007 and 012 fail;
+- 009, 019 and 020 use psql meta-commands that cannot travel over the wire
+  protocol, and some heavier files hit the cloud statement timeout.
+
+Do not "fix" these by narrowing production grants or reverting the login flag:
+both were deliberate deployment decisions, and doing so would break the worker.
+
+**Still outstanding:**
+
+1. **Deploying the web app.** This machine has no Vercel credential, so the
+   deployed build is still the 2026-09-03 one — and its
+   `parseCollectionMediaType` rejects `application/json`. Until it is rebuilt and
+   redeployed, the registered JSON sources will fail gracefully with
+   `unsupported_content_type` on every pass (no bad rows, but no data either).
+2. **End-to-end confirmation.** After the redeploy, one collection pass should
+   show `content_kind = 'json_api'`, `disposition = 'discovered_only'`, zero
+   article fetches, and evidence via `discovered_summary`.
 
 The enum value is purely additive, so a code-only rollback leaves it inert. To
 undo migration 43, drop `collection_attempts_body_fetch_count_valid` and recreate
-it as `check (body_fetch_count between 0 and 20)`.
+it as `check (body_fetch_count between 0 and 20)`. To undo the registrations,
+delete the three `source_collection_schedules`, then the three
+`project_sources`, then the three `sources` (in that order — the foreign keys
+are `ON DELETE RESTRICT`).
 
 ## Shutdown
 
