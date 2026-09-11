@@ -1171,9 +1171,29 @@ but not the `json_api` enum value, the widened check constraint, or the
 
 ### Rollout status and remaining gates
 
-Neither migration is applied to production, and no source is registered there.
-Applying them needs an explicit owner authorization, as does any source insert.
-The enum value is purely additive, so a code-only rollback leaves it inert.
+**Both migrations are applied to the cloud database** (44 migrations; 2026-09-11,
+owner-authorized): `collection_content_kind` now carries `json_api` and the
+constraint reads `body_fetch_count between 0 and 35`. Verified with rolled-back
+transactional probes — `raw_items` accepts `json_api`, the budget accepts 35 and
+rejects 36 — with zero probe residue and an unchanged data baseline.
+
+`pgTAP` is **not installed** on the cloud project (only available, 1.3.3).
+Installing the extension is a schema change that needs its own authorization, so
+the suite has not been run there; the 023 assertions were covered by the probes
+above instead.
+
+**Still outstanding, each needing its own explicit authorization:**
+
+1. **Registering the sources.** No JSON source exists yet; the SQL above has not
+   been run.
+2. **Pushing and deploying.** The commits are local only.
+3. **End-to-end check.** A real collection pass against DeFiLlama (content kind,
+   zero article fetches, and the `discovered_summary` evidence path) can only be
+   observed after a source is registered and the cron runs.
+
+The enum value is purely additive, so a code-only rollback leaves it inert. To
+undo migration 43, drop `collection_attempts_body_fetch_count_valid` and recreate
+it as `check (body_fetch_count between 0 and 20)`.
 
 ## Shutdown
 
